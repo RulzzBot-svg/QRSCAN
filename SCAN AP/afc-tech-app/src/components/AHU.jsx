@@ -1,31 +1,20 @@
-import { hospitals } from "../data/hospitals"
-import { useNavigate } from "react-router-dom"
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
-export default function HospitalList() {
-  const navigate = useNavigate()
 
-  return (
-    <div className="min-h-screen bg-base-200 p-4 max-w-md mx-auto">
-      <h1 className="text-xl font-semibold mb-4">Select Hospital</h1>
+function AHU() {
+    const navigate = useNavigate();
+    return (
 
-      <div className="grid gap-4">
-        {hospitals.map((hosp) => (
-          <div
-            key={hosp.id}
-            className="card bg-base-100 shadow-sm border border-base-300"
-          >
-            <div className="card-body p-4">
-              <h2 className="card-title text-base mb-2">{hosp.name}</h2>
-              <button
-                className="btn btn-primary btn-sm w-full"
-                onClick={() => navigate(`/hospital/${hosp.id}/ahus`)}
-              >
-                View AHUs →
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+        <div class="bg-neutral-primary-soft block max-w-sm p-6 border border-default rounded-base shadow-xs">
+            <h5 class="mb-3 text-2xl font-semibold tracking-tight text-heading leading-8">AHU</h5>
+            <p class="text-body mb-6">Here are the biggest technology acquisitions of 2025 so far, in reverse chronological order.</p>
+            <button className="btn btn-outline w-full"  onClick={()=>navigate("/FilterInfo")}>Load filter information</button>
+            <button className="btn btn-outline w-full"  onClick={()=>navigate("/hospitals")}>Back</button>
+
+        </div>
+
+    );
 }
+
+export default AHU;
