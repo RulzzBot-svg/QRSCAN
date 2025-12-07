@@ -1,20 +1,111 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function HospitalCards() {
-    const navigate = useNavigate();
-    return (
+  const navigate = useNavigate();
 
+  // Temporary hardcoded full list (simulate big data)
+  const hospitals = [
+    { id: 1, name: "Kaiser Permanente Baldwin Park", ahus: 22 },
+    { id: 2, name: "Cedars-Sinai Medical Center", ahus: 34 },
+    { id: 3, name: "California Hospital Medical Center", ahus: 18 },
+    { id: 4, name: "St. Francis Medical Center", ahus: 12 },
+    { id: 5, name: "Methodist Hospital Arcadia", ahus: 16 },
+    { id: 6, name: "Huntington Hospital Pasadena", ahus: 28 },
+    { id: 7, name: "Pomona Valley Hospital", ahus: 21 },
+  ];
 
-        <div class="bg-neutral-primary-soft block max-w-sm p-6 border border-default rounded-base shadow-xs">
-            <h5 class="mb-3 text-2xl font-semibold tracking-tight text-heading leading-8">HOSPITALS</h5>
-            <p class="text-body mb-6">Here are the biggest technology acquisitions of 2025 so far, in reverse chronological order.</p>
-            <button className="btn btn-outline w-full"  onClick={()=>navigate("/AHU")}>Load AHUs</button>
-            <button className="btn btn-outline w-full"  onClick={()=>navigate("/")}>Back</button>
+  // Pagination: how many hospitals to show at once
+  const [visible, setVisible] = useState(4);
 
+  // Search bar state
+  const [search, setSearch] = useState("");
+
+  // Filtered list based on search
+  const filtered = hospitals.filter((h) =>
+    h.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div data-theme="corporate" className="min-h-screen bg-base-200 p-4">
+      {/* Header */}
+      <h1 className="text-3xl font-bold mb-2 text-primary">Hospitals</h1>
+
+      {/* Search Bar */}
+
+      <div className="form-control  mb-4 relative">
+        <input
+        type="text"
+        placeholder="Search hospital..."
+        className="input input-bordered w-full pr-10"
+        value={search}
+        onChange={(e)=>setSearch(e.target.value)}
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 pointer-events-none">🔍</span> 
+
+      </div>
+
+      {/* Divider */}
+      <div className="divider my-2">Hospital List</div>
+
+      {/* Grid of Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {filtered.slice(0, visible).map((hospital) => (
+          <div
+            key={hospital.id}
+            className="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:bg-base-100 transition-all cursor-pointer"
+          >
+            <div className="card-body p-5">
+
+              <h2 className="card-title text-lg text-primary">
+                {hospital.name}
+              </h2>
+
+              {/* STAT COMPONENT */}
+              <div className="stats shadow w-full mb-3 mt-1">
+                <div className="stat">
+                  <div className="stat-title text-xs">AHUs</div>
+                  <div className="stat-value text-primary text-xl">
+                    {hospital.ahus}
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="divider my-1"></div>
+
+              {/* Buttons */}
+              <button
+                className="btn btn-primary btn-sm w-full mb-2 "
+                onClick={() => navigate(`/AHU/${hospital.id}`)}
+              >
+                Load AHUs
+              </button>
+
+              <button
+                className="btn btn-ghost btn-sm w-full bg-[#E0DEDE] hover:bg-[#B5B5B5]"
+                onClick={() => navigate("/")}
+              >
+                ⬅ Back
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Show More Button */}
+      {visible < filtered.length && (
+        <div className="mt-6 flex justify-center">
+          <button
+            className="btn btn-outline btn-primary w-full max-w-xs"
+            onClick={() => setVisible(visible + 4)}
+          >
+            Show More
+          </button>
         </div>
-
-    );
+      )}
+    </div>
+  );
 }
 
 export default HospitalCards;

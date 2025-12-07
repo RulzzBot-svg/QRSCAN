@@ -1,19 +1,8 @@
 @import "tailwindcss";
-@plugin "daisyui";
-
-/* Optional: set a default theme for the app (Material/Business style) */
-:root {
-  color-scheme: light;
+@plugin "daisyui" {
+  themes: "all";
 }
 
-/* Body reset for mobile app feel */
 body {
   @apply bg-base-200 text-base-content;
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-/* Root div should take full height */
-#root {
-  min-height: 100vh;
 }

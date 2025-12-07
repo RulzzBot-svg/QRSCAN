@@ -1,15 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-function App() {
-  const navigate = useNavigate(); // navigation hook
+export default function App() {
+  const navigate = useNavigate();
 
   return (
-    <div
-      data-theme="business"
-      className="min-h-screen flex flex-col bg-base-200"
-    >
-      {/* Top App Bar */}
+    <div data-theme="corporate" className="min-h-screen flex flex-col bg-base-200">
+      {/* Header */}
       <header className="navbar bg-base-100 shadow-sm px-4">
         <div className="flex-1">
           <span className="font-bold text-lg tracking-tight">
@@ -22,27 +19,32 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col gap-4 px-4 pt-4 pb-6 max-w-md mx-auto w-full">
+      <main className="flex-1 px-4 pt-4 pb-10 max-w-md mx-auto w-full space-y-5">
+        
         {/* Greeting */}
         <section>
-          <h1 className="text-2xl font-semibold mb-1">
-            Hi [TechName], lets get to work!
+          <h1 className="text-2xl font-semibold">
+            Hi [TechName], let's get to work!
           </h1>
+          <p className="text-sm text-base-content/70 mt-1">
+            Choose how you want to start today’s job.
+          </p>
         </section>
 
         {/* Quick Actions */}
-        <section className="grid gap-4 mt-2">
-          {/* Fast Scan Mode */}
-          <div className="card bg-base-100 shadow-md border border-base-300">
+        <section className="space-y-4">
+
+          {/* Scan Mode */}
+          <div className="card bg-base-100 border border-base-300 shadow-sm">
             <div className="card-body p-4">
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <h2 className="card-title text-base">Scan QR to Start</h2>
                 <span className="badge badge-success text-xs">Recommended</span>
               </div>
 
-              <p className="text-sm text-base-content/70 mb-3">
-                Open the camera, scan the AHU QR label, and we&apos;ll load all
-                unit info automatically. Use this when the QR sticker is present.
+              <p className="text-sm text-base-content/70 mb-3 leading-snug">
+                Scan the AHU's QR label to instantly load filter info,
+                last service date, and required steps.
               </p>
 
               <button className="btn btn-primary w-full">
@@ -52,18 +54,18 @@ function App() {
           </div>
 
           {/* Manual Mode */}
-          <div className="card bg-base-100 shadow-sm border border-base-300">
+          <div className="card bg-base-100 border border-base-300 shadow-sm">
             <div className="card-body p-4">
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <h2 className="card-title text-base">
                   Manual Mode – Select Hospital
                 </h2>
                 <span className="badge badge-ghost text-xs">Fallback</span>
               </div>
 
-              <p className="text-sm text-base-content/70 mb-3">
-                If the QR label is missing or the camera isn't loading, pick the hospital,
-                then AHU, and we'll take you to a checklist from there.
+              <p className="text-sm text-base-content/70 mb-3 leading-snug">
+                If the QR label is missing or the camera has issues, browse
+                hospitals manually and pick the AHU.
               </p>
 
               <button
@@ -76,21 +78,19 @@ function App() {
           </div>
         </section>
 
-        {/* Mini Status / Info */}
-        <section className="mt-2 space-y-2">
-          <div className="flex items-center justify-between text-xs text-base-content/60">
-            <span>Today&apos;s jobs</span>
+        {/* Status Section */}
+        <section className="space-y-1 pt-4">
+          <div className="flex justify-between text-xs text-base-content/60">
+            <span>Today's jobs</span>
             <span className="font-semibold">—</span>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-base-content/60">
+          <div className="flex justify-between text-xs text-base-content/60">
             <span>Last sync</span>
-            <span className="font-semibold">Online</span>
+            <span className="font-semibold text-success">Online</span>
           </div>
         </section>
       </main>
     </div>
   );
 }
-
-export default App;
