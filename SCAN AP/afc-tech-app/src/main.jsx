@@ -7,6 +7,7 @@ import HospitalCards from "./components/HospitalCards";
 import AHU from "./components/AHU";
 import FilterInfo from "./components/FilterInfo";
 import AHUPage from "./components/AHUPage";
+import jobCompleted from "./components/job-completed";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -18,6 +19,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/AHU" element={<AHU />} />
         <Route path="/AHU/:hospitalId" element={<AHUPage/>}/>
         <Route path="FilterInfo/:ahuId" element={<FilterInfo/>}/>
+        <Route path="/job-completed" element={<jobCompleted/>}/>
+
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
