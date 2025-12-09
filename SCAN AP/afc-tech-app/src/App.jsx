@@ -47,7 +47,7 @@ export default function App() {
                 last service date, and required steps.
               </p>
 
-              <button className="btn btn-primary w-full">
+              <button className="btn btn-primary w-full" onClick={()=>navigate("/scan")}>
                 📷 Scan QR Code
               </button>
             </div>
