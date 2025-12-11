@@ -1,6 +1,8 @@
 from flask import Flask
 from db import db
 from flask_cors import CORS
+from routes.hospital_routes import hospital_bp
+from routes.ahu_routes import ahu_bp
 
 
 def create_app():
@@ -9,7 +11,7 @@ def create_app():
     # -----------------------------
     # DATABASE CONFIG
     # -----------------------------
-    app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://postgres:pass123@localhost/afc_tech"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://postgres:pass123@localhost:5432/AFCQRSCAN"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # Allow React frontend to communicate with Flask
@@ -26,10 +28,10 @@ def create_app():
     # from routes.tech_routes import tech_bp
     # from routes.hospital_routes import hospital_bp
     #
-    # app.register_blueprint(ahu_bp, url_prefix="/api")
+    app.register_blueprint(ahu_bp, url_prefix="/api")
     # app.register_blueprint(job_bp, url_prefix="/api")
     # app.register_blueprint(tech_bp, url_prefix="/api")
-    # app.register_blueprint(hospital_bp, url_prefix="/api")
+    app.register_blueprint(hospital_bp, url_prefix="/api")
 
     # Simple root endpoint
     @app.route("/")
@@ -41,4 +43,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True)
+    app.run(debug=True, host="192.168.1.131", port=5000)
+

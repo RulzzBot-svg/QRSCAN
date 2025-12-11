@@ -1,10 +1,13 @@
 from datetime import datetime
-from sqlalchemy import (Column, String, Integer, Text, Float, Date, DateTime, Boolean, ForeignKey)
+from sqlalchemy import (
+    Column, String, Integer, Text, Float, Date, DateTime, Boolean, ForeignKey
+)
 from sqlalchemy.orm import relationship
 from db import db
 
-#Create Hospital
-
+# -------------------------
+# HOSPITAL
+# -------------------------
 class Hospital(db.Model):
     __tablename__ = "hospitals"
 
@@ -16,28 +19,34 @@ class Hospital(db.Model):
 
     ahus = relationship("AHU", back_populates="hospital", cascade="all, delete-orphan")
 
-#Create AHU
 
+# -------------------------
+# AHU
+# -------------------------
 class AHU(db.Model):
     __tablename__ = "ahus"
-    id = Column(String(100), primary_key=True) #QR CODE = ID
+
+    id = Column(String(100), primary_key=True)  # QR CODE = ID
     hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
 
-    name=Column(String(150), nullabl=False)
+    name = Column(String(150), nullable=False)
     location = Column(String(200))
     frequency_days = Column(Integer)
     last_service_date = Column(Date)
     notes = Column(Text)
 
     hospital = relationship("Hospital", back_populates="ahus")
-    filters = relationship("Filter", back_populates="ahus", cascade="all, delete-orphan")
+    filters = relationship("Filter", back_populates="ahu", cascade="all, delete-orphan")
     jobs = relationship("Job", back_populates="ahu", cascade="all, delete-orphan")
 
-#Create Filter
 
+# -------------------------
+# FILTER
+# -------------------------
 class Filter(db.Model):
     __tablename__ = "filters"
-    id = Column(String(100), primary_key=True)
+
+    id = Column(Integer, primary_key=True)
     ahu_id = Column(String(100), ForeignKey("ahus.id"), nullable=False)
 
     phase = Column(String(50))
@@ -48,8 +57,24 @@ class Filter(db.Model):
     ahu = relationship("AHU", back_populates="filters")
     job_filters = relationship("JobFilter", back_populates="filter", cascade="all, delete-orphan")
 
-#JOB
 
+# -------------------------
+# TECHNICIAN
+# -------------------------
+class Technician(db.Model):
+    __tablename__ = "technicians"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(150), nullable=False)
+    pin = Column(String(20), nullable=False)
+    active = Column(Boolean, default=True)
+
+    jobs = relationship("Job", back_populates="technician", cascade="all, delete-orphan")
+
+
+# -------------------------
+# JOB
+# -------------------------
 class Job(db.Model):
     __tablename__ = "jobs"
 
@@ -57,7 +82,7 @@ class Job(db.Model):
     ahu_id = Column(String(100), ForeignKey("ahus.id"), nullable=False)
     tech_id = Column(Integer, ForeignKey("technicians.id"), nullable=False)
 
-    completed_at = Column(DateTime, default=datetime.now)
+    completed_at = Column(DateTime, default=datetime.utcnow)
     overall_notes = Column(Text)
     gps_lat = Column(Float)
     gps_long = Column(Float)
@@ -66,14 +91,16 @@ class Job(db.Model):
     technician = relationship("Technician", back_populates="jobs")
     job_filters = relationship("JobFilter", back_populates="job", cascade="all, delete-orphan")
 
-#job filters
 
+# -------------------------
+# JOB FILTERS
+# -------------------------
 class JobFilter(db.Model):
     __tablename__ = "job_filters"
 
     id = Column(Integer, primary_key=True)
     job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
-    filter_id = Column(Integer, ForeignKey("filters.id"), nullable= False)
+    filter_id = Column(Integer, ForeignKey("filters.id"), nullable=False)
 
     is_completed = Column(Boolean, default=False)
     note = Column(Text)
