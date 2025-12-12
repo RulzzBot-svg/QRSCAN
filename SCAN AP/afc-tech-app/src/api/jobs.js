@@ -1,4 +1,6 @@
-import { API } from "./api";
+import axios from "axios";
+const API = "http://192.168.1.131:5000/api";
 
-
-export const submitJob = (payload) => API.post("/jobs", payload);
+export function submitJob(data) {
+  return axios.post(`${API}/jobs`, data);
+}

@@ -23,6 +23,13 @@ function AHUPage() {
       (a.location || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  // Convert ISO to readable format (MM/DD/YYYY)
+  const formatDate = (iso) => {
+    if (!iso) return "TBD";
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US");
+  };
+
   // Status badge helper
   const statusBadge = (status) => {
     switch (status) {
@@ -81,7 +88,7 @@ function AHUPage() {
                 {ahu.status}
               </span>
 
-              {/* Extra status metadata (optional) */}
+              {/* Extra status metadata */}
               <div className="text-xs mt-2 text-base-content/60">
                 {ahu.status === "Overdue" && (
                   <p>Overdue by {ahu.days_overdue} days</p>
@@ -91,8 +98,8 @@ function AHUPage() {
                   <p>Due in {ahu.days_until_due} days</p>
                 )}
 
-                {ahu.status === "Completed" && ahu.days_until_due !== null && (
-                  <p>Next due in {ahu.days_until_due} days</p>
+                {ahu.status === "Completed" && ahu.next_due_date && (
+                  <p>Next changeout: {formatDate(ahu.next_due_date)}</p>
                 )}
 
                 {ahu.status === "Pending" && (
