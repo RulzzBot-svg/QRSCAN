@@ -11,7 +11,7 @@ def create_app():
     # -----------------------------
     # DATABASE CONFIG
     # -----------------------------
-    app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://postgres:pass123@localhost:5432/AFCQRSCAN"
+    app.config["SQLALCHEMY_DATABASE_URI"] = 'postgresql://neondb_owner:npg_Py3QvJn6dTgF@ep-odd-cell-afq855xw-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # Allow React frontend to communicate with Flask
@@ -43,5 +43,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True, host="192.168.1.131", port=5000)
+    app.run(debug=True, host="192.168.1.167")
 
