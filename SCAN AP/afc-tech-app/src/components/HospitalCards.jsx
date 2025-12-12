@@ -1,19 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getHospitals } from "../api/hospitals";
 
 function HospitalCards() {
   const navigate = useNavigate();
 
   // Temporary hardcoded full list (simulate big data)
-  const hospitals = [
-    { id: 1, name: "Kaiser Permanente Baldwin Park", ahus: 22 },
-    { id: 2, name: "Cedars-Sinai Medical Center", ahus: 34 },
-    { id: 3, name: "California Hospital Medical Center", ahus: 18 },
-    { id: 4, name: "St. Francis Medical Center", ahus: 12 },
-    { id: 5, name: "Methodist Hospital Arcadia", ahus: 16 },
-    { id: 6, name: "Huntington Hospital Pasadena", ahus: 28 },
-    { id: 7, name: "Pomona Valley Hospital", ahus: 21 },
-  ];
+  const [hospitals, setHospitals] = useState([]);
+
+  useEffect(()=>{
+    getHospitals().then((res)=>setHospitals(res.data)).catch((err)=>console.error("Error Loading", err));
+  }, []);
 
   // Pagination: how many hospitals to show at once
   const [visible, setVisible] = useState(4);

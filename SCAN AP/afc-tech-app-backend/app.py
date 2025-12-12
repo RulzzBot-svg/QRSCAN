@@ -3,6 +3,8 @@ from db import db
 from flask_cors import CORS
 from routes.hospital_routes import hospital_bp
 from routes.ahu_routes import ahu_bp
+from routes.tech_routes import tech_bp
+from routes.job_routes import job_bp
 
 
 def create_app():
@@ -20,17 +22,10 @@ def create_app():
     # Init SQLAlchemy
     db.init_app(app)
 
-    # -----------------------------
-    # Register Blueprints (Later)
-    # -----------------------------
-    # from routes.ahu_routes import ahu_bp
-    # from routes.job_routes import job_bp
-    # from routes.tech_routes import tech_bp
-    # from routes.hospital_routes import hospital_bp
-    #
+
     app.register_blueprint(ahu_bp, url_prefix="/api")
-    # app.register_blueprint(job_bp, url_prefix="/api")
-    # app.register_blueprint(tech_bp, url_prefix="/api")
+    app.register_blueprint(job_bp, url_prefix="/api")
+    app.register_blueprint(tech_bp, url_prefix="/api")
     app.register_blueprint(hospital_bp, url_prefix="/api")
 
     # Simple root endpoint
@@ -43,5 +38,7 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True, host="192.168.1.167")
+    #this runs for my home computer lol
+    #app.run(debug=True, host="192.168.1.167")
+    app.run(debug=True, host="192.168.1.131")
 

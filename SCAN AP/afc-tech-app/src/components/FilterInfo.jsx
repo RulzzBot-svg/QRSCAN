@@ -1,33 +1,37 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { getAHUbyQR } from "../api/ahu";
+import { submitJob } from "../api/jobs";
 
 function FilterInfo() {
   const navigate = useNavigate();
   const { ahuId } = useParams();
 
-  // --- Ref for modal trigger ---
+  // Modal ref
   const modalRef = useRef(null);
 
-  // Simulated AHU filter data
-  const filterData = {
-    "AHU-1A": [
-      { id: "row1", qty: 12, phase: "Pre", part: "zlp20242", size: "20x24x2" },
-      { id: "row2", qty: 4, phase: "Pre", part: "zlp12242", size: "12x24x2" },
-      { id: "row3", qty: 2, phase: "Final", part: "F8V4-2424-GWB", size: "24x24x12" },
-    ],
-    "AHU-1B": [
-      { id: "row1", qty: 6, phase: "Pre", part: "23LP-2020", size: "20x20x2" },
-      { id: "row2", qty: 6, phase: "Final", part: "HPA-2024", size: "20x24x12" },
-    ],
-    "AHU-201": [
-      { id: "row1", qty: 10, phase: "Pre", part: "KLP-2424", size: "24x24x2" },
-    ],
-  };
+  // AHU data
+  const [ahu, setAhu] = useState(null);
 
-  const filterRows = filterData[ahuId] || [];
+  // Filters from backend
+  const [filterRows, setFilterRows] = useState([]);
 
+  // Checkbox and notes state
   const [checked, setChecked] = useState({});
   const [notes, setNotes] = useState({});
+
+  // Load AHU data when page loads
+  useEffect(() => {
+    getAHUbyQR(ahuId)
+      .then((res) => {
+        setAhu(res.data);
+        setFilterRows(res.data.filters);
+      })
+      .catch(() => {
+        alert("AHU not found");
+        navigate("/hospitals");
+      });
+  }, [ahuId, navigate]);
 
   const handleCheckbox = (id) => {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -37,11 +41,44 @@ function FilterInfo() {
     setNotes((prev) => ({ ...prev, [id]: value }));
   };
 
-  // --- Trigger modal ---
+  // Open success modal
   const openModal = () => {
-    if (modalRef.current) {
-      modalRef.current.showModal();
+    if (modalRef.current) modalRef.current.showModal();
+  };
+
+  // -----------------------
+  // Submit Job to Backend
+  // -----------------------
+  const handleCompleteJob = () => {
+    if (!filterRows.length) {
+      alert("No filters found for this AHU.");
+      return;
     }
+
+    // TEMP TECH ID (later replaced with login system)
+    const techId = 1;
+
+    const payload = {
+      ahu_id: ahuId,
+      tech_id: techId,
+      overall_notes: "",
+      gps_lat: null,
+      gps_long: null,
+      filters: filterRows.map((row) => ({
+        filter_id: row.id, // MUST match backend Filter.id
+        is_completed: checked[row.id] || false,
+        note: notes[row.id] || "",
+      })),
+    };
+
+    submitJob(payload)
+      .then(() => {
+        openModal();
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Failed to submit job.");
+      });
   };
 
   return (
@@ -79,9 +116,9 @@ function FilterInfo() {
             <tbody>
               {filterRows.map((row) => (
                 <tr key={row.id} className="bg-base-100 border-b border-base-300 hover:bg-base-200">
-                  <td className="px-4 py-4 font-medium">{row.qty}</td>
+                  <td className="px-4 py-4 font-medium">{row.quantity}</td>
                   <td className="px-4 py-4">{row.phase}</td>
-                  <td className="px-4 py-4">{row.part}</td>
+                  <td className="px-4 py-4">{row.part_number}</td>
                   <td className="px-4 py-4">{row.size}</td>
 
                   <td className="px-4 py-4 text-center">
@@ -111,11 +148,7 @@ function FilterInfo() {
         <div className="flex flex-col gap-3 mt-6">
           <button
             className="btn btn-primary w-full"
-            onClick={() => {
-              console.log("Checked:", checked);
-              console.log("Notes:", notes);
-              openModal();
-            }}
+            onClick={handleCompleteJob}
           >
             ✅ Complete Job
           </button>
@@ -139,13 +172,16 @@ function FilterInfo() {
                 <button className="btn btn-primary w-full">OK</button>
               </form>
 
-              <button className="btn btn-outline w-full" onClick={() => navigate("/hospitals")}>
+              <button
+                className="btn btn-outline w-full"
+                onClick={() => navigate("/hospitals")}
+              >
                 Back to Hospitals
               </button>
             </div>
           </div>
 
-          <form method="dialog" className="modal-backdrop" >
+          <form method="dialog" className="modal-backdrop">
             <button>close</button>
           </form>
         </dialog>
