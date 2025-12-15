@@ -29,6 +29,8 @@ def create_job():
     tech = db.session.get(Technician, tech_id)
     if not tech:
         return jsonify({"error": "Invalid technician ID"}), 400
+    
+    ahu.last_service_date = datetime.utcnow()
 
     # Create job record
     job = Job(

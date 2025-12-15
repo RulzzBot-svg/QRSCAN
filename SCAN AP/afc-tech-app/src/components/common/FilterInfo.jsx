@@ -14,6 +14,11 @@ function FilterInfo() {
   const [notes, setNotes] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
+  const [gps, setGps] = useState({
+    lat: null,
+    long: null
+  })
+
   useEffect(() => {
     getAHUbyQR(ahuId)
       .then((res) => {
@@ -56,8 +61,11 @@ function FilterInfo() {
       return;
     }
 
+    setSubmitting(true);
+    const location = await getCurrentLocation();
+
     const jobData = {
-      ahu_id: ahu.ahu_id,
+      ahu_id: ahuId,
       tech_id: 1, // TODO: replace with auth user
       overall_notes: "",
       gps_lat: null,
@@ -76,6 +84,55 @@ function FilterInfo() {
       setSubmitting(false);
     }
   };
+
+
+  const getCurrentLocation = () => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        console.warn("Geolocation not supported");
+        return resolve({ lat: null, long: null });
+      }
+
+      // First attempt: high accuracy
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            long: position.coords.longitude
+          });
+        },
+        () => {
+          // Fallback attempt: cached / low accuracy
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              resolve({
+                lat: position.coords.latitude,
+                long: position.coords.longitude
+              });
+            },
+            () => {
+              console.warn("Unable to retrieve location");
+              resolve({ lat: null, long: null });
+            },
+            {
+              enableHighAccuracy: false,
+              timeout: 20000,
+              maximumAge: 300000 // allow cached (5 min)
+            }
+          );
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0
+        }
+      );
+    });
+  };
+
+
+
+
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200 pb-28">
@@ -101,13 +158,12 @@ function FilterInfo() {
                 </div>
 
                 <span
-                  className={`badge ${
-                    ahu.status === "Overdue"
-                      ? "badge-error"
-                      : ahu.status === "Due Soon"
+                  className={`badge ${ahu.status === "Overdue"
+                    ? "badge-error"
+                    : ahu.status === "Due Soon"
                       ? "badge-warning"
                       : "badge-success"
-                  }`}
+                    }`}
                 >
                   {ahu.status}
                 </span>
@@ -161,9 +217,8 @@ function FilterInfo() {
               {filterRows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`border-b border-base-300 ${
-                    checked[row.id] ? "bg-success/10" : "bg-base-100"
-                  }`}
+                  className={`border-b border-base-300 ${checked[row.id] ? "bg-success/10" : "bg-base-100"
+                    }`}
                 >
                   <td className="px-4 py-3 font-medium">{row.quantity}</td>
                   <td className="px-4 py-3">{row.phase}</td>

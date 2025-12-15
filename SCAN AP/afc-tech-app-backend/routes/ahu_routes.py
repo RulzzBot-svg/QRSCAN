@@ -6,8 +6,17 @@ from datetime import date, timedelta
 ahu_bp = Blueprint("ahu", __name__)
 
 
+# ---------------------------------------------------
+# Helper: Compute AHU service status safely
+# ---------------------------------------------------
 def compute_ahu_status(ahu):
-    if not ahu.last_service_date:
+    """
+    Determines service status and derived scheduling data
+    based on last_service_date and frequency_days.
+    """
+
+    # AHU has never been serviced
+    if not ahu.last_service_date or not ahu.frequency_days:
         return {
             "status": "Pending",
             "next_due_date": None,
@@ -42,6 +51,9 @@ def compute_ahu_status(ahu):
     }
 
 
+# ---------------------------------------------------
+# Get AHU details by QR code (primary tech entry point)
+# ---------------------------------------------------
 @ahu_bp.route("/qr/<string:ahu_id>", methods=["GET"])
 def get_ahu_by_qr(ahu_id):
     # Look up AHU
@@ -49,10 +61,10 @@ def get_ahu_by_qr(ahu_id):
     if not ahu:
         return jsonify({"error": "AHU not found"}), 404
 
-    # Compute service status
+    # Compute derived scheduling/status data
     status_data = compute_ahu_status(ahu)
 
-    # Get filter list tied to this AHU
+    # Filters tied to this AHU
     filters = [
         {
             "id": f.id,
@@ -64,18 +76,24 @@ def get_ahu_by_qr(ahu_id):
         for f in ahu.filters
     ]
 
-    # Build QR payload response
+    # Build response payload
     payload = {
         "ahu_id": ahu.id,
         "hospital_id": ahu.hospital_id,
-        "hospita_name":ahu.hospital.name,
+        "hospital_name": ahu.hospital.name if ahu.hospital else None,
         "name": ahu.name,
         "location": ahu.location,
         "frequency_days": ahu.frequency_days,
-        "last_service_date": ahu.last_service_date.isoformat() if ahu.last_service_date else None,
+        "last_service_date": (
+            ahu.last_service_date.isoformat()
+            if ahu.last_service_date
+            else None
+        ),
         "notes": ahu.notes,
         "filters": filters,
-        **status_data  # dynamically injects status, next due date, etc.
+
+        # ✅ Inject computed fields safely
+        **status_data
     }
 
     return jsonify(payload), 200

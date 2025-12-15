@@ -16,7 +16,10 @@ export default defineConfig({
     host:true,
     proxy:{
       "/api":{
-        target:"http://192.168.1.167:5000",
+        //home
+        //target:"http://192.168.1.167:5000",
+        //work
+        target:"http://192.168.1.131:5000",
         changeOrigin:true,
         secure:false,
       },
