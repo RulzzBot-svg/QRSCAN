@@ -11,6 +11,10 @@ import jobCompleted from "./components/common/job-completed";
 import "./index.css";
 import QRScanner from "./components/common/QRScanner";
 import AdminDashboard from "./components/admin/admin";
+import Hospitals from "./components/admin/hospitals";
+import adminAHU from "./components/admin/adminahus";
+
+
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -24,6 +28,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/job-completed" element={<jobCompleted/>}/>
         <Route path="/scan" element={<QRScanner/>}/>
         <Route path="/admin" element={<AdminDashboard/>}/>
+        <Route path="/admin/hospitals" element={<Hospitals/>}/>
+        <Route path="/admin/ahus" element={<adminAHU/>}/>
 
       </Routes>
     </BrowserRouter>
