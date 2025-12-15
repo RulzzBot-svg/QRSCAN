@@ -8,8 +8,8 @@ function HospitalCards() {
   // Temporary hardcoded full list (simulate big data)
   const [hospitals, setHospitals] = useState([]);
 
-  useEffect(()=>{
-    getHospitals().then((res)=>setHospitals(res.data)).catch((err)=>console.error("Error Loading", err));
+  useEffect(() => {
+    getHospitals().then((res) => setHospitals(res.data)).catch((err) => console.error("Error Loading", err));
   }, []);
 
   // Pagination: how many hospitals to show at once
@@ -25,20 +25,29 @@ function HospitalCards() {
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200 p-4">
+
+
+      <button
+        className="btn btn-ghost mb-3"
+        onClick={() => navigate("/")}
+      >
+        ⬅ Back
+      </button>
       {/* Header */}
       <h1 className="text-3xl font-bold mb-2 text-primary">Hospitals</h1>
+
 
       {/* Search Bar */}
 
       <div className="form-control  mb-4 relative">
         <input
-        type="text"
-        placeholder="Search hospital..."
-        className="input input-bordered w-full pr-10"
-        value={search}
-        onChange={(e)=>setSearch(e.target.value)}
+          type="text"
+          placeholder="Search hospital..."
+          className="input input-bordered w-full pr-10"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 pointer-events-none">🔍</span> 
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 pointer-events-none">🔍</span>
 
       </div>
 
@@ -50,7 +59,7 @@ function HospitalCards() {
         {filtered.slice(0, visible).map((hospital) => (
           <div
             key={hospital.id}
-            onClick={()=>navigate(`/AHU/${hospital.id}`)}
+            onClick={() => navigate(`/AHU/${hospital.id}`)}
             className="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:bg-base-100 transition-all cursor-pointer"
           >
             <div className="card-body p-5 ">
@@ -58,11 +67,11 @@ function HospitalCards() {
               <h2 className="card-title text-lg text-primary">
                 {hospital.name}
               </h2>
-              
+
               <p className="text-xs text-base-content/60"> {hospital.city} </p>
 
-              <span className={`badge badge-sm ${hospital.active ? "badge-success":"badge-ghost"}`}>
-                {hospital.active ? "Active":"Inactive"}
+              <span className={`badge badge-sm ${hospital.active ? "badge-success" : "badge-ghost"}`}>
+                {hospital.active ? "Active" : "Inactive"}
               </span>
 
               {/* STAT COMPONENT */}
@@ -84,13 +93,6 @@ function HospitalCards() {
                 onClick={() => navigate(`/AHU/${hospital.id}`)}
               >
                 Load AHUs
-              </button>
-
-              <button
-                className="btn btn-ghost btn-sm w-full bg-[#E0DEDE] hover:bg-[#B5B5B5]"
-                onClick={() => navigate("/")}
-              >
-                ⬅ Back
               </button>
             </div>
           </div>
