@@ -68,6 +68,7 @@ def get_ahu_by_qr(ahu_id):
     payload = {
         "ahu_id": ahu.id,
         "hospital_id": ahu.hospital_id,
+        "hospita_name":ahu.hospital.name,
         "name": ahu.name,
         "location": ahu.location,
         "frequency_days": ahu.frequency_days,

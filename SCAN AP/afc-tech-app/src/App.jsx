@@ -20,7 +20,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 px-4 pt-4 pb-10 max-w-md mx-auto w-full space-y-5">
-        
+
         {/* Greeting */}
         <section>
           <h1 className="text-2xl font-semibold">
@@ -39,7 +39,7 @@ export default function App() {
             <div className="card-body p-4">
               <div className="flex justify-between items-center mb-2">
                 <h2 className="card-title text-base">Scan QR to Start</h2>
-                <span className="badge badge-success text-xs">Recommended</span>
+                <span className="rounded-2xl badge badge-success text-xs">Recommended</span>
               </div>
 
               <p className="text-sm text-base-content/70 mb-3 leading-snug">
@@ -47,7 +47,7 @@ export default function App() {
                 last service date, and required steps.
               </p>
 
-              <button className="btn btn-primary w-full" onClick={()=>navigate("/scan")}>
+              <button className="btn btn-primary w-full" onClick={() => navigate("/scan")}>
                 📷 Scan QR Code
               </button>
             </div>
@@ -60,7 +60,7 @@ export default function App() {
                 <h2 className="card-title text-base">
                   Manual Mode – Select Hospital
                 </h2>
-                <span className="badge badge-ghost text-xs">Fallback</span>
+                <span className="badge rounded-2xl badge-ghost text-xs">Fallback</span>
               </div>
 
               <p className="text-sm text-base-content/70 mb-3 leading-snug">
@@ -77,6 +77,34 @@ export default function App() {
             </div>
           </div>
         </section>
+
+        {/* Admin Dashboard */}
+        <div className="card bg-base-100 border border-base-300 shadow-sm">
+          <div className="card-body p-4">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="card-title text-base">
+                Admin Dashboard
+              </h2>
+              <span className="rounded-2xl badge badge-info badge-soft badge-outline text-xs">
+                Admin
+              </span>
+            </div>
+
+            <p className="text-sm text-base-content/70 mb-3 leading-snug">
+              View system-wide status, upcoming changeouts, and overall
+              compliance across all hospitals and AHUs.
+            </p>
+
+            <button
+              className="btn btn-outline btn-info w-full"
+              onClick={() => navigate("/admin")}
+            >
+              📊 Open Admin Dashboard
+            </button>
+          </div>
+        </div>
+
+
 
         {/* Status Section */}
         <section className="space-y-1 pt-4">

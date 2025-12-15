@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getHospitals } from "../api/hospitals";
+import { getHospitals } from "../../api/hospitals";
 
 function HospitalCards() {
   const navigate = useNavigate();
@@ -50,20 +50,27 @@ function HospitalCards() {
         {filtered.slice(0, visible).map((hospital) => (
           <div
             key={hospital.id}
+            onClick={()=>navigate(`/AHU/${hospital.id}`)}
             className="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:bg-base-100 transition-all cursor-pointer"
           >
-            <div className="card-body p-5">
+            <div className="card-body p-5 ">
 
               <h2 className="card-title text-lg text-primary">
                 {hospital.name}
               </h2>
+              
+              <p className="text-xs text-base-content/60"> {hospital.city} </p>
+
+              <span className={`badge badge-sm ${hospital.active ? "badge-success":"badge-ghost"}`}>
+                {hospital.active ? "Active":"Inactive"}
+              </span>
 
               {/* STAT COMPONENT */}
               <div className="stats shadow w-full mb-3 mt-1">
                 <div className="stat">
                   <div className="stat-title text-xs">AHUs</div>
                   <div className="stat-value text-primary text-xl">
-                    {hospital.ahus}
+                    {hospital.ahu_count}
                   </div>
                 </div>
               </div>

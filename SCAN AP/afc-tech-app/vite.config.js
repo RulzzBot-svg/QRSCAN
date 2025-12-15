@@ -13,8 +13,13 @@ export default defineConfig({
     mkcert()
   ],
   server:{
-    htpps:true,
     host:true,
-    port:5173,
+    proxy:{
+      "/api":{
+        target:"http://192.168.1.167:5000",
+        changeOrigin:true,
+        secure:false,
+      },
+    },
   },
 })

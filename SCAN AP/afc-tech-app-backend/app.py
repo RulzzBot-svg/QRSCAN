@@ -5,7 +5,7 @@ from routes.hospital_routes import hospital_bp
 from routes.ahu_routes import ahu_bp
 from routes.tech_routes import tech_bp
 from routes.job_routes import job_bp
-
+from routes.admin import admin_bp
 
 def create_app():
     app = Flask(__name__)
@@ -27,6 +27,7 @@ def create_app():
     app.register_blueprint(job_bp, url_prefix="/api")
     app.register_blueprint(tech_bp, url_prefix="/api")
     app.register_blueprint(hospital_bp, url_prefix="/api")
+    app.register_blueprint(admin_bp, url_prefix="/admin")
 
     # Simple root endpoint
     @app.route("/")
@@ -39,6 +40,6 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     #this runs for my home computer lol
-    #app.run(debug=True, host="192.168.1.167")
-    app.run(debug=True, host="192.168.1.131")
+    app.run(debug=True, host="192.168.1.167")
+    #app.run(debug=True, host="192.168.1.131")
 

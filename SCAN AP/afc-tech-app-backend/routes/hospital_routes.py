@@ -14,7 +14,8 @@ def get_all_hospitals():
             "id": h.id,
             "name": h.name,
             "city": h.city,
-            "active": h.active
+            "active": h.active,
+            "ahu_count": len(h.ahus)
         }
         for h in hospitals
     ]

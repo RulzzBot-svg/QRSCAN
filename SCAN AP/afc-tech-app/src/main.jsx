@@ -3,13 +3,14 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
-import HospitalCards from "./components/HospitalCards";
-import AHU from "./components/AHU";
-import FilterInfo from "./components/FilterInfo";
-import AHUPage from "./components/AHUPage";
-import jobCompleted from "./components/job-completed";
+import HospitalCards from "./components/common/HospitalCards";
+import AHU from "./components/common/AHU";
+import FilterInfo from "./components/common/FilterInfo";
+import AHUPage from "./components/common/AHUPage";
+import jobCompleted from "./components/common/job-completed";
 import "./index.css";
-import QRScanner from "./components/QRScanner";
+import QRScanner from "./components/common/QRScanner";
+import AdminDashboard from "./components/admin/admin";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -22,6 +23,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="FilterInfo/:ahuId" element={<FilterInfo/>}/>
         <Route path="/job-completed" element={<jobCompleted/>}/>
         <Route path="/scan" element={<QRScanner/>}/>
+        <Route path="/admin" element={<AdminDashboard/>}/>
 
       </Routes>
     </BrowserRouter>
