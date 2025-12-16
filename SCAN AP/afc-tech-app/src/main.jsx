@@ -12,7 +12,9 @@ import "./index.css";
 import QRScanner from "./components/common/QRScanner";
 import AdminDashboard from "./components/admin/admin";
 import Hospitals from "./components/admin/hospitals";
-import adminAHU from "./components/admin/adminahus";
+import AdminAHUs from "./components/admin/adminahus";
+import AdminJobs from "./components/admin/adminjobs";
+
 
 
 
@@ -29,7 +31,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/scan" element={<QRScanner/>}/>
         <Route path="/admin" element={<AdminDashboard/>}/>
         <Route path="/admin/hospitals" element={<Hospitals/>}/>
-        <Route path="/admin/ahus" element={<adminAHU/>}/>
+        <Route path="/admin/ahus" element={<AdminAHUs/>}/>
+        <Route path="/admin/jobs" element={<AdminJobs/>}/>
+
 
       </Routes>
     </BrowserRouter>

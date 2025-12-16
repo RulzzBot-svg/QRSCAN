@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify
 from models import Hospital, AHU
 from db import db
-from utility.status import compute_ahu_status   # <-- use your helper
 
 hospital_bp = Blueprint("hospital", __name__)
 
@@ -28,18 +27,11 @@ def get_ahus_for_hospital(hospital_id):
 
     result = []
     for a in ahus:
-        status = compute_ahu_status(a)
 
         result.append({
             "id": a.id,
             "name": a.name,
             "location": a.location,
-            "frequency_days": a.frequency_days,
-            "last_service_date": str(a.last_service_date) if a.last_service_date else None,
-            "status": status["status"],                # <-- required by frontend
-            "next_due_date": status["next_due_date"],  # optional UI
-            "days_overdue": status["days_overdue"],    # optional UI
-            "days_until_due": status["days_until_due"] # optional UI
         })
 
     return jsonify(result), 200

@@ -1,107 +1,144 @@
 from db import db
 from app import create_app
 from models import Hospital, AHU, Filter, Technician
+from datetime import date, timedelta
+import random
+
+app = create_app()
 
 
-app=create_app()
+def random_past_date(max_days=600, chance_none=0.25):
+    if random.random() < chance_none:
+        return None
+    return date.today() - timedelta(days=random.randint(1, max_days))
 
 
 def seed_data():
-
     with app.app_context():
 
-        # -------------------------
+        print("🔄 Resetting database...")
+        db.drop_all()
+        db.create_all()
+
+        # -------------------------------------------------
         # HOSPITALS
-        # -------------------------
-        h1 = Hospital(name="Cedars-Sinai Marina del Rey", city="Marina del Rey", active=True)
-        h2 = Hospital(name="St. Francis Medical Center", city="Lynwood", active=True)
-        h3 = Hospital(name="California Hospital Medical Center", city="Los Angeles", active=True)
+        # -------------------------------------------------
+        hospitals = [
+            Hospital(name="Cedars-Sinai Marina del Rey", city="Marina del Rey", active=True),
+            Hospital(name="St. Francis Medical Center", city="Lynwood", active=True),
+            Hospital(name="California Hospital Medical Center", city="Los Angeles", active=True),
+            Hospital(name="Queen of the Valley Hospital", city="West Covina", active=True),
+            Hospital(name="Encino Hospital Medical Center", city="Encino", active=True),
+            Hospital(name="Glendale Adventist Medical Center", city="Glendale", active=True),
+            Hospital(name="Good Samaritan Hospital", city="Downtown LA", active=True),
+            Hospital(name="White Memorial Medical Center", city="Boyle Heights", active=True),
+        ]
 
-        db.session.add_all([h1, h2, h3])
-        db.session.flush()  # get generated IDs
+        db.session.add_all(hospitals)
+        db.session.flush()
 
-
-        # -------------------------
-        # AHUs (REALISTIC NAMES)
-        # -------------------------
+        # -------------------------------------------------
+        # AHUs
+        # -------------------------------------------------
         ahus = [
-            AHU(
-                id="AHU-127",
-                hospital_id=h1.id,
-                name="Surgery Wing AHU 127",
-                location="2nd Floor Mechanical Room",
-                frequency_days=60,
-                last_service_date=None,
-                notes="Critical OR supply."
-            ),
-            AHU(
-                id="AHU-210",
-                hospital_id=h1.id,
-                name="Main Lobby AHU 210",
-                location="Lobby East Air Handler",
-                frequency_days=90,
-                last_service_date=None,
-                notes=""
-            ),
-            AHU(
-                id="AHU-3A",
-                hospital_id=h2.id,
-                name="ICU Block AHU 3A",
-                location="3rd Floor ICU",
-                frequency_days=30,
-                last_service_date=None
-            ),
-            AHU(
-                id="AHU-4B",
-                hospital_id=h3.id,
-                name="Radiology AHU 4B",
-                location="Basement Radiology Wing",
-                frequency_days=60,
-                last_service_date=None
-            )
+            # Cedars
+            AHU(id="AHU-127", hospital_id=hospitals[0].id, name="Surgery Wing AHU 127", location="2nd Floor Mech Room"),
+            AHU(id="AHU-210", hospital_id=hospitals[0].id, name="Main Lobby AHU 210", location="Lobby East"),
+
+            # St Francis
+            AHU(id="AHU-3A", hospital_id=hospitals[1].id, name="ICU Block AHU 3A", location="3rd Floor ICU"),
+            AHU(id="AHU-3B", hospital_id=hospitals[1].id, name="ER Intake AHU 3B", location="Emergency Dept"),
+
+            # California Hospital
+            AHU(id="AHU-4B", hospital_id=hospitals[2].id, name="Radiology AHU 4B", location="Basement"),
+            AHU(id="AHU-5A", hospital_id=hospitals[2].id, name="Patient Tower AHU 5A", location="5th Floor"),
+
+            # Queen of the Valley
+            AHU(id="AHU-QV-1", hospital_id=hospitals[3].id, name="OR Suite AHU 1", location="OR Wing"),
+            AHU(id="AHU-QV-2", hospital_id=hospitals[3].id, name="PACU AHU 2", location="Recovery"),
+
+            # Encino
+            AHU(id="AHU-EN-1", hospital_id=hospitals[4].id, name="Lobby AHU 1", location="Main Lobby"),
+            AHU(id="AHU-EN-2", hospital_id=hospitals[4].id, name="Med Surg AHU 2", location="2nd Floor"),
+
+            # Glendale
+            AHU(id="AHU-GA-1", hospital_id=hospitals[5].id, name="ICU AHU 1", location="ICU Wing"),
+
+            # Good Samaritan
+            AHU(id="AHU-GS-1", hospital_id=hospitals[6].id, name="Central Plant AHU 1", location="Roof"),
+            AHU(id="AHU-GS-2", hospital_id=hospitals[6].id, name="Admin Wing AHU 2", location="Admin"),
+
+            # White Memorial
+            AHU(id="AHU-WM-1", hospital_id=hospitals[7].id, name="NICU AHU 1", location="NICU"),
         ]
 
         db.session.add_all(ahus)
         db.session.flush()
 
+        # -------------------------------------------------
+        # FILTERS (frequency & service dates live here)
+        # -------------------------------------------------
+        filters = []
 
-        # -------------------------
-        # FILTERS FOR EACH AHU
-        # -------------------------
-        filters = [
-            # AHU-126
-            Filter(ahu_id="AHU-127", phase="Pre", part_number="20x24x2-M13", size="20x24x2", quantity=12),
-            Filter(ahu_id="AHU-127", phase="Final", part_number="HVP-2424-12", size="24x24x12", quantity=4),
+        for ahu in ahus:
+            # PRE FILTER
+            filters.append(
+                Filter(
+                    ahu_id=ahu.id,
+                    phase="PRE",
+                    part_number="PLEAT-2424",
+                    size="24x24x2",
+                    quantity=random.choice([6, 8, 10, 12]),
+                    frequency_days=random.choice([30, 60, 90]),
+                    last_service_date=random_past_date()
+                )
+            )
 
-            # AHU-210
-            Filter(ahu_id="AHU-210", phase="Pre", part_number="PLEAT-2020", size="20x20x2", quantity=8),
-            Filter(ahu_id="AHU-210", phase="Carbon", part_number="CRB-2020", size="20x20x1", quantity=4),
+            # FINAL FILTER
+            filters.append(
+                Filter(
+                    ahu_id=ahu.id,
+                    phase="FINAL",
+                    part_number="V-BANK-2424",
+                    size="24x24x12",
+                    quantity=random.choice([2, 4]),
+                    frequency_days=random.choice([365, 540, 730]),
+                    last_service_date=random_past_date()
+                )
+            )
 
-            # AHU-3A
-            Filter(ahu_id="AHU-3A", phase="Pre", part_number="PLEAT-1224", size="12x24x2", quantity=6),
-            Filter(ahu_id="AHU-3A", phase="Final", part_number="V-BANK-2424", size="24x24x12", quantity=2),
-
-            # AHU-4B
-            Filter(ahu_id="AHU-4B", phase="Pre", part_number="PLEAT-2424", size="24x24x2", quantity=10),
-            Filter(ahu_id="AHU-4B", phase="HEPA", part_number="HEPA-2424-GS", size="24x24x12", quantity=2),
-        ]
+            # OPTIONAL CARBON / HEPA
+            if random.random() > 0.5:
+                filters.append(
+                    Filter(
+                        ahu_id=ahu.id,
+                        phase="CARBON",
+                        part_number="CRB-2424",
+                        size="24x24x1",
+                        quantity=random.choice([2, 4]),
+                        frequency_days=random.choice([180, 270]),
+                        last_service_date=random_past_date()
+                    )
+                )
 
         db.session.add_all(filters)
 
-
-        # -------------------------
+        # -------------------------------------------------
         # TECHNICIANS
-        # -------------------------
+        # -------------------------------------------------
         techs = [
             Technician(name="John Doe", pin="1234", active=True),
             Technician(name="Maria Sanchez", pin="2222", active=True),
-            Technician(name="Kevin Lee", pin="9999", active=True)
+            Technician(name="Kevin Lee", pin="9999", active=True),
+            Technician(name="Luis Ramirez", pin="4567", active=True),
+            Technician(name="Ana Torres", pin="8888", active=True),
         ]
 
         db.session.add_all(techs)
 
-        # Commit all
         db.session.commit()
-        print("Seed data inserted successfully!")
+        print("✅ Seed data inserted successfully!")
 
-seed_data()
+
+if __name__ == "__main__":
+    seed_data()

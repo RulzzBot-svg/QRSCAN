@@ -31,8 +31,6 @@ class AHU(db.Model):
 
     name = Column(String(150), nullable=False)
     location = Column(String(200))
-    frequency_days = Column(Integer)
-    last_service_date = Column(Date)
     notes = Column(Text)
 
     hospital = relationship("Hospital", back_populates="ahus")
@@ -54,9 +52,16 @@ class Filter(db.Model):
     size = Column(String(50))
     quantity = Column(Integer)
 
-    ahu = relationship("AHU", back_populates="filters")
-    job_filters = relationship("JobFilter", back_populates="filter", cascade="all, delete-orphan")
+    # ✅ SERVICE LOGIC BELONGS HERE
+    frequency_days = Column(Integer, nullable=False)
+    last_service_date = Column(Date)
 
+    ahu = relationship("AHU", back_populates="filters")
+    job_filters = relationship(
+        "JobFilter",
+        back_populates="filter",
+        cascade="all, delete-orphan"
+    )
 
 # -------------------------
 # TECHNICIAN

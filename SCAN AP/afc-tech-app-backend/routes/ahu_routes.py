@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from models import AHU, Filter
 from db import db
 from datetime import date, timedelta
@@ -61,9 +61,6 @@ def get_ahu_by_qr(ahu_id):
     if not ahu:
         return jsonify({"error": "AHU not found"}), 404
 
-    # Compute derived scheduling/status data
-    status_data = compute_ahu_status(ahu)
-
     # Filters tied to this AHU
     filters = [
         {
@@ -83,17 +80,81 @@ def get_ahu_by_qr(ahu_id):
         "hospital_name": ahu.hospital.name if ahu.hospital else None,
         "name": ahu.name,
         "location": ahu.location,
-        "frequency_days": ahu.frequency_days,
-        "last_service_date": (
-            ahu.last_service_date.isoformat()
-            if ahu.last_service_date
-            else None
-        ),
         "notes": ahu.notes,
         "filters": filters,
 
-        # ✅ Inject computed fields safely
-        **status_data
     }
 
     return jsonify(payload), 200
+
+
+#admin options
+
+#get ahus
+@ahu_bp.route("/admin/ahus/<string:ahu_id>/filters", methods=["GET"])
+def get_filters_for_admin(ahu_id):
+    ahu = db.session.get(AHU, ahu_id)
+    if not ahu:
+        return jsonify({"error": "AHU not found"}), 404
+
+    return jsonify([
+        {
+            "id": f.id,
+            "phase": f.phase,
+            "part_number": f.part_number,
+            "size": f.size,
+            "quantity": f.quantity
+        }
+        for f in ahu.filters
+    ])
+
+
+#add fiters
+@ahu_bp.route("/admin/ahus/<string:ahu_id>/filters", methods=["POST"])
+def add_filter(ahu_id):
+    data = request.json
+
+    f = Filter(
+        ahu_id=ahu_id,
+        phase=data["phase"],
+        part_number=data["part_number"],
+        size=data["size"],
+        quantity=data["quantity"]
+    )
+
+    db.session.add(f)
+    db.session.commit()
+
+    return jsonify({"message": "Filter added"}), 201
+
+
+#update filter
+@ahu_bp.route("/admin/filters/<int:filter_id>", methods=["PUT"])
+def update_filter(filter_id):
+    f = db.session.get(Filter, filter_id)
+    if not f:
+        return jsonify({"error": "Filter not found"}), 404
+
+    data = request.json
+
+    f.phase = data["phase"]
+    f.part_number = data["part_number"]
+    f.size = data["size"]
+    f.quantity = data["quantity"]
+
+    db.session.commit()
+
+    return jsonify({"message": "Filter updated"})
+
+#delete filter
+@ahu_bp.route("/admin/filters/<int:filter_id>", methods=["DELETE"])
+def delete_filter(filter_id):
+    f = db.session.get(Filter, filter_id)
+    if not f:
+        return jsonify({"error": "Filter not found"}), 404
+
+    db.session.delete(f)
+    db.session.commit()
+
+    return jsonify({"message": "Filter removed"})
+
