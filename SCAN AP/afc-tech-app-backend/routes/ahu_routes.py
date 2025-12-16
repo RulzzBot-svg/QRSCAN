@@ -2,6 +2,8 @@ from flask import Blueprint, jsonify, request
 from models import AHU, Filter
 from db import db
 from datetime import date, timedelta
+from utility.status import compute_ahu_status_from_filters
+from sqlalchemy.orm import joinedload, selectinload
 
 ahu_bp = Blueprint("ahu", __name__)
 
@@ -158,3 +160,35 @@ def delete_filter(filter_id):
 
     return jsonify({"message": "Filter removed"})
 
+
+@ahu_bp.route("/admin/ahus", methods=["GET"])
+def admin_get_all_ahus():
+
+    ahus = (
+        db.session.query(AHU)
+        .options(
+            joinedload(AHU.hospital),
+            selectinload(AHU.filters)
+        )
+        .all()
+    )
+
+    payload =[]
+    for a in ahus:
+        status_data = compute_ahu_status_from_filters(a.filters)
+
+        payload.append({
+            "id": a.id,
+            "hospital_id": a.hospital_id,
+            "hospital": a.hospital.name if a.hospital else None,
+            "name": a.name,
+            "location": a.location,
+            "notes": a.notes,
+            "status": status_data["status"],
+            "next_due_date": status_data["next_due_date"],
+            "days_until_due": status_data["days_until_due"],
+            "days_overdue": status_data["days_overdue"],
+            "filters_count": len(a.filters),
+        })
+
+    return jsonify(payload), 200

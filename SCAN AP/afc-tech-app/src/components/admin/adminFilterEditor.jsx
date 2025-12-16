@@ -76,9 +76,6 @@ function AdminFilterEditor({ ahu, onClose }) {
     }, [ahu.id]);
 
 
-
-
-
     return (
         <dialog className="modal modal-open">
             <div className="modal-box max-w-4xl">

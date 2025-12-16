@@ -13,6 +13,7 @@ export default defineConfig({
     mkcert()
   ],
   server:{
+    https:true,
     host:true,
     proxy:{
       "/api":{

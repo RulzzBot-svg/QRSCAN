@@ -1,9 +1,9 @@
 import qrcode
 
 
-ahu_id="AHU-4B"
+ahu_id="AHU-EN-1"
 
-url= f"https://192.168.1.131:5173/FilterInfo/{ahu_id}"
+url= f"https://192.168.1.131:5173/FilterInfo/AHU-EN-1"
 
 qr=qrcode.QRCode(
     version=2,
