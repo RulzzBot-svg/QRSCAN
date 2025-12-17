@@ -165,7 +165,7 @@ function FilterInfo() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+              <div className="grid grid-cols-2 gap-4 mt-3">
                 <div className="font-medium">
                   <p className="text-base-content/60 text-sm">Last Serviced Date</p>
                   {filterRows.some(f => f.last_service_date)
@@ -227,10 +227,13 @@ function FilterInfo() {
                   <td className="px-4 py-3">{row.phase}</td>
                   <td className="px-4 py-3">{row.part_number}</td>
                   <td className="px-4 py-3">{row.size}</td>
-                  <td className="px-4 py-3 text-xs badge badge-success">
-                    {row.last_service_date
-                      ? new Date(row.last_service_date).toLocaleDateString()
-                      : "Never"}
+                  <td className="px-4 py-3">
+                    <span className="badge badge-success">
+                      {row.last_service_date
+                        ? new Date(row.last_service_date).toLocaleDateString()
+                        : "Never"}
+                    </span>
+
                   </td>
 
                   <td className="px-4 py-3 text-center">
