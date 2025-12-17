@@ -13,15 +13,16 @@ def create_app():
     # -----------------------------
     # DATABASE CONFIG
     # -----------------------------
-    app.config["SQLALCHEMY_DATABASE_URI"] = 'postgresql://neondb_owner:npg_Py3QvJn6dTgF@ep-odd-cell-afq855xw-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+    app.config["SQLALCHEMY_DATABASE_URI"] = (
+        "postgresql://neondb_owner:npg_Py3QvJn6dTgF@"
+        "ep-odd-cell-afq855xw-pooler.c-2.us-west-2.aws.neon.tech/"
+        "neondb?sslmode=require&channel_binding=require"
+    )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # Allow React frontend to communicate with Flask
     CORS(app)
 
-    # Init SQLAlchemy
     db.init_app(app)
-
 
     app.register_blueprint(ahu_bp, url_prefix="/api")
     app.register_blueprint(job_bp, url_prefix="/api")
@@ -29,14 +30,16 @@ def create_app():
     app.register_blueprint(hospital_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/admin")
 
-    # Simple root endpoint
     @app.route("/")
     def home():
         return {"message": "AFC Technician API Running"}
 
     return app
 
-app=create_app()
+
+# 👇 THIS is what Gunicorn should load
+app = create_app()
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
