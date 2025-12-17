@@ -138,10 +138,6 @@ function FilterInfo() {
     <div data-theme="corporate" className="min-h-screen bg-base-200 pb-28">
       <div className="max-w-3xl mx-auto p-4">
 
-        {/* Back */}
-        <button className="btn btn-ghost mb-3" onClick={() => navigate(-1)}>
-          ⬅ Back
-        </button>
 
         {/* AHU SUMMARY CARD */}
         {ahu && (
@@ -170,11 +166,17 @@ function FilterInfo() {
               </div>
 
               <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                <div>
-                  <div className="text-base-content/60">Last Service</div>
-                  <div className="font-medium">
-                    {ahu.last_service_date || "Never"}
-                  </div>
+                <div className="font-medium">
+                  <p className="text-base-content/60 text-sm">Last Serviced Date</p>
+                  {filterRows.some(f => f.last_service_date)
+                    ? new Date(
+                      Math.max(
+                        ...filterRows
+                          .filter(f => f.last_service_date)
+                          .map(f => new Date(f.last_service_date))
+                      )
+                    ).toLocaleDateString()
+                    : "Never"}
                 </div>
 
                 <div>
@@ -208,6 +210,7 @@ function FilterInfo() {
                 <th className="px-4 py-3">Phase</th>
                 <th className="px-4 py-3">Part</th>
                 <th className="px-4 py-3">Size</th>
+                <th className="px-4 py-3">Last Serviced</th>
                 <th className="px-4 py-3 text-center text-primary">Done</th>
                 <th className="px-4 py-3 text-center">Notes</th>
               </tr>
@@ -224,6 +227,11 @@ function FilterInfo() {
                   <td className="px-4 py-3">{row.phase}</td>
                   <td className="px-4 py-3">{row.part_number}</td>
                   <td className="px-4 py-3">{row.size}</td>
+                  <td className="px-4 py-3 text-xs badge badge-success">
+                    {row.last_service_date
+                      ? new Date(row.last_service_date).toLocaleDateString()
+                      : "Never"}
+                  </td>
 
                   <td className="px-4 py-3 text-center">
                     <input
@@ -248,6 +256,18 @@ function FilterInfo() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex justify-between gap-2 mb-4 mt-3.5 pt-3">
+          <button className="btn btn-ghost mb btn-outline" disable={!ahu} onClick={() => navigate(`/AHU/${ahu.hospital_id}`)}>
+            ⬅ Back to list
+          </button>
+
+          <button className="btn btn-outline" onClick={() => navigate("/scan")}>
+            Scan another QR Code
+          </button>
+
+
         </div>
 
         {/* STICKY ACTION BAR */}

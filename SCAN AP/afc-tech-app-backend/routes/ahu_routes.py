@@ -2,8 +2,9 @@ from flask import Blueprint, jsonify, request
 from models import AHU, Filter
 from db import db
 from datetime import date, timedelta
-from utility.status import compute_ahu_status_from_filters
+
 from sqlalchemy.orm import joinedload, selectinload
+from utility.status import compute_filter_status
 
 ahu_bp = Blueprint("ahu", __name__)
 
@@ -11,50 +12,67 @@ ahu_bp = Blueprint("ahu", __name__)
 # ---------------------------------------------------
 # Helper: Compute AHU service status safely
 # ---------------------------------------------------
-def compute_ahu_status(ahu):
-    """
-    Determines service status and derived scheduling data
-    based on last_service_date and frequency_days.
-    """
 
-    # AHU has never been serviced
-    if not ahu.last_service_date or not ahu.frequency_days:
+def compute_ahu_status_from_filters(filters):
+    if not filters:
         return {
             "status": "Pending",
             "next_due_date": None,
+            "days_until_due": None,
             "days_overdue": None,
-            "days_until_due": None
         }
 
-    next_due = ahu.last_service_date + timedelta(days=ahu.frequency_days)
-    today = date.today()
+    next_dues = []
+    days_until_list = []
+    overdue_days = []
 
-    if today > next_due:
+    for f in filters:
+        status = compute_filter_status(f)
+        if status["next_due_date"]:
+            next_dues.append(status["next_due_date"])
+        if status["days_until_due"] is not None:
+            days_until_list.append(status["days_until_due"])
+        if status["days_overdue"]:
+            overdue_days.append(status["days_overdue"])
+
+    if not next_dues:
+        return{
+            "status":"Pending",
+            "next_due_date":None,
+            "days_until_due":None,
+            "days_overdue":None,
+        }
+
+    if overdue_days:
         return {
             "status": "Overdue",
-            "next_due_date": next_due.isoformat(),
-            "days_overdue": (today - next_due).days,
-            "days_until_due": 0
+            "next_due_date": min(next_dues),
+            "days_until_due": 0,
+            "days_overdue": max(overdue_days),
         }
 
-    if today >= next_due - timedelta(days=7):
-        return {
-            "status": "Due Soon",
-            "next_due_date": next_due.isoformat(),
-            "days_overdue": 0,
-            "days_until_due": (next_due - today).days
+    if any(d <= 7 for d in days_until_list):
+        return{
+            "status":"Due Soon",
+            "next_due_date":min(next_dues),
+            "days_until_due":min(days_until_list),
+            "days_overdue":0,
         }
 
     return {
         "status": "Completed",
-        "next_due_date": next_due.isoformat(),
+        "next_due_date": min(next_dues),
+        "days_until_due": min(
+            compute_filter_status(f)["days_until_due"]
+            for f in filters
+            if compute_filter_status(f)["days_until_due"] is not None
+        ),
         "days_overdue": 0,
-        "days_until_due": (next_due - today).days
     }
 
 
 # ---------------------------------------------------
-# Get AHU details by QR code (primary tech entry point)
+# Get AHU details by QR code
 # ---------------------------------------------------
 @ahu_bp.route("/qr/<string:ahu_id>", methods=["GET"])
 def get_ahu_by_qr(ahu_id):
@@ -64,16 +82,24 @@ def get_ahu_by_qr(ahu_id):
         return jsonify({"error": "AHU not found"}), 404
 
     # Filters tied to this AHU
-    filters = [
-        {
+    filters = []
+    for f in ahu.filters:
+        status = compute_filter_status(f)
+        filters.append({
             "id": f.id,
             "phase": f.phase,
             "part_number": f.part_number,
             "size": f.size,
-            "quantity": f.quantity
-        }
-        for f in ahu.filters
-    ]
+            "quantity": f.quantity,
+            "frequency_days": f.frequency_days,
+            "last_service_date": (
+                f.last_service_date.isoformat()
+                if f.last_service_date else None
+            ),
+            **status
+        })
+    
+    ahu_status=compute_ahu_status_from_filters(ahu.filters)
 
     # Build response payload
     payload = {
@@ -83,6 +109,7 @@ def get_ahu_by_qr(ahu_id):
         "name": ahu.name,
         "location": ahu.location,
         "notes": ahu.notes,
+        **ahu_status,
         "filters": filters,
 
     }
@@ -121,7 +148,8 @@ def add_filter(ahu_id):
         phase=data["phase"],
         part_number=data["part_number"],
         size=data["size"],
-        quantity=data["quantity"]
+        quantity=data["quantity"],
+        frequency_days=data["frequency_days"]
     )
 
     db.session.add(f)
@@ -143,6 +171,7 @@ def update_filter(filter_id):
     f.part_number = data["part_number"]
     f.size = data["size"]
     f.quantity = data["quantity"]
+    f.frequency_days = data["frequency_days"]
 
     db.session.commit()
 

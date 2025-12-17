@@ -10,10 +10,9 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     react(),
-    mkcert()
   ],
   server:{
-    https:true,
+    port:5173,
     host:true,
     proxy:{
       "/api":{

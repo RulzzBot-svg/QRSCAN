@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from models import Job, JobFilter, Filter, AHU, Technician
 from db import db
 from datetime import datetime
+from sqlalchemy.orm import joinedload
 
 job_bp = Blueprint("jobs", __name__)
 
@@ -30,7 +31,7 @@ def create_job():
     if not tech:
         return jsonify({"error": "Invalid technician ID"}), 400
     
-    ahu.last_service_date = datetime.utcnow()
+    #ahu.last_service_date = datetime.utcnow()
 
     # Create job record
     job = Job(
@@ -53,6 +54,11 @@ def create_job():
             note=f.get("note", "")
         )
         db.session.add(jf)
+
+        if jf.is_completed:
+            filter_obj = db.session.get(Filter, jf.filter_id)
+            if filter_obj:
+                filter_obj.last_service_date = datetime.utcnow().date()
 
     db.session.commit()
 
@@ -79,6 +85,7 @@ def get_job(job_id):
             "note": jf.note
         }
         for jf in job.job_filters
+
     ]
 
     return jsonify({
@@ -96,20 +103,43 @@ def get_job(job_id):
 # -----------------------------
 # Get all jobs
 # -----------------------------
-@job_bp.route("/jobs", methods=["GET"])
-def get_all_jobs():
-    jobs = Job.query.all()
-    result = [
-        {
+
+@job_bp.route("/admin/jobs", methods=["GET"])
+def admin_get_all_jobs():
+    jobs = (
+        Job.query
+        .options(
+            joinedload(Job.ahu),
+            joinedload(Job.technician),
+            joinedload(Job.job_filters).joinedload(JobFilter.filter)
+        )
+        .order_by(Job.completed_at.desc())
+        .all()
+    )
+
+    payload = []
+
+    for j in jobs:
+        payload.append({
             "id": j.id,
             "ahu_id": j.ahu_id,
-            "tech_id": j.tech_id,
-            "completed_at": j.completed_at.isoformat()
-        }
-        for j in jobs
-    ]
-    return jsonify(result), 200
+            "ahu_name": j.ahu.name if j.ahu else None,
+            "technician": j.technician.name if j.technician else None,
+            "completed_at": j.completed_at.isoformat(),
+            "filters": [
+                {
+                    "filter_id": jf.filter_id,
+                    "phase": jf.filter.phase,
+                    "part_number": jf.filter.part_number,
+                    "size": jf.filter.size,
+                    "is_completed": jf.is_completed,
+                    "note": jf.note
+                }
+                for jf in j.job_filters
+            ]
+        })
 
+    return jsonify(payload), 200
 
 # -----------------------------
 # Get all jobs for a technician

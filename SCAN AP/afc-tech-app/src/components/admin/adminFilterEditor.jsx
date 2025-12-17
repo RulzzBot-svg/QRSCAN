@@ -90,7 +90,9 @@ function AdminFilterEditor({ ahu, onClose }) {
                             <th>Part #</th>
                             <th>Size</th>
                             <th>Qty</th>
-                            <th> </th>
+                            <th>Frequency (Days)</th>
+                            <th>Save</th>
+                            <th>Delete</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -155,6 +157,14 @@ function AdminFilterEditor({ ahu, onClose }) {
                                         value={f.quantity}
                                         onChange={e => updateFilter(f.id, "quantity", e.target.value)}
                                     />
+                                </td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        className="input input-xs input-bordered w-16"
+                                        value={f.frequency_days}
+                                        onChange={e=>updateFilter(f.id, "frequency_days", e.target.value)}
+                                    /> 
                                 </td>
                                 <td>
                                     <button
