@@ -55,7 +55,7 @@ export default function QRScanner() {
             try {
               const url = new URL(value);
               log("Externadl URL detected");
-              window.location.hred = url.href;
+              window.location.href = url.href;
             } catch {
               log(`➡️ Navigating to /FilterInfo/${value}`);
               navigate(`/FilterInfo/${value}`, { replace: true });
