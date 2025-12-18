@@ -14,7 +14,18 @@ import AdminDashboard from "./components/admin/admin";
 import Hospitals from "./components/admin/hospitals";
 import AdminAHUs from "./components/admin/adminahus";
 import AdminJobs from "./components/admin/adminjobs";
+import { registerSW } from "virtual:pwa-register";
 
+//hope it works
+registerSW({
+  immediate: false,
+  onOfflineReady() {
+    console.log("PWA offline ready");
+  },
+  onNeedRefresh() {
+    console.log("New version available");
+  }
+});
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(
