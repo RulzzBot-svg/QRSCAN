@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
@@ -6,50 +6,65 @@ export default function QRScanner() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
-  const navigatingRef = useRef(false);
+  const hasScannedRef = useRef(false);
+
+  const [logs, setLogs] = useState([]);
+
+  const log = (msg) => {
+    console.log(msg);
+    setLogs((prev) => [...prev.slice(-6), msg]);
+  };
 
   useEffect(() => {
-    const startScanner = async () => {
-      scannerRef.current = new BrowserMultiFormatReader();
+    log("🔵 Scanner component mounted");
 
-      try {
-        await scannerRef.current.decodeFromVideoDevice(
-          null,
-          videoRef.current,
-          (result) => {
-            if (!result || navigatingRef.current) return;
+    scannerRef.current = new BrowserMultiFormatReader();
 
-            navigatingRef.current = true;
+    scannerRef.current
+      .decodeFromVideoDevice(
+        null,
+        videoRef.current,
+        (result, error) => {
+          if (result && !hasScannedRef.current) {
+            hasScannedRef.current = true;
 
             const value = result.getText();
-            console.log("QR Detected:", value);
+            log("✅ QR detected");
+            log(value);
 
-            // ✅ STOP CAMERA FIRST
-            scannerRef.current.reset();
+            // 🔑 STEP 1: Navigate FIRST
+            try {
+              const url = new URL(value);
+              const ahuId = url.pathname.split("/").pop();
+              log(`➡️ Navigating to /FilterInfo/${ahuId}`);
+              navigate(`/FilterInfo/${ahuId}`);
+            } catch {
+              log(`➡️ Navigating to /FilterInfo/${value}`);
+              navigate(`/FilterInfo/${value}`);
+            }
 
-            // ✅ NAVIGATE ON NEXT TICK
+            // 🔑 STEP 2: Clean up AFTER navigation
             setTimeout(() => {
-              try {
-                const url = new URL(value);
-                const ahuId = url.pathname.split("/").pop();
-                navigate(`/FilterInfo/${ahuId}`, { replace: true });
-              } catch {
-                navigate(`/FilterInfo/${value}`, { replace: true });
-              }
-            }, 0);
+              log("🧹 Cleaning up camera");
+              scannerRef.current?.reset();
+            }, 300);
           }
-        );
-      } catch (err) {
-        console.error("Camera start failed:", err);
-      }
-    };
 
-    startScanner();
+          if (error) {
+            // ZXing throws frequent "not found" errors — log only occasionally
+            // log("🔍 scanning...");
+          }
+        }
+      )
+      .then(() => log("📷 Camera stream started"))
+      .catch((err) => {
+        log("❌ Camera failed to start");
+        log(err.message || String(err));
+      });
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.reset();
-      }
+      log("🔴 Scanner unmounting");
+      scannerRef.current?.reset();
     };
   }, [navigate]);
 
@@ -73,9 +88,13 @@ export default function QRScanner() {
         />
       </div>
 
-      <p className="text-center text-sm text-base-content/70 mt-2">
-        Position the QR Code inside the frame
-      </p>
+      {/* 🔍 ON-SCREEN DEBUG LOGS */}
+      <div className="mt-4 bg-base-100 border border-base-300 rounded p-3 text-xs font-mono space-y-1">
+        <div className="font-semibold text-primary">Scanner Debug</div>
+        {logs.map((l, i) => (
+          <div key={i}>{l}</div>
+        ))}
+      </div>
     </div>
   );
 }
