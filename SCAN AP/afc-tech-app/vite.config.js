@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      devOptions: { enabled: true }, // lets you test PWA in dev
+      devOptions: { enabled: false }, 
       workbox: {
         // Cache app assets; API caching comes later (we'll handle data via IndexedDB)
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
