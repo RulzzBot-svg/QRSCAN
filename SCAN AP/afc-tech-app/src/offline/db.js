@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 
 const DB_NAME = "afc-tech";
-const DB_VERSION =1;
+const DB_VERSION =2;
 
 
 export const dbPromise = openDB(DB_NAME, DB_VERSION,{
@@ -12,7 +12,7 @@ export const dbPromise = openDB(DB_NAME, DB_VERSION,{
             store.createIndex("synced","synced");
         }
         if(!db.objectStoreNames.contains("ahuCache")){
-            db.createObjectStore("ahuCahce",{keyPath:"ahu_id"});
+            db.createObjectStore("ahuCache",{keyPath:"ahu_id"});
         }
     },
 
