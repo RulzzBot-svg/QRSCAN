@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import axios from "axios";
 import { API } from "../../api/api";
 
 function AdminFilterEditor({ ahu, onClose }) {
@@ -7,8 +6,8 @@ function AdminFilterEditor({ ahu, onClose }) {
     const [filters, setFilters] = useState([]);
 
     useEffect(() => {
-        axios
-            .get(`/api/admin/ahus/${ahu.id}/filters`)
+        API
+            .get(`/admin/ahus/${ahu.id}/filters`)
             .then(res => setFilters(res.data));
     }, [ahu.id]);
 
@@ -35,7 +34,7 @@ function AdminFilterEditor({ ahu, onClose }) {
 
 
     const saveFilter = async (filter) => {
-        await API.put(`/api/admin/filters/${filter.id}`, filter);
+        await API.put(`/admin/filters/${filter.id}`, filter);
     };
 
     const addFilter = () => {
@@ -46,7 +45,7 @@ function AdminFilterEditor({ ahu, onClose }) {
     };
 
     const saveNew = async (filter) => {
-        await API.post(`/api/admin/ahus/${ahu.id}/filters`, filter);
+        await API.post(`/admin/ahus/${ahu.id}/filters`, filter);
     };
 
     const markForDelete = (filter) => {
@@ -73,7 +72,7 @@ function AdminFilterEditor({ ahu, onClose }) {
 
 
     useEffect(() => {
-        API.get(`/api/admin/ahus/${ahu.id}/filters`).then(res => setFilters(res.data.map(f => ({ ...f, sizeParts: parseSize(f.size) }))))
+        API.get(`/admin/ahus/${ahu.id}/filters`).then(res => setFilters(res.data.map(f => ({ ...f, sizeParts: parseSize(f.size) }))))
     }, [ahu.id]);
 
 
@@ -200,7 +199,7 @@ function AdminFilterEditor({ ahu, onClose }) {
                             const toDelete = filters.filter(f => f._markedForDelete && !f.id.toString().startsWith("new"));
 
                             for (const f of toDelete) {
-                                await API.delete(`/api/admin/filters/${f.id}`);
+                                await API.delete(`/admin/filters/${f.id}`);
                             }
 
                             // 2️⃣ Save new filters that weren't deleted
@@ -209,7 +208,7 @@ function AdminFilterEditor({ ahu, onClose }) {
                             );
 
                             for (const f of newOnes) {
-                                await API.post(`/api/admin/ahus/${ahu.id}/filters`, f);
+                                await API.post(`/admin/ahus/${ahu.id}/filters`, f);
                             }
 
                             onClose();

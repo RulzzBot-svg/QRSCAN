@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import AdminSidebar from "./AdminSidebar";
+import { API } from "../../api/api";
+
 
 function AdminJobs() {
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
 
   useEffect(() => {
-    fetch("/api/admin/jobs")
-      .then(res => res.json())
-      .then(setJobs);
+    API.get("/admin/jobs")
+      .then(res => setJobs(res.data));
   }, []);
 
   return (

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import AdminSidebar from "./AdminSidebar";
 import AdminFilterEditor from "./adminFilterEditor";
+import { API } from "../../api/api";
 
 function AdminAHUs() {
   const [ahus, setAhus] = useState([]);
@@ -11,7 +12,7 @@ function AdminAHUs() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const res = await axios.get("/api/admin/ahus");
+      const res = await API.get("/admin/ahus");
       setAhus(Array.isArray(res.data) ? res.data : []);
       setLoading(false);
     };
