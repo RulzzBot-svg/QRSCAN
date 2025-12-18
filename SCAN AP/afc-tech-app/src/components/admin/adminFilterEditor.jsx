@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { API } from "../../api/api";
 
 function AdminFilterEditor({ ahu, onClose }) {
     const [confirmDelete, setConfirmDelete] = useState(null);
@@ -34,7 +35,7 @@ function AdminFilterEditor({ ahu, onClose }) {
 
 
     const saveFilter = async (filter) => {
-        await axios.put(`/api/admin/filters/${filter.id}`, filter);
+        await API.put(`/api/admin/filters/${filter.id}`, filter);
     };
 
     const addFilter = () => {
@@ -45,7 +46,7 @@ function AdminFilterEditor({ ahu, onClose }) {
     };
 
     const saveNew = async (filter) => {
-        await axios.post(`/api/admin/ahus/${ahu.id}/filters`, filter);
+        await API.post(`/api/admin/ahus/${ahu.id}/filters`, filter);
     };
 
     const markForDelete = (filter) => {
@@ -72,7 +73,7 @@ function AdminFilterEditor({ ahu, onClose }) {
 
 
     useEffect(() => {
-        axios.get(`/api/admin/ahus/${ahu.id}/filters`).then(res => setFilters(res.data.map(f => ({ ...f, sizeParts: parseSize(f.size) }))))
+        API.get(`/api/admin/ahus/${ahu.id}/filters`).then(res => setFilters(res.data.map(f => ({ ...f, sizeParts: parseSize(f.size) }))))
     }, [ahu.id]);
 
 
@@ -199,7 +200,7 @@ function AdminFilterEditor({ ahu, onClose }) {
                             const toDelete = filters.filter(f => f._markedForDelete && !f.id.toString().startsWith("new"));
 
                             for (const f of toDelete) {
-                                await axios.delete(`/api/admin/filters/${f.id}`);
+                                await API.delete(`/api/admin/filters/${f.id}`);
                             }
 
                             // 2️⃣ Save new filters that weren't deleted
@@ -208,7 +209,7 @@ function AdminFilterEditor({ ahu, onClose }) {
                             );
 
                             for (const f of newOnes) {
-                                await axios.post(`/api/admin/ahus/${ahu.id}/filters`, f);
+                                await API.post(`/api/admin/ahus/${ahu.id}/filters`, f);
                             }
 
                             onClose();
