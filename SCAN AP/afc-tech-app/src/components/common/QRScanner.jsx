@@ -2,6 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
+function stopCamera(videoRef) {
+  const video = videoRef.current;
+  if (!video) return;
+
+  const stream = video.srcObject;
+  if (stream) {
+    stream.getTracks().forEach((track) => track.stop());
+    video.srcObject = null;
+  }
+}
+
 export default function QRScanner() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
@@ -15,15 +26,15 @@ export default function QRScanner() {
     console.log(msg);
     setLogs((prev) => [...prev.slice(-6), msg]);
   };
-
   useEffect(() => {
     if (!scanning) return;
 
     log("📷 Starting camera");
 
-    scannerRef.current = new BrowserMultiFormatReader();
+    const scanner = new BrowserMultiFormatReader();
+    scannerRef.current = scanner;
 
-    scannerRef.current
+    scanner
       .decodeFromVideoDevice(null, videoRef.current, (result) => {
         if (result && !scannedRef.current) {
           scannedRef.current = true;
@@ -32,10 +43,14 @@ export default function QRScanner() {
           log("✅ QR detected");
           log(value);
 
-          // 🔑 STEP 1: UNMOUNT VIDEO
+          // 🛑 HARD STOP CAMERA + ZXING FIRST
+          scanner.reset();
+          stopCamera(videoRef);
+
+          // 🧹 UNMOUNT VIDEO
           setScanning(false);
 
-          // 🔑 STEP 2: NAVIGATE AFTER VIDEO IS GONE
+          // 🚀 NAVIGATE ON NEXT FRAME
           requestAnimationFrame(() => {
             try {
               const url = new URL(value);
@@ -43,6 +58,7 @@ export default function QRScanner() {
               log(`➡️ Navigating to /FilterInfo/${ahuId}`);
               navigate(`/FilterInfo/${ahuId}`, { replace: true });
             } catch {
+              log(`➡️ Navigating to /FilterInfo/${value}`);
               navigate(`/FilterInfo/${value}`, { replace: true });
             }
           });
@@ -56,9 +72,11 @@ export default function QRScanner() {
 
     return () => {
       log("🧹 Scanner cleanup");
-      scannerRef.current?.reset();
+      scanner.reset();
+      stopCamera(videoRef);
     };
   }, [navigate, scanning]);
+
 
   return (
     <div data-theme="corporate" className="p-4 min-h-screen bg-base-200">
