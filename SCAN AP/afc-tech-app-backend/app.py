@@ -28,7 +28,7 @@ def create_app():
     app.register_blueprint(job_bp, url_prefix="/api")
     app.register_blueprint(tech_bp, url_prefix="/api")
     app.register_blueprint(hospital_bp, url_prefix="/api")
-    app.register_blueprint(admin_bp, url_prefix="/admin")
+    app.register_blueprint(admin_bp, url_prefix="/api/admin")
 
     @app.route("/")
     def home():
