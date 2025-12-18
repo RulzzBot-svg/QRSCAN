@@ -13,6 +13,7 @@
     "@yudiel/react-qr-scanner": "^2.4.1",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.13.2",
+    "html5-qrcode": "^2.3.8",
     "idb": "^8.0.3",
     "qr-scanner": "^1.4.2",
     "react": "^19.2.0",

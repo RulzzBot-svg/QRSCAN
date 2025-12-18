@@ -1,43 +1,47 @@
-import React, { useState, useRef } from 'react';
-import { QrScanner } from '@yudiel/react-qr-scanner';
+import { useEffect } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 
-const QRScanner = () => {
-  const [scannedUrl, setScannedUrl] = useState(null);
-  const scannerRef = useRef(null);
+export default function QRScanner() {
+  useEffect(() => {
+    const qrCodeRegionId = "qr-reader";
+    const html5QrCode = new Html5Qrcode(qrCodeRegionId);
 
-  const handleScan = (result) => {
-    if (result) {
-      const url = result[0]?.rawValue; // Get the raw value from the scan result
-      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-        setScannedUrl(url); // Store the URL
-        // Redirect the user
-        window.location.href = url; // This redirects the current browser tab to the URL
-      } else {
-        // Handle cases where the scanned data is not a valid URL (optional)
-        console.log("Scanned data is not a valid URL:", url);
-      }
-    }
-  };
+    html5QrCode
+      .start(
+        { facingMode: "environment" }, // back camera
+        {
+          fps: 10,
+          qrbox: 250,
+        },
+        (decodedText) => {
+          console.log("QR detected:", decodedText);
 
-  const handleError = (error) => {
-    console.error(error);
-  };
+          // 🛑 Stop scanner FIRST
+          html5QrCode
+            .stop()
+            .then(() => {
+              // 🌍 HARD REDIRECT
+              window.location.assign(decodedText);
+            })
+            .catch((err) => console.error("Stop failed", err));
+        },
+        (errorMessage) => {
+          // Optional: console.log(errorMessage);
+        }
+      )
+      .catch((err) => {
+        console.error("Camera start failed", err);
+      });
+
+    return () => {
+      html5QrCode.stop().catch(() => {});
+    };
+  }, []);
 
   return (
     <div>
-      <h1>Scan a QR Code to Redirect</h1>
-      {scannedUrl ? (
-        <p>Redirecting to: {scannedUrl}</p>
-      ) : (
-        <div ref={scannerRef} style={{ width: '500px', height: '500px' }}>
-          <QrScanner
-            onDecode={handleScan}
-            onError={handleError}
-          />
-        </div>
-      )}
+      <h2>Scan QR Code</h2>
+      <div id="qr-reader" style={{ width: "100%" }} />
     </div>
   );
-};
-
-export default QRScanner;
+}
