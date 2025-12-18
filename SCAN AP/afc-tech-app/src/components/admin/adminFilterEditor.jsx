@@ -83,7 +83,7 @@ function AdminFilterEditor({ ahu, onClose }) {
                     Edit Filters – {ahu.id}
                 </h3>
 
-                <table className="table table-sm">
+                <table className="table table-sm ">
                     <thead>
                         <tr>
                             <th>Phase</th>
@@ -179,7 +179,7 @@ function AdminFilterEditor({ ahu, onClose }) {
                                     </button>
                                 </td>
                                 <td>
-                                    <button className="btn btn-error btn-xs text-white" disabled={f._markedForDelete} onClick={() => setConfirmDelete(f)}>
+                                    <button className="btn btn-error btn-xs inline-flex items-center flex-nowrap whitespace-nowrap text-white" disabled={f._markedForDelete} onClick={() => setConfirmDelete(f)}>
                                         Delete 🗑️
                                     </button>
                                 </td>
@@ -195,14 +195,12 @@ function AdminFilterEditor({ ahu, onClose }) {
                     <button
                         className="btn"
                         onClick={async () => {
-                            // 1️⃣ Delete marked filters
                             const toDelete = filters.filter(f => f._markedForDelete && !f.id.toString().startsWith("new"));
 
                             for (const f of toDelete) {
                                 await API.delete(`/admin/filters/${f.id}`);
                             }
 
-                            // 2️⃣ Save new filters that weren't deleted
                             const newOnes = filters.filter(
                                 f => f.id.toString().startsWith("new") && !f._markedForDelete
                             );

@@ -11,7 +11,6 @@ function AdminHospitals() {
 
   return (
     <div data-theme="corporate" className="flex min-h-screen bg-base-200">
-      <AdminSidebar />
 
       <main className="flex-1 p-6">
         <h1 className="text-3xl font-bold text-primary mb-6">

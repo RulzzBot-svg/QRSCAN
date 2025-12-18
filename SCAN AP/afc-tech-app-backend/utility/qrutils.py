@@ -1,9 +1,9 @@
 import qrcode
 
 
-ahu_id="work2"
+ahu_id="work3"
 
-url= f"https://qrscan-lyart.vercel.app/FilterInfo/AHU-3A"
+url= f"https://qrscan-lyart.vercel.app/FilterInfo/AHU-5A"
 
 qr=qrcode.QRCode(
     version=2,

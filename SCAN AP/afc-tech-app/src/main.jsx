@@ -14,6 +14,7 @@ import AdminDashboard from "./components/admin/admin";
 import Hospitals from "./components/admin/hospitals";
 import AdminAHUs from "./components/admin/adminahus";
 import AdminJobs from "./components/admin/adminjobs";
+import AdminLayout from "./components/admin/AdminLayout";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -22,14 +23,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/" element={<App />} />
         <Route path="/hospitals" element={<HospitalCards />} />
         <Route path="/AHU" element={<AHU />} />
-        <Route path="/AHU/:hospitalId" element={<AHUPage/>}/>
-        <Route path="FilterInfo/:ahuId" element={<FilterInfo/>}/>
-        <Route path="/job-completed" element={<jobCompleted/>}/>
-        <Route path="/scan" element={<QRScanner/>}/>
-        <Route path="/admin" element={<AdminDashboard/>}/>
-        <Route path="/admin/hospitals" element={<Hospitals/>}/>
-        <Route path="/admin/ahus" element={<AdminAHUs/>}/>
-        <Route path="/admin/jobs" element={<AdminJobs/>}/>
+        <Route path="/AHU/:hospitalId" element={<AHUPage />} />
+        <Route path="FilterInfo/:ahuId" element={<FilterInfo />} />
+        <Route path="/job-completed" element={<jobCompleted />} />
+        <Route path="/scan" element={<QRScanner />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="hospitals" element={<Hospitals />} />
+          <Route path="ahus" element={<AdminAHUs />} />
+          <Route path="jobs" element={<AdminJobs />} />
+        </Route>
+
 
 
       </Routes>

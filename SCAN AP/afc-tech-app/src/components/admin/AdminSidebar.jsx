@@ -1,47 +1,88 @@
-import { NavLink } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-
-
-
-
+import { NavLink, useNavigate } from "react-router-dom";
 
 function AdminSidebar() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+
   const linkClass = ({ isActive }) =>
-    `block px-4 py-2 rounded-lg ${isActive
-      ? "bg-primary text-primary-content"
-      : "hover:bg-base-200"
-    }`;
+    `flex items-center gap-3 px-3 py-2 rounded-lg transition
+     ${isActive ? "bg-primary text-primary-content" : "hover:bg-base-300"}`;
 
   return (
-    <aside className="w-64 bg-base-100 border-r border-base-300 p-4">
-      <h2 className="text-xl font-bold text-primary mb-6">
+    <aside
+      className="
+        flex min-h-full flex-col bg-base-100 border-r border-base-300
+        is-drawer-close:w-14
+        is-drawer-open:w-64
+        transition-all duration-300
+      "
+    >
+      {/* Logo / Title */}
+      <div className="p-4 font-bold text-primary is-drawer-close:hidden">
         AFC Admin
-      </h2>
+      </div>
 
-      <nav className="space-y-2 text-sm">
-        <NavLink to="/admin" end className={linkClass}>
-          📊 Dashboard
-        </NavLink>
+      {/* Nav */}
+      <ul className="menu grow px-2 space-y-1 text-sm">
+        <li>
+          <NavLink
+            to="/admin"
+            end
+            className={`${linkClass} is-drawer-close:tooltip is-drawer-close:tooltip-right`}
+            data-tip="Dashboard"
+          >
+            📊
+            <span className="is-drawer-close:hidden">Dashboard</span>
+          </NavLink>
+        </li>
 
-        <NavLink to="/admin/hospitals" className={linkClass}>
-          🏥 Hospitals
-        </NavLink>
+        <li>
+          <NavLink
+            to="/admin/hospitals"
+            className={`${linkClass} is-drawer-close:tooltip is-drawer-close:tooltip-right`}
+            data-tip="Hospitals"
+          >
+            🏥
+            <span className="is-drawer-close:hidden">Hospitals</span>
+          </NavLink>
+        </li>
 
-        <NavLink to="/admin/ahus" className={linkClass}>
-          🌀 AHUs
-        </NavLink>
+        <li>
+          <NavLink
+            to="/admin/ahus"
+            className={`${linkClass} is-drawer-close:tooltip is-drawer-close:tooltip-right`}
+            data-tip="AHUs"
+          >
+            🌀
+            <span className="is-drawer-close:hidden">AHUs</span>
+          </NavLink>
+        </li>
 
-        <NavLink to="/admin/jobs" className={linkClass}>
-          📋 Jobs / History
-        </NavLink>
-      </nav>
-      <div className="px-4 py-3 border-t border-base-300">
+        <li>
+          <NavLink
+            to="/admin/jobs"
+            className={`${linkClass} is-drawer-close:tooltip is-drawer-close:tooltip-right`}
+            data-tip="Jobs"
+          >
+            📋
+            <span className="is-drawer-close:hidden">Jobs</span>
+          </NavLink>
+        </li>
+      </ul>
+
+      {/* Footer */}
+      <div className="p-2 border-t border-base-300">
         <button
-          className="btn btn-ghost btn-sm w-full justify-start"
+          className="
+            btn btn-ghost btn-sm w-full justify-start
+            is-drawer-close:tooltip is-drawer-close:tooltip-right
+          "
+          data-tip="Back to Technician App"
           onClick={() => navigate("/")}
         >
-          ⬅ Back to Technician App
+          ⬅
+          <span className="is-drawer-close:hidden ml-2">
+            Back to Technician App
+          </span>
         </button>
       </div>
     </aside>
