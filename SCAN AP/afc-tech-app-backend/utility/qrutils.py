@@ -1,9 +1,9 @@
 import qrcode
 
 
-ahu_id="AHU-WM-1"
+ahu_id="work1"
 
-url= f"https://qrscan-a7pc3udxz-raul-ostorgas-projects.vercel.app/FilterInfo/AHU-WM-1"
+url= f"https://qrscan-4r8pp4dvi-raul-ostorgas-projects.vercel.app/FilterInfo/AHU-EN-2"
 
 qr=qrcode.QRCode(
     version=2,

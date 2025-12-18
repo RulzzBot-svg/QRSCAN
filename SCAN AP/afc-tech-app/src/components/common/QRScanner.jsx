@@ -10,11 +10,11 @@ export default function QRScanner() {
     if (!results || scannedRef.current) return;
 
     const result = Array.isArray(results) ? results[0] : results;
-    if (!result) return;
+    if (!result?.rawValue) return;
 
     scannedRef.current = true;
 
-    const value = result.rawValue || result.text;
+    const value = result.rawValue;
     console.log("QR Detected:", value);
 
     try {
@@ -22,7 +22,6 @@ export default function QRScanner() {
       const ahuId = url.pathname.split("/").pop();
       navigate(`/FilterInfo/${ahuId}`);
     } catch {
-      // Fallback: plain text QR
       navigate(`/FilterInfo/${value}`);
     }
   };
@@ -40,9 +39,11 @@ export default function QRScanner() {
       <div className="rounded-xl overflow-hidden shadow border border-base-300">
         <Scanner
           onResult={handleScan}
+          formats={["qr_code"]}              // ✅ REQUIRED
           constraints={{ facingMode: "environment" }}
           scanDelay={150}
-          className="w-full h-auto"
+          className="w-full"
+          styles={{ container: { height: "320px" } }} // ✅ REQUIRED
         />
       </div>
 
