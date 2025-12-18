@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function App() {
   const navigate = useNavigate();
+  console.log("API BASE URL:", import.meta.env.VITE_API_BASE_URL);
 
   return (
     <div data-theme="corporate" className="min-h-screen flex flex-col bg-base-200">

@@ -1,6 +1,7 @@
 import axios from "axios";
+import { API } from "./api";
 
 
 export const getAdminOverview = () =>{
-    return axios.get("/admin");
+    return API.get("/admin");
 };
