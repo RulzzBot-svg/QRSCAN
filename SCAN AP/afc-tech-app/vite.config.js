@@ -7,8 +7,6 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-
-      // 🚫 Do NOT enable SW in dev (prevents weird caching during development)
       devOptions: { enabled: false },
 
       manifest: {
@@ -26,13 +24,25 @@ export default defineConfig({
       },
 
       workbox: {
-        // ✅ This helps avoid stale/broken caches hanging around
         cleanupOutdatedCaches: true,
 
-        // ✅ Cache your built assets (including css/js) once you deploy
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // ⛔ REMOVE CSS FROM PRECACHE
+        globPatterns: ["**/*.{js,html,ico,png,svg,woff2}"],
 
-        // ✅ Don’t cache API calls here (we’ll do offline data via IndexedDB)
+        // ✅ CSS MUST BE NETWORK-FIRST
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.destination === "style",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "css-runtime",
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 // 1 hour
+              }
+            }
+          }
+        ]
       }
     })
   ]
