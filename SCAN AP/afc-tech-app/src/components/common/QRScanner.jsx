@@ -6,9 +6,10 @@ export default function QRScanner() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
-  const hasScannedRef = useRef(false);
+  const scannedRef = useRef(false);
 
   const [logs, setLogs] = useState([]);
+  const [scanning, setScanning] = useState(true); // 🔑 controls video mount
 
   const log = (msg) => {
     console.log(msg);
@@ -16,57 +17,48 @@ export default function QRScanner() {
   };
 
   useEffect(() => {
-    log("🔵 Scanner component mounted");
+    if (!scanning) return;
+
+    log("📷 Starting camera");
 
     scannerRef.current = new BrowserMultiFormatReader();
 
     scannerRef.current
-      .decodeFromVideoDevice(
-        null,
-        videoRef.current,
-        (result, error) => {
-          if (result && !hasScannedRef.current) {
-            hasScannedRef.current = true;
+      .decodeFromVideoDevice(null, videoRef.current, (result) => {
+        if (result && !scannedRef.current) {
+          scannedRef.current = true;
 
-            const value = result.getText();
-            log("✅ QR detected");
-            log(value);
+          const value = result.getText();
+          log("✅ QR detected");
+          log(value);
 
-            // 🔑 STEP 1: Navigate FIRST
+          // 🔑 STEP 1: UNMOUNT VIDEO
+          setScanning(false);
+
+          // 🔑 STEP 2: NAVIGATE AFTER VIDEO IS GONE
+          requestAnimationFrame(() => {
             try {
               const url = new URL(value);
               const ahuId = url.pathname.split("/").pop();
               log(`➡️ Navigating to /FilterInfo/${ahuId}`);
-              navigate(`/FilterInfo/${ahuId}`);
+              navigate(`/FilterInfo/${ahuId}`, { replace: true });
             } catch {
-              log(`➡️ Navigating to /FilterInfo/${value}`);
-              navigate(`/FilterInfo/${value}`);
+              navigate(`/FilterInfo/${value}`, { replace: true });
             }
-
-            // 🔑 STEP 2: Clean up AFTER navigation
-            setTimeout(() => {
-              log("🧹 Cleaning up camera");
-              scannerRef.current?.reset();
-            }, 300);
-          }
-
-          if (error) {
-            // ZXing throws frequent "not found" errors — log only occasionally
-            // log("🔍 scanning...");
-          }
+          });
         }
-      )
-      .then(() => log("📷 Camera stream started"))
+      })
+      .then(() => log("🎥 Camera stream active"))
       .catch((err) => {
-        log("❌ Camera failed to start");
+        log("❌ Camera failed");
         log(err.message || String(err));
       });
 
     return () => {
-      log("🔴 Scanner unmounting");
+      log("🧹 Scanner cleanup");
       scannerRef.current?.reset();
     };
-  }, [navigate]);
+  }, [navigate, scanning]);
 
   return (
     <div data-theme="corporate" className="p-4 min-h-screen bg-base-200">
@@ -78,17 +70,25 @@ export default function QRScanner() {
         Scan AHU QR Code
       </h1>
 
-      <div className="rounded-xl overflow-hidden shadow border border-base-300">
-        <video
-          ref={videoRef}
-          className="w-full"
-          style={{ height: "320px", objectFit: "cover" }}
-          muted
-          playsInline
-        />
-      </div>
+      {/* 🔑 CONDITIONAL VIDEO RENDER */}
+      {scanning ? (
+        <div className="rounded-xl overflow-hidden shadow border border-base-300">
+          <video
+            ref={videoRef}
+            className="w-full"
+            style={{ height: "320px", objectFit: "cover" }}
+            muted
+            playsInline
+          />
+        </div>
+      ) : (
+        <div className="flex items-center justify-center h-80 bg-base-100 border border-base-300 rounded">
+          <span className="loading loading-spinner loading-lg text-primary" />
+          <span className="ml-3 text-sm">Loading AHU…</span>
+        </div>
+      )}
 
-      {/* 🔍 ON-SCREEN DEBUG LOGS */}
+      {/* 🔍 DEBUG LOGS */}
       <div className="mt-4 bg-base-100 border border-base-300 rounded p-3 text-xs font-mono space-y-1">
         <div className="font-semibold text-primary">Scanner Debug</div>
         {logs.map((l, i) => (
