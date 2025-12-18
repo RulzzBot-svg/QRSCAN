@@ -1,99 +1,43 @@
-import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
+import React, { useState, useRef } from 'react';
+import { QrScanner } from '@yudiel/react-qr-scanner';
 
-function stopCamera(videoRef) {
-  const video = videoRef.current;
-  if (!video) return;
-
-  const stream = video.srcObject;
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop());
-    video.srcObject = null;
-  }
-}
-
-export default function QRScanner() {
-  const videoRef = useRef(null);
+const QRScanner = () => {
+  const [scannedUrl, setScannedUrl] = useState(null);
   const scannerRef = useRef(null);
-  const scannedRef = useRef(false);
 
-  const [logs, setLogs] = useState([]);
-  const [scanning, setScanning] = useState(true);
-
-  const log = (msg) => {
-    console.log(msg);
-    setLogs((prev) => [...prev.slice(-6), msg]);
+  const handleScan = (result) => {
+    if (result) {
+      const url = result[0]?.rawValue; // Get the raw value from the scan result
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        setScannedUrl(url); // Store the URL
+        // Redirect the user
+        window.location.href = url; // This redirects the current browser tab to the URL
+      } else {
+        // Handle cases where the scanned data is not a valid URL (optional)
+        console.log("Scanned data is not a valid URL:", url);
+      }
+    }
   };
 
-  useEffect(() => {
-    if (!scanning) return;
-
-    log("📷 Starting camera");
-
-    const scanner = new BrowserMultiFormatReader();
-    scannerRef.current = scanner;
-
-    scanner
-      .decodeFromVideoDevice(null, videoRef.current, (result) => {
-        if (!result || scannedRef.current) return;
-
-        scannedRef.current = true;
-
-        const value = result.getText();
-        log("✅ QR detected");
-        log(value);
-
-        // 🛑 STOP EVERYTHING FIRST
-        scanner.reset();
-        stopCamera(videoRef);
-        setScanning(false);
-
-        // 🌍 HARD REDIRECT (mobile-safe)
-        log("🌍 Redirecting…");
-        window.location.assign(value);
-      })
-      .then(() => log("🎥 Camera stream active"))
-      .catch((err) => {
-        log("❌ Camera failed");
-        log(err.message || String(err));
-      });
-
-    return () => {
-      log("🧹 Scanner cleanup");
-      scanner.reset();
-      stopCamera(videoRef);
-    };
-  }, [scanning]);
+  const handleError = (error) => {
+    console.error(error);
+  };
 
   return (
-    <div data-theme="corporate" className="p-4 min-h-screen bg-base-200">
-      <h1 className="text-2xl font-bold mb-4 text-primary">
-        Scan AHU QR Code
-      </h1>
-
-      {scanning ? (
-        <div className="rounded-xl overflow-hidden shadow border border-base-300">
-          <video
-            ref={videoRef}
-            className="w-full"
-            style={{ height: "320px", objectFit: "cover" }}
-            muted
-            playsInline
+    <div>
+      <h1>Scan a QR Code to Redirect</h1>
+      {scannedUrl ? (
+        <p>Redirecting to: {scannedUrl}</p>
+      ) : (
+        <div ref={scannerRef} style={{ width: '500px', height: '500px' }}>
+          <QrScanner
+            onDecode={handleScan}
+            onError={handleError}
           />
         </div>
-      ) : (
-        <div className="flex items-center justify-center h-80 bg-base-100 border border-base-300 rounded">
-          <span className="loading loading-spinner loading-lg text-primary" />
-          <span className="ml-3 text-sm">Loading AHU…</span>
-        </div>
       )}
-
-      <div className="mt-4 bg-base-100 border border-base-300 rounded p-3 text-xs font-mono space-y-1">
-        <div className="font-semibold text-primary">Scanner Debug</div>
-        {logs.map((l, i) => (
-          <div key={i}>{l}</div>
-        ))}
-      </div>
     </div>
   );
-}
+};
+
+export default QRScanner;
