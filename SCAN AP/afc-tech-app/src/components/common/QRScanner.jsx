@@ -1,34 +1,50 @@
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Scanner } from "@yudiel/react-qr-scanner";
-import { useRef } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 export default function QRScanner() {
   const navigate = useNavigate();
-  const scannedRef = useRef(false);
+  const videoRef = useRef(null);
+  const scannerRef = useRef(null);
 
-  const handleResult = (result, error) => {
-    if (scannedRef.current) return;
-
-    if (result) {
-      scannedRef.current = true;
-
-      const value = result.rawValue;
-      console.log("QR Detected:", value);
+  useEffect(() => {
+    const startScanner = async () => {
+      scannerRef.current = new BrowserMultiFormatReader();
 
       try {
-        const url = new URL(value);
-        const ahuId = url.pathname.split("/").pop();
-        navigate(`/FilterInfo/${ahuId}`);
-      } catch {
-        navigate(`/FilterInfo/${value}`);
-      }
-    }
+        await scannerRef.current.decodeFromVideoDevice(
+          null, // auto-select back camera
+          videoRef.current,
+          (result, error) => {
+            if (result) {
+              const value = result.getText();
+              console.log("QR Detected:", value);
 
-    if (error) {
-      // This fires continuously when no QR is found — safe to ignore
-      // console.debug("QR scan error:", error);
-    }
-  };
+              try {
+                const url = new URL(value);
+                const ahuId = url.pathname.split("/").pop();
+                navigate(`/FilterInfo/${ahuId}`);
+              } catch {
+                navigate(`/FilterInfo/${value}`);
+              }
+
+              scannerRef.current.reset();
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Camera start failed:", err);
+      }
+    };
+
+    startScanner();
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.reset();
+      }
+    };
+  }, [navigate]);
 
   return (
     <div data-theme="corporate" className="p-4 min-h-screen bg-base-200">
@@ -41,19 +57,12 @@ export default function QRScanner() {
       </h1>
 
       <div className="rounded-xl overflow-hidden shadow border border-base-300">
-        <Scanner
-          onResult={handleResult}          // ✅ REQUIRED
-          constraints={{
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }}
+        <video
+          ref={videoRef}
           className="w-full"
-          styles={{
-            container: {
-              height: "320px"              // ✅ REQUIRED
-            }
-          }}
+          style={{ height: "320px", objectFit: "cover" }}
+          muted
+          playsInline
         />
       </div>
 
