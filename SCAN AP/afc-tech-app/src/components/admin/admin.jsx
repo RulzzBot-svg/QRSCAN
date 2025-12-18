@@ -4,6 +4,8 @@ import { getHospitals } from "../../api/hospitals";
 import { getAHUsForHospital } from "../../api/hospitals";
 
 function AdminDashboard() {
+    console.log("API BASE URL:", import.meta.env.VITE_API_BASE_URL);
+
   const [stats, setStats] = useState({
     hospitals: 0,
     ahus: 0,
