@@ -54,9 +54,8 @@ export default function QRScanner() {
           requestAnimationFrame(() => {
             try {
               const url = new URL(value);
-              const ahuId = url.pathname.split("/").pop();
-              log(`➡️ Navigating to /FilterInfo/${ahuId}`);
-              navigate(`/FilterInfo/${ahuId}`, { replace: true });
+              log("Externadl URL detected");
+              window.location.hred = url.href;
             } catch {
               log(`➡️ Navigating to /FilterInfo/${value}`);
               navigate(`/FilterInfo/${value}`, { replace: true });
