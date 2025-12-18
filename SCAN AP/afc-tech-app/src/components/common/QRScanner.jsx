@@ -6,23 +6,27 @@ export default function QRScanner() {
   const navigate = useNavigate();
   const scannedRef = useRef(false);
 
-  const handleScan = (results) => {
-    if (!results || scannedRef.current) return;
+  const handleResult = (result, error) => {
+    if (scannedRef.current) return;
 
-    const result = Array.isArray(results) ? results[0] : results;
-    if (!result?.rawValue) return;
+    if (result) {
+      scannedRef.current = true;
 
-    scannedRef.current = true;
+      const value = result.rawValue;
+      console.log("QR Detected:", value);
 
-    const value = result.rawValue;
-    console.log("QR Detected:", value);
+      try {
+        const url = new URL(value);
+        const ahuId = url.pathname.split("/").pop();
+        navigate(`/FilterInfo/${ahuId}`);
+      } catch {
+        navigate(`/FilterInfo/${value}`);
+      }
+    }
 
-    try {
-      const url = new URL(value);
-      const ahuId = url.pathname.split("/").pop();
-      navigate(`/FilterInfo/${ahuId}`);
-    } catch {
-      navigate(`/FilterInfo/${value}`);
+    if (error) {
+      // This fires continuously when no QR is found — safe to ignore
+      // console.debug("QR scan error:", error);
     }
   };
 
@@ -38,12 +42,18 @@ export default function QRScanner() {
 
       <div className="rounded-xl overflow-hidden shadow border border-base-300">
         <Scanner
-          onResult={handleScan}
-          formats={["qr_code"]}              // ✅ REQUIRED
-          constraints={{ facingMode: "environment" }}
-          scanDelay={150}
+          onResult={handleResult}          // ✅ REQUIRED
+          constraints={{
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }}
           className="w-full"
-          styles={{ container: { height: "320px" } }} // ✅ REQUIRED
+          styles={{
+            container: {
+              height: "320px"              // ✅ REQUIRED
+            }
+          }}
         />
       </div>
 
