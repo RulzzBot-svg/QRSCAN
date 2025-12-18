@@ -14,8 +14,9 @@ import AdminDashboard from "./components/admin/admin";
 import Hospitals from "./components/admin/hospitals";
 import AdminAHUs from "./components/admin/adminahus";
 import AdminJobs from "./components/admin/adminjobs";
+import {registerSW} from "virtual:pwa-register";
 
-
+registerSW({immediate:true});
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(

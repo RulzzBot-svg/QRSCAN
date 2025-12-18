@@ -1,28 +1,30 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import mkcert from "vite-plugin-mkcert";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 
-
-
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    tailwindcss(),
     react(),
-  ],
-  server:{
-    port:5173,
-    host:true,
-    proxy:{
-      "/api":{
-        //home
-        //target:"http://192.168.1.167:5000",
-        //work
-        target:"http://192.168.1.131:5000",
-        changeOrigin:true,
-        secure:false,
+    VitePWA({
+      registerType: "autoUpdate",
+      devOptions: { enabled: true }, // lets you test PWA in dev
+      workbox: {
+        // Cache app assets; API caching comes later (we'll handle data via IndexedDB)
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
       },
-    },
-  },
-})
+      manifest: {
+        name: "AFC Technician",
+        short_name: "AFC Tech",
+        display: "standalone",
+        start_url: "/",
+        scope: "/",
+        background_color: "#ffffff",
+        theme_color: "#0f172a",
+        icons: [
+          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
+          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" }
+        ]
+      }
+    })
+  ]
+});

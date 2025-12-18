@@ -2,6 +2,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { getAHUbyQR } from "../../api/ahu";
 import { submitJob } from "../../api/jobs";
+import { queueJob } from "../../offline/jobQueue";
 
 function FilterInfo() {
   const navigate = useNavigate();
@@ -74,11 +75,17 @@ function FilterInfo() {
     };
 
     try {
-      setSubmitting(true);
-      await submitJob(jobData);
-      openModal();
+      if (!navigator.onLine) {
+        await queueJob(jobData);
+        openModal();
+        return;
+      }
+        await submitJob(jobData);
+        openModal();
     } catch (err) {
       console.error("Error submitting job:", err);
+      await queueJob(jobData);
+      openModal();
       alert("Failed to submit job.");
     } finally {
       setSubmitting(false);
@@ -290,7 +297,7 @@ function FilterInfo() {
         <dialog ref={modalRef} className="modal">
           <div className="modal-box text-center">
             <h3 className="font-bold text-lg text-primary">
-              Job Completed!
+              Job Saved!
             </h3>
 
             <p className="py-4 text-base-content/70">
