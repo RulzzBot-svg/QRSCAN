@@ -6,6 +6,7 @@ export default function QRScanner() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
+  const navigatingRef = useRef(false);
 
   useEffect(() => {
     const startScanner = async () => {
@@ -13,23 +14,29 @@ export default function QRScanner() {
 
       try {
         await scannerRef.current.decodeFromVideoDevice(
-          null, // auto-select back camera
+          null,
           videoRef.current,
-          (result, error) => {
-            if (result) {
-              const value = result.getText();
-              console.log("QR Detected:", value);
+          (result) => {
+            if (!result || navigatingRef.current) return;
 
+            navigatingRef.current = true;
+
+            const value = result.getText();
+            console.log("QR Detected:", value);
+
+            // ✅ STOP CAMERA FIRST
+            scannerRef.current.reset();
+
+            // ✅ NAVIGATE ON NEXT TICK
+            setTimeout(() => {
               try {
                 const url = new URL(value);
                 const ahuId = url.pathname.split("/").pop();
-                navigate(`/FilterInfo/${ahuId}`);
+                navigate(`/FilterInfo/${ahuId}`, { replace: true });
               } catch {
-                navigate(`/FilterInfo/${value}`);
+                navigate(`/FilterInfo/${value}`, { replace: true });
               }
-
-              scannerRef.current.reset();
-            }
+            }, 0);
           }
         );
       } catch (err) {
