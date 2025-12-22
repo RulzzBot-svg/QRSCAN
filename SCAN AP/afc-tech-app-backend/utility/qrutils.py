@@ -1,9 +1,9 @@
 import qrcode
 
 
-ahu_id="work3"
+ahu_id="AHU-GS-2"
 
-url= f"https://qrscan-lyart.vercel.app/FilterInfo/AHU-5A"
+url= f"https://qrscan-lyart.vercel.app/FilterInfo/{ahu_id}"
 
 qr=qrcode.QRCode(
     version=2,
@@ -16,5 +16,5 @@ qr.add_data(url)
 qr.make(fit=True)
 
 img = qr.make_image(fill_color="black", back_color="white")
-img.save(f"{ahu_id}.png")
+img.save(f"{ahu_id}Final.png")
 print("QR generated succesfully!")
