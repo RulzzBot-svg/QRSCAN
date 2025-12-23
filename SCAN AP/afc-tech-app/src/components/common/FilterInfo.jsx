@@ -18,6 +18,10 @@ function FilterInfo() {
   const [notes, setNotes] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
+  const [inspected, setInspected] = useState({});
+
+
+
 
   /* ----------------------------- */
   /* Online / Offline status watch */
@@ -79,9 +83,21 @@ function FilterInfo() {
   /* ----------------------------- */
   /* UI helpers                    */
   /* ----------------------------- */
-  const handleCheckbox = (id) => {
+
+  /*ask about this, should the tech have to check each box when they do replace or leave it seperate
+  each checkbox individual meaning inspected can be unchecked and replaced be checked?
+  or when its replaced it automatically checks inspected as well.
+  */ 
+  const handleCompleted = (id) => {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+    //delete the line below depending on the situation in the comments above line 87-90
+    setInspected((prev) => ({ ...prev, [id]: true }));
   };
+
+  const handleInspected = (id) => {
+    setInspected((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
 
   const handleNoteChange = (id, value) => {
     setNotes((prev) => ({ ...prev, [id]: value }));
@@ -103,6 +119,7 @@ function FilterInfo() {
 
     const filterPayload = filterRows.map((row) => ({
       filter_id: row.id,
+      is_inspected: inspected[row.id] || false,
       is_completed: checked[row.id] || false,
       note: notes[row.id] || ""
     }));
@@ -197,13 +214,12 @@ function FilterInfo() {
                 </div>
 
                 <span
-                  className={`badge ${
-                    ahu.status === "Overdue"
-                      ? "badge-error"
-                      : ahu.status === "Due Soon"
+                  className={`badge ${ahu.status === "Overdue"
+                    ? "badge-error"
+                    : ahu.status === "Due Soon"
                       ? "badge-warning"
                       : "badge-success"
-                  }`}
+                    }`}
                 >
                   {ahu.status}
                 </span>
@@ -216,12 +232,12 @@ function FilterInfo() {
                   </p>
                   {filterRows.some((f) => f.last_service_date)
                     ? new Date(
-                        Math.max(
-                          ...filterRows
-                            .filter((f) => f.last_service_date)
-                            .map((f) => new Date(f.last_service_date))
-                        )
-                      ).toLocaleDateString()
+                      Math.max(
+                        ...filterRows
+                          .filter((f) => f.last_service_date)
+                          .map((f) => new Date(f.last_service_date))
+                      )
+                    ).toLocaleDateString()
                     : "Never"}
                 </div>
 
@@ -257,7 +273,8 @@ function FilterInfo() {
                 <th className="px-4 py-3">Part</th>
                 <th className="px-4 py-3">Size</th>
                 <th className="px-4 py-3">Last Serviced</th>
-                <th className="px-4 py-3 text-center text-primary">Done</th>
+                <th className="px-4 py-3 text-center text-primary">Inspected</th>
+                <th className="px-4 py-4 text-center text-primary">Replaced</th>
                 <th className="px-4 py-3 text-center">Notes</th>
               </tr>
             </thead>
@@ -266,11 +283,10 @@ function FilterInfo() {
               {filterRows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`border-b border-base-300 ${
-                    checked[row.id]
-                      ? "bg-success/10"
-                      : "bg-base-100"
-                  }`}
+                  className={`border-b border-base-300 ${checked[row.id]
+                    ? "bg-success/10"
+                    : "bg-base-100"
+                    }`}
                 >
                   <td className="px-4 py-3 font-medium">
                     {row.quantity}
@@ -282,8 +298,8 @@ function FilterInfo() {
                     <span className="badge badge-success">
                       {row.last_service_date
                         ? new Date(
-                            row.last_service_date
-                          ).toLocaleDateString()
+                          row.last_service_date
+                        ).toLocaleDateString()
                         : "Never"}
                     </span>
                   </td>
@@ -292,10 +308,22 @@ function FilterInfo() {
                     <input
                       type="checkbox"
                       className="checkbox checkbox-primary"
-                      checked={checked[row.id] || false}
-                      onChange={() => handleCheckbox(row.id)}
+                      checked={inspected[row.id] || false}
+                      onChange={() => handleInspected(row.id)}
                     />
                   </td>
+
+                  <td className="px-4 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-primary"
+                      checked={checked[row.id] || false}
+                      onChange={() => handleCompleted(row.id)}
+                    />
+                  </td>
+
+
+
 
                   <td className="px-4 py-3 text-center">
                     <textarea
@@ -337,9 +365,8 @@ function FilterInfo() {
         <div className="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-4">
           <div className="max-w-3xl mx-auto">
             <button
-              className={`btn btn-primary w-full ${
-                submitting ? "loading" : ""
-              }`}
+              className={`btn btn-primary w-full ${submitting ? "loading" : ""
+                }`}
               onClick={handleJobCompletion}
               disabled={submitting}
             >
