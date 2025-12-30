@@ -112,26 +112,31 @@ class JobFilter(db.Model):
 
     job = relationship("Job", back_populates="job_filters")
     filter = relationship("Filter", back_populates="job_filters")
+    signature = relationship(
+    "JobSignature",
+    uselist=False,
+    back_populates="job",
+    cascade="all, delete-orphan"
+)
 #added a "inspected" checbox
 
 
 
 
 class JobSignature(db.Model):
-    
     __tablename__ = "job_signatures"
 
     id = Column(Integer, primary_key=True)
+    job_id = Column(
+        Integer,
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True
+    )
 
-    job_id = Column(Integer,
-                    ForeignKey("jobs.id", ondelete="CASCADE"),
-                    nullable = False,
-                    unique=True
-                    )
     signer_name = Column(String(150))
     signer_role = Column(String(150))
-    signature_date = Column(Text, nullable=False)
+    signature_data = Column(Text, nullable=False)
     signed_at = Column(DateTime, default=datetime.utcnow)
 
-
-    job = relationship("Job",backref="signature")
+    job = relationship("Job", back_populates="signature")

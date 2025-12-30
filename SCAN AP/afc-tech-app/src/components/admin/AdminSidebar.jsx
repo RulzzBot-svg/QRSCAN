@@ -77,7 +77,7 @@ function AdminSidebar() {
             is-drawer-close:tooltip is-drawer-close:tooltip-right
           "
           data-tip="Back to Technician App"
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/Home")}
         >
           ⬅
           <span className="is-drawer-close:hidden ml-2">

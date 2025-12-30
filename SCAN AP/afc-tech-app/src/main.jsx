@@ -15,18 +15,22 @@ import Hospitals from "./components/admin/hospitals";
 import AdminAHUs from "./components/admin/adminahus";
 import AdminJobs from "./components/admin/adminjobs";
 import AdminLayout from "./components/admin/AdminLayout";
+import Login from "./components/common/login";
+import JobSignature from "./components/common/jobSignatures";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />} />
+        <Route path="/" element={<Login />} />
+        <Route path="/Home" element={<App />} />
         <Route path="/hospitals" element={<HospitalCards />} />
         <Route path="/AHU" element={<AHU />} />
         <Route path="/AHU/:hospitalId" element={<AHUPage />} />
         <Route path="FilterInfo/:ahuId" element={<FilterInfo />} />
         <Route path="/job-completed" element={<jobCompleted />} />
         <Route path="/scan" element={<QRScanner />} />
+        <Route path="/jobs/:jobId/signature" element={<JobSignature/>}/>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="hospitals" element={<Hospitals />} />

@@ -29,7 +29,7 @@ function HospitalCards() {
 
       <button
         className="btn btn-ghost mb-3"
-        onClick={() => navigate("/")}
+        onClick={() => navigate("/Home")}
       >
         ⬅ Back
       </button>

@@ -28,7 +28,7 @@ export default function jobCompleted() {
 
                     <button
                         className="btn btn-outline w-full"
-                        onClick={() => navigate("/")}
+                        onClick={() => navigate("/Home")}
                     >
                         Return Home
                     </button>
