@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import LogoutButton from "./components/common/logoutbutton";
 
 
 export default function App() {
@@ -113,7 +114,11 @@ export default function App() {
           </div>
         </div>
 
-
+        <div className="card bg-base-100 border border-base-300 shadow-sm">
+          <div className="card-body p-4">
+            <LogoutButton/>
+          </div>
+        </div>
 
         {/* Status Section */}
         <section className="space-y-1 pt-4">

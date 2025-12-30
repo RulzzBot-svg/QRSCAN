@@ -11,6 +11,6 @@ export default function LogoutButton(){
     }
 
     return(
-        <button className="btn btn-ghost btn-sm text-error" onClick={handleLogOut}>🚪 Logout </button>
+        <button className="btn btn-error text-white" onClick={handleLogOut}>🚪Logout </button>
     )
 }

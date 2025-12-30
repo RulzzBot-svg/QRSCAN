@@ -28,7 +28,7 @@ export default function Login() {
       );
 
       // Navigate to technician app
-      navigate("/hospitals");
+      navigate("/Home");
 
     } catch (err) {
       setError(

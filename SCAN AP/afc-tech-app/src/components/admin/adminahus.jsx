@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-import AdminSidebar from "./AdminSidebar";
 import AdminFilterEditor from "./adminFilterEditor";
 import { API } from "../../api/api";
 
@@ -21,11 +19,10 @@ function AdminAHUs() {
   }, []);
 
   return (
-    <div data-theme="corporate" className="flex min-h-screen bg-base-200">
-
-      <main className="flex-1 p-6">
+    <div data-theme="corporate" className="min-h-screen bg-base-200">
+      <main className="p-6">
         <h1 className="text-3xl font-bold text-primary mb-6">
-          AHU Master List
+          AHU Maintenance Overview
         </h1>
 
         <div className="bg-base-100 border border-base-300 rounded-lg shadow">
@@ -40,41 +37,65 @@ function AdminAHUs() {
                   <th>AHU</th>
                   <th>Hospital</th>
                   <th>Location</th>
-                  <th>Edit Filters</th>
-                  <th>Status</th>
+                  <th className="text-center">Overdue</th>
+                  <th className="text-center">Due Soon</th>
+                  <th>Last Serviced</th>
                   <th>Next Due</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {ahus.map(a => (
+                {ahus.map((a) => (
                   <tr key={a.id}>
                     <td className="font-medium">{a.id}</td>
                     <td>{a.hospital}</td>
-                    <td>{a.location}</td>
-                    <td>
+                    <td>{a.location || "—"}</td>
+
+                    {/* Overdue count */}
+                    <td className="text-center">
+                      {a.overdue_count > 0 ? (
+                        <span className="badge badge-error">
+                          {a.overdue_count}
+                        </span>
+                      ) : (
+                        <span className="badge badge-ghost">0</span>
+                      )}
+                    </td>
+
+                    {/* Due soon count */}
+                    <td className="text-center">
+                      {a.due_soon_count > 0 ? (
+                        <span className="badge badge-warning">
+                          {a.due_soon_count}
+                        </span>
+                      ) : (
+                        <span className="badge badge-ghost">0</span>
+                      )}
+                    </td>
+
+                    {/* Last serviced */}
+                    <td className="text-sm">
+                      {a.last_serviced
+                        ? new Date(a.last_serviced).toLocaleDateString()
+                        : "Never"}
+                    </td>
+
+                    {/* Next due */}
+                    <td className="text-sm">
+                      {a.next_due_date
+                        ? new Date(a.next_due_date).toLocaleDateString()
+                        : "—"}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="text-right">
                       <button
                         className="btn btn-xs btn-outline"
                         onClick={() => setSelectedAHU(a)}
                       >
-                        Edit Filters
+                        View Schedule
                       </button>
                     </td>
-                    <td>
-                      <span
-                        className={`badge ${
-                          a.status === "Overdue"
-                            ? "badge-error"
-                            : a.status === "Due Soon"
-                            ? "badge-warning"
-                            : a.status === "Completed"
-                            ? "badge-success"
-                            : "badge-ghost"
-                        }`}
-                      >
-                        {a.status}
-                      </span>
-                    </td>
-                    <td>{a.next_due_date || "—"}</td>
                   </tr>
                 ))}
               </tbody>
