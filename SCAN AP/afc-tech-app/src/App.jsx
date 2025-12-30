@@ -1,11 +1,19 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
+
 export default function App() {
   const navigate = useNavigate();
+  const tech = JSON.parse(localStorage.getItem("tech"));
+  console.log(tech.name);
   console.log("API BASE URL:", import.meta.env.VITE_API_BASE_URL);
 
+  if (!tech) {
+    return navigate("/")
+  }
+
   return (
+
     <div data-theme="corporate" className="min-h-screen flex flex-col bg-base-200">
       {/* Header */}
       <header className="navbar bg-base-100 shadow-sm px-4">
@@ -25,7 +33,7 @@ export default function App() {
         {/* Greeting */}
         <section>
           <h1 className="text-2xl font-semibold">
-            Hi [TechName], let's get to work!
+            Hi {tech.name}, let's get to work!
           </h1>
           <p className="text-sm text-base-content/70 mt-1">
             Choose how you want to start today’s job.

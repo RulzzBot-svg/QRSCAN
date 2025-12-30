@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getHospitals } from "../../api/hospitals";
+import LogoutButton from "./logoutbutton";
 
 function HospitalCards() {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ function HospitalCards() {
       >
         ⬅ Back
       </button>
+      <LogoutButton/>
       {/* Header */}
       <h1 className="text-3xl font-bold mb-2 text-primary">Hospitals</h1>
 
