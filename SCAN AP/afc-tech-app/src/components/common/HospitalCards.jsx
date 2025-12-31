@@ -34,7 +34,6 @@ function HospitalCards() {
       >
         ⬅ Back
       </button>
-      <LogoutButton/>
       {/* Header */}
       <h1 className="text-3xl font-bold mb-2 text-primary">Hospitals</h1>
 
