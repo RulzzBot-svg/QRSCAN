@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import AdminFilterEditor from "./adminFilterEditor";
 import { API } from "../../api/api";
+import AdminFilterEditorInline from "./adminInlineEditor";
 
 function AdminAHUs() {
   const [ahus, setAhus] = useState([]);
-  const [selectedAHU, setSelectedAHU] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // which AHUs are expanded
+  const [openMap, setOpenMap] = useState({}); // { [ahuId]: true/false }
 
   useEffect(() => {
     const load = async () => {
@@ -14,9 +16,12 @@ function AdminAHUs() {
       setAhus(Array.isArray(res.data) ? res.data : []);
       setLoading(false);
     };
-
     load();
   }, []);
+
+  const toggleOpen = (ahuId) => {
+    setOpenMap((prev) => ({ ...prev, [ahuId]: !prev[ahuId] }));
+  };
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
@@ -31,84 +36,82 @@ function AdminAHUs() {
               <span className="loading loading-spinner loading-lg"></span>
             </div>
           ) : (
-            <table className="table table-zebra table-pin-rows w-full">
-              <thead>
-                <tr>
-                  <th>AHU</th>
-                  <th>Hospital</th>
-                  <th>Location</th>
-                  <th className="text-center">Overdue</th>
-                  <th className="text-center">Due Soon</th>
-                  <th>Last Serviced</th>
-                  <th>Next Due</th>
-                  <th className="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ahus.map((a) => (
-                  <tr key={a.id}>
-                    <td className="font-medium">{a.id}</td>
-                    <td>{a.hospital}</td>
-                    <td>{a.location || "—"}</td>
+            <div className="divide-y divide-base-300">
+              {ahus.map((a) => {
+                const isOpen = !!openMap[a.id];
 
-                    {/* Overdue count */}
-                    <td className="text-center">
-                      {a.overdue_count > 0 ? (
-                        <span className="badge badge-error">
-                          {a.overdue_count}
-                        </span>
-                      ) : (
-                        <span className="badge badge-ghost">0</span>
-                      )}
-                    </td>
+                return (
+                  <div key={a.id} className="p-4">
+                    {/* AHU "line item" */}
+                    <button
+                      className="w-full text-left"
+                      onClick={() => toggleOpen(a.id)}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <div className="font-semibold text-lg truncate">
+                              {a.id}
+                            </div>
 
-                    {/* Due soon count */}
-                    <td className="text-center">
-                      {a.due_soon_count > 0 ? (
-                        <span className="badge badge-warning">
-                          {a.due_soon_count}
-                        </span>
-                      ) : (
-                        <span className="badge badge-ghost">0</span>
-                      )}
-                    </td>
+                            {/* quick status chips */}
+                            <div className="flex items-center gap-2">
+                              {a.overdue_count > 0 ? (
+                                <span className="badge badge-error">
+                                  {a.overdue_count} overdue
+                                </span>
+                              ) : (
+                                <span className="badge badge-ghost">0 overdue</span>
+                              )}
 
-                    {/* Last serviced */}
-                    <td className="text-sm">
-                      {a.last_serviced
-                        ? new Date(a.last_serviced).toLocaleDateString()
-                        : "Never"}
-                    </td>
+                              {a.due_soon_count > 0 ? (
+                                <span className="badge badge-warning">
+                                  {a.due_soon_count} due soon
+                                </span>
+                              ) : (
+                                <span className="badge badge-ghost">0 due soon</span>
+                              )}
+                            </div>
+                          </div>
 
-                    {/* Next due */}
-                    <td className="text-sm">
-                      {a.next_due_date
-                        ? new Date(a.next_due_date).toLocaleDateString()
-                        : "—"}
-                    </td>
+                          <div className="text-sm opacity-80 mt-1">
+                            {a.hospital}
+                            {a.location ? ` • ${a.location}` : ""}
+                            {" • "}
+                            Last:{" "}
+                            {a.last_serviced
+                              ? new Date(a.last_serviced).toLocaleDateString()
+                              : "Never"}
+                            {" • "}
+                            Next:{" "}
+                            {a.next_due_date
+                              ? new Date(a.next_due_date).toLocaleDateString()
+                              : "—"}
+                          </div>
+                        </div>
 
-                    {/* Actions */}
-                    <td className="text-right">
-                      <button
-                        className="btn btn-xs btn-outline"
-                        onClick={() => setSelectedAHU(a)}
-                      >
-                        View Schedule
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <div className="shrink-0">
+                          <span className="btn btn-sm btn-outline">
+                            {isOpen ? "Hide Filters" : "View Filters"}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Filters grouped under this AHU */}
+                    <AdminFilterEditorInline ahuId={a.id} isOpen={isOpen} />
+                  </div>
+                );
+              })}
+
+              {ahus.length === 0 && (
+                <div className="p-6 text-center opacity-70">
+                  No AHUs found.
+                </div>
+              )}
+            </div>
           )}
         </div>
-
-        {selectedAHU && (
-          <AdminFilterEditor
-            ahu={selectedAHU}
-            onClose={() => setSelectedAHU(null)}
-          />
-        )}
       </main>
     </div>
   );
