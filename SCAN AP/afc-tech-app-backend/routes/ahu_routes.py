@@ -217,19 +217,32 @@ def delete_filter(filter_id):
 
 @ahu_bp.route("/admin/ahus", methods=["GET"])
 def admin_get_all_ahus():
-
     ahus = (
         db.session.query(AHU)
-        .options(
-            joinedload(AHU.hospital),
-            selectinload(AHU.filters)
-        )
+        .options(joinedload(AHU.hospital), selectinload(AHU.filters))
         .all()
     )
 
-    payload =[]
+    payload = []
     for a in ahus:
-        status_data = compute_ahu_status_from_filters(a.filters)
+        active_filters = [f for f in a.filters if getattr(f, "is_active", True)]
+
+        status_data = compute_ahu_status_from_filters(active_filters)
+
+        # optional: derive counts for your chips
+        overdue_count = 0
+        due_soon_count = 0
+        last_serviced_dates = []
+
+        for f in active_filters:
+          st = compute_filter_status(f)
+          if st.get("status") == "Overdue":
+              overdue_count += 1
+          elif st.get("status") == "Due Soon":
+              due_soon_count += 1
+
+          if getattr(f, "last_service_date", None):
+              last_serviced_dates.append(f.last_service_date)
 
         payload.append({
             "id": a.id,
@@ -238,11 +251,19 @@ def admin_get_all_ahus():
             "name": a.name,
             "location": a.location,
             "notes": a.notes,
+
+            # ✅ what the UI expects
+            "overdue_count": overdue_count,
+            "due_soon_count": due_soon_count,
+            "last_serviced": (max(last_serviced_dates).isoformat() if last_serviced_dates else None),
+
+            # ✅ from your existing helper
             "status": status_data["status"],
             "next_due_date": status_data["next_due_date"],
             "days_until_due": status_data["days_until_due"],
             "days_overdue": status_data["days_overdue"],
-            "filters_count": len(a.filters),
+
+            "filters_count": len(active_filters),
         })
 
     return jsonify(payload), 200
