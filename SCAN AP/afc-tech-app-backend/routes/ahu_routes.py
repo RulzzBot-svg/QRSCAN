@@ -126,16 +126,25 @@ def get_filters_for_admin(ahu_id):
     if not ahu:
         return jsonify({"error": "AHU not found"}), 404
 
-    return jsonify([
-        {
-            "id": f.id,
-            "phase": f.phase,
-            "part_number": f.part_number,
-            "size": f.size,
-            "quantity": f.quantity
-        }
+    active_filters = [f for f in ahu.filters if getattr(f, "is_active", True)]
+
+    return jsonify(
+        [
+            {
+                "id": f.id,
+                "phase": f.phase,
+                "part_number": f.part_number,
+                "size": f.size,
+                "quantity": f.quantity,
+                "frequency_days": f.frequency_days,
+                "last_serviced_date":(
+                    f.last_serviced_date.isoformat()
+                    if f.last_serviced_date else None
+                ),
+                "is_active":f.is_active,
+            }
         for f in ahu.filters
-    ])
+    ]), 200
 
 
 #add fiters
@@ -149,13 +158,26 @@ def add_filter(ahu_id):
         part_number=data["part_number"],
         size=data["size"],
         quantity=data["quantity"],
-        frequency_days=data["frequency_days"]
+        frequency_days=data["frequency_days"],
+        is_active=True,
     )
 
     db.session.add(f)
     db.session.commit()
 
     return jsonify({"message": "Filter added"}), 201
+
+@ahu_bp.route("/admin/filter/<int:filter_id>.deactivate", methods=["PATCH"])
+def deactive_filter(filter_id):
+    f = db.session.get(Filter, filter_id)
+    if not f:
+        return jsonify({"error":"Filter not found"}),404
+    
+    f.is_active = False
+    db.session_commit()
+
+    return jsonify({"message":"Filter deactivated","id":f.id}),200
+
 
 
 #update filter
@@ -188,6 +210,9 @@ def delete_filter(filter_id):
     db.session.commit()
 
     return jsonify({"message": "Filter removed"})
+
+
+@ahu_bp.route("/")
 
 
 @ahu_bp.route("/admin/ahus", methods=["GET"])
