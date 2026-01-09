@@ -109,7 +109,8 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
     };
 
     const deactivateFilter = async (filter) => {
-        // if it's a new unsaved row, just remove it locally
+        if (!filter) return; // ✅ prevents "reading 'id' of null"
+
         if (String(filter.id).startsWith("new-")) {
             setFilters((prev) => prev.filter((x) => x.id !== filter.id));
             showToast("Unsaved filter removed.", "info");
@@ -118,7 +119,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
         try {
             await API.patch(`/admin/filters/${filter.id}/deactivate`);
-            markInactive(filter); // keep your “Inactive” styling
+            markInactive(filter);
             showToast("Filter deactivated.", "success");
         } catch (err) {
             console.error("Deactivate failed:", err);
