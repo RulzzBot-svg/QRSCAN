@@ -53,7 +53,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 (Array.isArray(res.data) ? res.data : []).map((f) => ({
                     ...f,
                     sizeParts: parseSize(f.size),
-                    _inactive: false,
+                    _inactive: f.is_active === false,
                 }))
             );
             setLoaded(true);
@@ -108,10 +108,28 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
         setFilters((prev) => prev.map((f) => (f.id === filter.id ? { ...f, _inactive: true } : f)));
     };
 
+    const deactivateFilter = async(filter) =>{
+        if(String(filter.id).startsWith("new-")) {
+            setFilters((prev)=>prev.filter((x)=>x.id !== filter.id));
+            showToast("Unsaved Filter removed!","info");
+            return;
+        }
+        try{
+            await API.patch(`/admin/filters/${filter.id}/deactivate`);
+            markInactive(filter);
+            showToast("Filter deactivated","success");
+        }catch(err){
+            console.error("Deactivate failed",err);
+            showToast("Deactivate Failed. Check server logs.","info");
+        }
+    }
+
     const activeCount = useMemo(
         () => filters.filter((f) => !f._inactive).length,
         [filters]
     );
+
+
 
     if (!isOpen) return null;
 
@@ -237,7 +255,11 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                                         ) : (
                                             <button
                                                 className="btn btn-xs btn-error text-white"
-                                                onClick={() => setConfirmDelete(f)}
+                                                onClick={async ()=>{
+                                                    const target= confirmDelete;
+                                                    setConfirmDelete(null);
+                                                    await deactivateFilter(target);
+                                                }}
                                             >
                                                 Deactivate
                                             </button>
