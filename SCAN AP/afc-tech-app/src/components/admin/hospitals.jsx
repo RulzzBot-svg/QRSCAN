@@ -1,125 +1,108 @@
 import { useEffect, useState } from "react";
 import { getHospitals } from "../../api/hospitals";
-import KpiCard from "./kpiCard";
 
-function AdminDashboard() {
-  const [stats, setStats] = useState({
-    hospitals: 0,
-    ahus: 0,
-    overdue: 0,
-    dueSoon: 0,
-  });
-
-  const [hospitalRows, setHospitalRows] = useState([]);
+function AdminHospitals() {
+  const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDashboard();
+    const load = async () => {
+      setLoading(true);
+      const res = await getHospitals();
+      setHospitals(Array.isArray(res.data) ? res.data : []);
+      setLoading(false);
+    };
+
+    load();
   }, []);
-
-  const loadDashboard = async () => {
-    setLoading(true);
-
-    // For now: hospitals endpoint
-    // Later: backend should return aggregates directly
-    const res = await getHospitals();
-    const hospitals = Array.isArray(res.data) ? res.data : [];
-
-    let totalAhus = 0;
-    let overdue = 0;
-    let dueSoon = 0;
-
-    const rows = hospitals.map((h) => {
-      totalAhus += h.ahu_count || 0;
-      overdue += h.overdue_count || 0;
-      dueSoon += h.due_soon_count || 0;
-
-      return {
-        id: h.id,
-        name: h.name,
-        ahus: h.ahu_count || 0,
-        overdue: h.overdue_count || 0,
-        dueSoon: h.due_soon_count || 0,
-        status:
-          (h.overdue_count || 0) > 0
-            ? "Overdue"
-            : (h.due_soon_count || 0) > 0
-            ? "Due Soon"
-            : "Compliant",
-      };
-    });
-
-    setStats({
-      hospitals: hospitals.length,
-      ahus: totalAhus,
-      overdue,
-      dueSoon,
-    });
-
-    setHospitalRows(rows);
-    setLoading(false);
-  };
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
       <main className="p-6">
         <h1 className="text-3xl font-bold text-primary mb-6">
-          Admin Dashboard
+          Hospital Maintenance Overview
         </h1>
 
-        {/* KPI CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <KpiCard title="Hospitals" value={stats.hospitals} />
-          <KpiCard title="AHUs" value={stats.ahus} />
-          <KpiCard title="Overdue" value={stats.overdue} color="error" />
-          <KpiCard title="Due Soon" value={stats.dueSoon} color="warning" />
-        </div>
-
-        {/* HOSPITAL OVERVIEW */}
         <div className="bg-base-100 border border-base-300 rounded-lg shadow">
-          <div className="p-4 border-b border-base-300">
-            <h2 className="text-lg font-semibold">
-              Hospital Compliance Overview
-            </h2>
-          </div>
-
           {loading ? (
             <div className="p-6 text-center">
               <span className="loading loading-spinner loading-lg"></span>
             </div>
           ) : (
-            <table className="table table-zebra w-full">
+            <table className="table table-zebra table-pin-rows w-full">
               <thead>
                 <tr>
                   <th>Hospital</th>
-                  <th className="text-center">AHUs</th>
+                  <th>City</th>
                   <th className="text-center">Overdue</th>
                   <th className="text-center">Due Soon</th>
+                  <th className="text-center">Compliance</th>
+                  <th>Last Job</th>
+                  <th className="text-center">AHUs</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {hospitalRows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="font-medium">{row.name}</td>
-                    <td className="text-center">{row.ahus}</td>
-                    <td className="text-center text-error">
-                      {row.overdue}
+                {hospitals.map((h) => (
+                  <tr key={h.id}>
+                    <td className="font-medium">{h.name}</td>
+                    <td>{h.city || "—"}</td>
+
+                    {/* Overdue */}
+                    <td className="text-center">
+                      {h.overdue_count > 0 ? (
+                        <span className="badge badge-error">
+                          {h.overdue_count}
+                        </span>
+                      ) : (
+                        <span className="badge badge-ghost">0</span>
+                      )}
                     </td>
-                    <td className="text-center text-warning">
-                      {row.dueSoon}
+
+                    {/* Due Soon */}
+                    <td className="text-center">
+                      {h.due_soon_count > 0 ? (
+                        <span className="badge badge-warning">
+                          {h.due_soon_count}
+                        </span>
+                      ) : (
+                        <span className="badge badge-ghost">0</span>
+                      )}
                     </td>
+
+                    {/* Compliance */}
+                    <td className="text-center">
+                      {h.compliance_pct ? (
+                        <span className="badge badge-success">
+                          {h.compliance_pct}%
+                        </span>
+                      ) : (
+                        <span className="badge badge-ghost">—</span>
+                      )}
+                    </td>
+
+                    {/* Last Job */}
+                    <td className="text-sm">
+                      {h.last_job_date
+                        ? new Date(h.last_job_date).toLocaleDateString()
+                        : "—"}
+                    </td>
+
+                    {/* AHU Count */}
+                    <td className="text-center">
+                      <span className="badge badge-outline">
+                        {h.ahu_count}
+                      </span>
+                    </td>
+
+                    {/* Active */}
                     <td>
                       <span
                         className={`badge ${
-                          row.status === "Overdue"
-                            ? "badge-error"
-                            : row.status === "Due Soon"
-                            ? "badge-warning"
-                            : "badge-success"
+                          h.active ? "badge-success" : "badge-error"
                         }`}
                       >
-                        {row.status}
+                        {h.active ? "Active" : "Inactive"}
                       </span>
                     </td>
                   </tr>
@@ -133,4 +116,4 @@ function AdminDashboard() {
   );
 }
 
-export default AdminDashboard;
+export default AdminHospitals;

@@ -51,6 +51,7 @@ class Filter(db.Model):
     part_number = Column(String(100))
     size = Column(String(50))
     quantity = Column(Integer)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     # ✅ SERVICE LOGIC BELONGS HERE
     frequency_days = Column(Integer, nullable=False)
@@ -95,6 +96,12 @@ class Job(db.Model):
     ahu = relationship("AHU", back_populates="jobs")
     technician = relationship("Technician", back_populates="jobs")
     job_filters = relationship("JobFilter", back_populates="job", cascade="all, delete-orphan")
+    signature = relationship(
+        "JobSignature",
+        uselist=False,
+        back_populates="job",
+        cascade="all, delete-orphan"
+    )
 
 
 # -------------------------
@@ -112,12 +119,7 @@ class JobFilter(db.Model):
 
     job = relationship("Job", back_populates="job_filters")
     filter = relationship("Filter", back_populates="job_filters")
-    signature = relationship(
-    "JobSignature",
-    uselist=False,
-    back_populates="job",
-    cascade="all, delete-orphan"
-)
+
 #added a "inspected" checbox
 
 

@@ -11,10 +11,16 @@ function AdminAHUs() {
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
-      const res = await API.get("/admin/ahus");
-      setAhus(Array.isArray(res.data) ? res.data : []);
-      setLoading(false);
+      try {
+        setLoading(true);
+        const res = await API.get("/admin/ahus");
+        setAhus(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Failed to load AHUs:", err);
+        setAhus([]);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);
