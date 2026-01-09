@@ -167,16 +167,16 @@ def add_filter(ahu_id):
 
     return jsonify({"message": "Filter added"}), 201
 
-@ahu_bp.route("/admin/filter/<int:filter_id>.deactivate", methods=["PATCH"])
-def deactive_filter(filter_id):
+@ahu_bp.route("/admin/filters/<int:filter_id>/deactivate", methods=["PATCH"])
+def deactivate_filter(filter_id):
     f = db.session.get(Filter, filter_id)
     if not f:
-        return jsonify({"error":"Filter not found"}),404
-    
-    f.is_active = False
-    db.session_commit()
+        return jsonify({"error": "Filter not found"}), 404
 
-    return jsonify({"message":"Filter deactivated","id":f.id}),200
+    f.is_active = False
+    db.session.commit()
+
+    return jsonify({"message": "Filter deactivated", "id": f.id}), 200
 
 
 
