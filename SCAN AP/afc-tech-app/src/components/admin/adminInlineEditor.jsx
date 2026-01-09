@@ -2,344 +2,400 @@ import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 
 const FREQUENCY_OPTIONS = [
-    { label: "90 Days", value: 90 },
-    { label: "180 Days", value: 180 },
-    { label: "365 Days", value: 365 },
+  { label: "90 Days", value: 90 },
+  { label: "180 Days", value: 180 },
+  { label: "365 Days", value: 365 },
 ];
 
-
-
 const parseSize = (size) => {
-    if (!size) return { h: "", w: "", d: "" };
-    const [h, w, d] = String(size).split("x");
-    return { h: h || "", w: w || "", d: d || "" };
+  if (!size) return { h: "", w: "", d: "" };
+  const [h, w, d] = String(size).split("x");
+  return { h: h || "", w: w || "", d: d || "" };
 };
 
 const buildSize = ({ h, w, d }) => {
-    if (!h || !w || !d) return "";
-    return `${h}x${w}x${d}`;
+  if (!h || !w || !d) return "";
+  return `${h}x${w}x${d}`;
 };
 
 const computeNextDue = (f) => {
-    if (!f.last_service_date || !f.frequency_days) return "—";
-    const last = new Date(f.last_service_date);
-    last.setDate(last.getDate() + Number(f.frequency_days));
-    return last.toLocaleDateString();
+  if (!f.last_service_date || !f.frequency_days) return "—";
+  const last = new Date(f.last_service_date);
+  last.setDate(last.getDate() + Number(f.frequency_days));
+  return last.toLocaleDateString();
 };
 
 function AdminFilterEditorInline({ ahuId, isOpen }) {
-    const [confirmDelete, setConfirmDelete] = useState(null);
-    const [filters, setFilters] = useState([]);
-    const [loaded, setLoaded] = useState(false);
-    const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-    const [toast, setToast] = useState(null);
+  // { mode: "deactivate" | "reactivate", filter: FilterRow } | null
+  const [confirmAction, setConfirmAction] = useState(null);
 
-    const showToast = (message, type = "info") => {
-        setToast({ message, type });
-        window.clearTimeout(showToast._t);
-        showToast._t = window.setTimeout(() => setToast(null), 1600);
-    };
+  const [toast, setToast] = useState(null);
 
+  const showToast = (message, type = "info") => {
+    setToast({ message, type });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), 1600);
+  };
 
-    // Lazy-load only when opened (first time)
-    useEffect(() => {
-        if (!isOpen || loaded) return;
+  // Lazy-load only when opened
+  useEffect(() => {
+    if (!isOpen || loaded) return;
 
-        const load = async () => {
-            setLoading(true);
-            const res = await API.get(`/admin/ahus/${ahuId}/filters`);
-            setFilters(
-                (Array.isArray(res.data) ? res.data : []).map((f) => ({
-                    ...f,
-                    sizeParts: parseSize(f.size),
-                    _inactive: f.is_active === false,
-                }))
-            );
-            setLoaded(true);
-            setLoading(false);
-        };
-
-        load();
-    }, [ahuId, isOpen, loaded]);
-
-    const updateFilter = (id, field, value) => {
-        setFilters((prev) =>
-            prev.map((f) => {
-                if (f.id !== id) return f;
-
-                if (field.startsWith("size.")) {
-                    const key = field.split(".")[1];
-                    const newSizeParts = { ...f.sizeParts, [key]: value };
-                    return { ...f, sizeParts: newSizeParts, size: buildSize(newSizeParts) };
-                }
-
-                return { ...f, [field]: value };
-            })
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await API.get(`/admin/ahus/${ahuId}/filters`);
+        setFilters(
+          (Array.isArray(res.data) ? res.data : []).map((f) => ({
+            ...f,
+            sizeParts: parseSize(f.size),
+            _inactive: f.is_active === false, // derive UI from DB
+          }))
         );
+        setLoaded(true);
+      } catch (e) {
+        console.error(e);
+        showToast("Failed to load filters.", "info");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const saveFilter = async (filter) => {
-        await API.put(`/admin/filters/${filter.id}`, filter);
-    };
+    load();
+  }, [ahuId, isOpen, loaded]);
 
-    const saveNew = async (filter) => {
-        await API.post(`/admin/ahus/${ahuId}/filters`, filter);
-    };
+  const updateFilter = (id, field, value) => {
+    setFilters((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f;
 
-    const addFilter = () => {
-        setFilters((prev) => [
-            ...prev,
-            {
-                id: `new-${Date.now()}`,
-                phase: "",
-                part_number: "",
-                size: "",
-                sizeParts: { h: "", w: "", d: "" },
-                quantity: 1,
-                frequency_days: 90,
-                _isNew: true,
-            },
-        ]);
-        showToast("New Filter row added. Fill it out and hit Save.", "success");
-    };
-
-    const markInactive = (filter) => {
-        setFilters((prev) => prev.map((f) => (f.id === filter.id ? { ...f, _inactive: true } : f)));
-    };
-
-    const setInactiveUI = (id, inactive) => {
-        setFilters((prev) =>
-            prev.map((f) =>
-                f.id === id ? { ...f, _inactive: inactive, is_active: !inactive } : f
-            )
-        );
-    }
-
-    const deactivateFilter = async (filter) => {
-        if (!filter) return;
-
-        // if it's a new unsaved row, just remove it
-        if (String(filter.id).startsWith("new-")) {
-            setFilters((prev) => prev.filter((x) => x.id !== filter.id));
-            showToast("Unsaved filter removed.", "info");
-            return;
+        if (field.startsWith("size.")) {
+          const key = field.split(".")[1];
+          const newSizeParts = { ...f.sizeParts, [key]: value };
+          return { ...f, sizeParts: newSizeParts, size: buildSize(newSizeParts) };
         }
 
-        await API.patch(`/admin/filters/${filter.id}/deactivate`);
-        setInactiveUI(filter.id, true);
-        showToast("Filter deactivated.", "success");
-    };
-
-
-
-    const activeCount = useMemo(
-        () => filters.filter((f) => !f._inactive).length,
-        [filters]
+        return { ...f, [field]: value };
+      })
     );
+  };
 
-    const reactivateFilter = async (filter) => {
-        if (!filter) return;
-        await API.patch(`/admin/filters/${filter.id}/reactivate`);
-        setInactiveUI(filter.id, false);
-        showToast("Filter reactivated.", "success");
+  const setInactiveUI = (id, inactive) => {
+    setFilters((prev) =>
+      prev.map((f) =>
+        f.id === id ? { ...f, _inactive: inactive, is_active: !inactive } : f
+      )
+    );
+  };
+
+  const saveFilter = async (filter) => {
+    const payload = {
+      phase: filter.phase,
+      part_number: filter.part_number,
+      size: filter.size,
+      quantity: Number(filter.quantity),
+      frequency_days: Number(filter.frequency_days),
     };
 
+    await API.put(`/admin/filters/${filter.id}`, payload);
+    showToast("Saved.", "success");
+  };
 
+  const saveNew = async (filter) => {
+    const payload = {
+      phase: filter.phase,
+      part_number: filter.part_number,
+      size: filter.size,
+      quantity: Number(filter.quantity),
+      frequency_days: Number(filter.frequency_days),
+    };
 
-    if (!isOpen) return null;
+    await API.post(`/admin/ahus/${ahuId}/filters`, payload);
+    showToast("Filter added.", "success");
 
-    return (
-        <div className="mt-3 bg-base-100 border border-base-300 rounded-lg p-4">
-            <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="text-sm opacity-80">
-                    Filters: <span className="font-semibold">{activeCount}</span>
-                </div>
+    // Force a reload so we get the real DB id
+    setLoaded(false);
+  };
 
-                <button className="btn btn-xs btn-outline" onClick={addFilter}>
-                    + Add Filter
-                </button>
-            </div>
+  const addFilter = () => {
+    setFilters((prev) => [
+      ...prev,
+      {
+        id: `new-${Date.now()}`,
+        phase: "",
+        part_number: "",
+        size: "",
+        sizeParts: { h: "", w: "", d: "" },
+        quantity: 1,
+        frequency_days: 90,
+        is_active: true,
+        _inactive: false,
+        _isNew: true,
+      },
+    ]);
+    showToast("New filter row added. Fill it out and hit Save.", "success");
+  };
 
-            {loading ? (
-                <div className="py-6 text-center">
-                    <span className="loading loading-spinner loading-md"></span>
-                </div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="table table-sm w-full">
-                        <thead>
-                            <tr>
-                                <th>Phase</th>
-                                <th>Part</th>
-                                <th>Size</th>
-                                <th>Qty</th>
-                                <th>Frequency</th>
-                                <th>Last Serviced</th>
-                                <th>Next Due</th>
-                                <th>Save</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
+  const deactivateFilter = async (filter) => {
+    if (!filter) return;
 
-                        <tbody>
-                            {filters.map((f) => (
-                                <tr
-                                    key={f.id}
-                                    className={
-                                        f._inactive ? "opacity-40 italic" : f._isNew ? "bg-primary/5" : ""
-                                    }
-                                >
-                                    <td>
-                                        <input
-                                            className="input input-xs input-bordered"
-                                            value={f.phase}
-                                            onChange={(e) => updateFilter(f.id, "phase", e.target.value)}
-                                            disabled={f._inactive}
-                                        />
-                                    </td>
+    // unsaved row? just remove it
+    if (String(filter.id).startsWith("new-")) {
+      setFilters((prev) => prev.filter((x) => x.id !== filter.id));
+      showToast("Unsaved filter removed.", "info");
+      return;
+    }
 
-                                    <td>
-                                        <input
-                                            className="input input-xs input-bordered"
-                                            value={f.part_number}
-                                            onChange={(e) => updateFilter(f.id, "part_number", e.target.value)}
-                                            disabled={f._inactive}
-                                        />
-                                    </td>
+    await API.patch(`/admin/filters/${filter.id}/deactivate`);
+    setInactiveUI(filter.id, true);
+    showToast("Filter deactivated.", "success");
+  };
 
-                                    <td>
-                                        <div className="flex gap-1">
-                                            {["h", "w", "d"].map((dim) => (
-                                                <input
-                                                    key={dim}
-                                                    type="number"
-                                                    placeholder={dim.toUpperCase()}
-                                                    className="input input-xs input-bordered w-14"
-                                                    value={f.sizeParts?.[dim] || ""}
-                                                    disabled={f._inactive}
-                                                    onChange={(e) => updateFilter(f.id, `size.${dim}`, e.target.value)}
-                                                />
-                                            ))}
-                                        </div>
-                                    </td>
+  const reactivateFilter = async (filter) => {
+    if (!filter) return;
 
-                                    <td>
-                                        <input
-                                            type="number"
-                                            className="input input-xs input-bordered w-16"
-                                            value={f.quantity}
-                                            disabled={f._inactive}
-                                            onChange={(e) => updateFilter(f.id, "quantity", e.target.value)}
-                                        />
-                                    </td>
+    await API.patch(`/admin/filters/${filter.id}/reactivate`);
+    setInactiveUI(filter.id, false);
+    showToast("Filter reactivated.", "success");
+  };
 
-                                    <td>
-                                        <select
-                                            className="select select-xs select-bordered"
-                                            value={f.frequency_days}
-                                            disabled={f._inactive}
-                                            onChange={(e) => updateFilter(f.id, "frequency_days", e.target.value)}
-                                        >
-                                            {FREQUENCY_OPTIONS.map((opt) => (
-                                                <option key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </td>
+  const activeCount = useMemo(
+    () => filters.filter((f) => !f._inactive).length,
+    [filters]
+  );
 
-                                    <td className="text-xs">
-                                        {f.last_service_date ? new Date(f.last_service_date).toLocaleDateString() : "Never"}
-                                    </td>
+  if (!isOpen) return null;
 
-                                    <td className="text-xs">{computeNextDue(f)}</td>
-
-                                    <td>
-                                        <button
-                                            className="btn btn-xs btn-primary"
-                                            disabled={f._inactive}
-                                            onClick={() => (f._isNew ? saveNew(f) : saveFilter(f))}
-                                        >
-                                            Save
-                                        </button>
-                                    </td>
-
-                                    <td>
-                                        {f._inactive ? (
-                                            <span className="badge badge-ghost">Inactive</span>
-                                        ) : (
-                                            <button
-                                                className="btn btn-warning"
-                                                onClick={async () => {
-                                                    const target = confirmDelete;     // ✅ capture
-                                                    setConfirmDelete(null);
-                                                    try {
-                                                        await deactivateFilter(target); // ✅ backend + UI
-                                                    } catch (e) {
-                                                        console.error(e);
-                                                        showToast("Deactivate failed. Check server logs.", "info");
-                                                    }
-                                                }}
-                                            >
-                                                Deactivate
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-
-                            {filters.length === 0 && (
-                                <tr>
-                                    <td colSpan={9} className="text-center py-6 opacity-70">
-                                        No filters found for this AHU.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {toast && (
-                <div className="toast toast-center toast-middle z-9999">
-                    <div className={`alert ${toast.type === "success" ? "alert-success" : "alert-info"}`}>
-                        <span>{toast.message}</span>
-                    </div>
-                </div>
-            )}
-
-            {confirmDelete && (
-                <dialog className="modal modal-open">
-                    <div className="modal-box">
-                        <h3 className="font-bold text-lg text-warning">Deactivate Filter</h3>
-
-                        <p className="py-3">
-                            This will remove <strong>{confirmDelete.part_number}</strong> from future schedules but keep historical data.
-                        </p>
-
-                        <div className="modal-action">
-                            <button className="btn btn-outline" onClick={() => setConfirmDelete(null)}>
-                                Cancel
-                            </button>
-
-                            <button
-                                className="btn btn-warning"
-                                onClick={() => {
-                                    markInactive(confirmDelete);
-                                    setConfirmDelete(null);
-                                }}
-                            >
-                                Deactivate
-                            </button>
-                        </div>
-                    </div>
-                </dialog>
-            )}
-
-
+  return (
+    <div className="mt-3 bg-base-100 border border-base-300 rounded-lg p-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="text-sm opacity-80">
+          Active Filters: <span className="font-semibold">{activeCount}</span>
+          <span className="ml-2 opacity-60">/ Total: {filters.length}</span>
         </div>
-    );
+
+        <button type="button" className="btn btn-xs btn-outline" onClick={addFilter}>
+          + Add Filter
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-6 text-center">
+          <span className="loading loading-spinner loading-md"></span>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="table table-sm w-full">
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>Part</th>
+                <th>Size</th>
+                <th>Qty</th>
+                <th>Frequency</th>
+                <th>Last Serviced</th>
+                <th>Next Due</th>
+                <th>Save</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filters.map((f) => (
+                <tr
+                  key={f.id}
+                  className={f._inactive ? "opacity-40 italic" : f._isNew ? "bg-primary/5" : ""}
+                >
+                  <td>
+                    <input
+                      className="input input-xs input-bordered"
+                      value={f.phase}
+                      onChange={(e) => updateFilter(f.id, "phase", e.target.value)}
+                      disabled={f._inactive}
+                    />
+                  </td>
+
+                  <td>
+                    <input
+                      className="input input-xs input-bordered"
+                      value={f.part_number}
+                      onChange={(e) => updateFilter(f.id, "part_number", e.target.value)}
+                      disabled={f._inactive}
+                    />
+                  </td>
+
+                  <td>
+                    <div className="flex gap-1">
+                      {["h", "w", "d"].map((dim) => (
+                        <input
+                          key={dim}
+                          type="number"
+                          placeholder={dim.toUpperCase()}
+                          className="input input-xs input-bordered w-14"
+                          value={f.sizeParts?.[dim] || ""}
+                          disabled={f._inactive}
+                          onChange={(e) => updateFilter(f.id, `size.${dim}`, e.target.value)}
+                        />
+                      ))}
+                    </div>
+                  </td>
+
+                  <td>
+                    <input
+                      type="number"
+                      className="input input-xs input-bordered w-16"
+                      value={f.quantity}
+                      disabled={f._inactive}
+                      onChange={(e) => updateFilter(f.id, "quantity", e.target.value)}
+                    />
+                  </td>
+
+                  <td>
+                    <select
+                      className="select select-xs select-bordered"
+                      value={f.frequency_days}
+                      disabled={f._inactive}
+                      onChange={(e) => updateFilter(f.id, "frequency_days", e.target.value)}
+                    >
+                      {FREQUENCY_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+
+                  <td className="text-xs">
+                    {f.last_service_date ? new Date(f.last_service_date).toLocaleDateString() : "Never"}
+                  </td>
+
+                  <td className="text-xs">{computeNextDue(f)}</td>
+
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-primary"
+                      disabled={f._inactive}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          if (f._isNew) await saveNew(f);
+                          else await saveFilter(f);
+                        } catch (err) {
+                          console.error(err);
+                          showToast("Save failed. Check server logs.", "info");
+                        }
+                      }}
+                    >
+                      Save
+                    </button>
+                  </td>
+
+                  <td>
+                    {!f._inactive ? (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-warning"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmAction({ mode: "deactivate", filter: f });
+                        }}
+                      >
+                        Deactivate
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-success text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmAction({ mode: "reactivate", filter: f });
+                        }}
+                      >
+                        Reactivate
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+              {filters.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="text-center py-6 opacity-70">
+                    No filters found for this AHU.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {toast && (
+        <div className="toast toast-center toast-middle z-9999">
+          <div className={`alert ${toast.type === "success" ? "alert-success" : "alert-info"}`}>
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ CONFIRM MODAL (THIS TIME IT WILL ACTUALLY OPEN) */}
+      {confirmAction && (
+        <dialog open className="modal">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">
+              {confirmAction.mode === "deactivate" ? (
+                <span className="text-warning">Deactivate Filter</span>
+              ) : (
+                <span className="text-success">Reactivate Filter</span>
+              )}
+            </h3>
+
+            <p className="py-3">
+              {confirmAction.mode === "deactivate" ? (
+                <>
+                  Deactivate <strong>{confirmAction.filter.part_number}</strong>? It will stay visible,
+                  but won’t count for future schedules.
+                </>
+              ) : (
+                <>
+                  Reactivate <strong>{confirmAction.filter.part_number}</strong>? It will count again for schedules.
+                </>
+              )}
+            </p>
+
+            <div className="modal-action">
+              <button className="btn btn-outline" onClick={() => setConfirmAction(null)}>
+                Cancel
+              </button>
+
+              <button
+                className={confirmAction.mode === "deactivate" ? "btn btn-warning" : "btn btn-success text-white"}
+                onClick={async () => {
+                  const { mode, filter } = confirmAction;
+                  setConfirmAction(null);
+
+                  try {
+                    if (mode === "deactivate") await deactivateFilter(filter);
+                    else await reactivateFilter(filter);
+                  } catch (err) {
+                    console.error(err);
+                    showToast(`${mode} failed. Check server logs.`, "info");
+                  }
+                }}
+              >
+                {confirmAction.mode === "deactivate" ? "Yes, Deactivate" : "Yes, Reactivate"}
+              </button>
+            </div>
+          </div>
+        </dialog>
+      )}
+    </div>
+  );
 }
 
 export default AdminFilterEditorInline;
