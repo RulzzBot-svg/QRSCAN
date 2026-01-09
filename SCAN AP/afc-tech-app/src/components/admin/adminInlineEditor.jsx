@@ -108,29 +108,42 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
         setFilters((prev) => prev.map((f) => (f.id === filter.id ? { ...f, _inactive: true } : f)));
     };
 
-    const deactivateFilter = async (filter) => {
-        if (!filter) return; // ✅ prevents "reading 'id' of null"
+    const setInactiveUI = (id, inactive) => {
+        setFilters((prev) =>
+            prev.map((f) =>
+                f.id === id ? { ...f, _inactive: inactive, is_active: !inactive } : f
+            )
+        );
+    }
 
+    const deactivateFilter = async (filter) => {
+        if (!filter) return;
+
+        // if it's a new unsaved row, just remove it
         if (String(filter.id).startsWith("new-")) {
             setFilters((prev) => prev.filter((x) => x.id !== filter.id));
             showToast("Unsaved filter removed.", "info");
             return;
         }
 
-        try {
-            await API.patch(`/admin/filters/${filter.id}/deactivate`);
-            markInactive(filter);
-            showToast("Filter deactivated.", "success");
-        } catch (err) {
-            console.error("Deactivate failed:", err);
-            showToast("Deactivate failed. Check server logs.", "info");
-        }
+        await API.patch(`/admin/filters/${filter.id}/deactivate`);
+        setInactiveUI(filter.id, true);
+        showToast("Filter deactivated.", "success");
     };
+
+
 
     const activeCount = useMemo(
         () => filters.filter((f) => !f._inactive).length,
         [filters]
     );
+
+    const reactivateFilter = async (filter) => {
+        if (!filter) return;
+        await API.patch(`/admin/filters/${filter.id}/reactivate`);
+        setInactiveUI(filter.id, false);
+        showToast("Filter reactivated.", "success");
+    };
 
 
 
@@ -257,11 +270,16 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                                             <span className="badge badge-ghost">Inactive</span>
                                         ) : (
                                             <button
-                                                className="btn btn-xs btn-error text-white"
+                                                className="btn btn-warning"
                                                 onClick={async () => {
-                                                    const target = confirmDelete;
+                                                    const target = confirmDelete;     // ✅ capture
                                                     setConfirmDelete(null);
-                                                    await deactivateFilter(target);
+                                                    try {
+                                                        await deactivateFilter(target); // ✅ backend + UI
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                        showToast("Deactivate failed. Check server logs.", "info");
+                                                    }
                                                 }}
                                             >
                                                 Deactivate

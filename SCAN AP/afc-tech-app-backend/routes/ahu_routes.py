@@ -331,3 +331,15 @@ def admin_get_all_ahus():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+@ahu_bp.route("/admin/filters/<int:filter_id>/reactivate", methods=["PATCH"])
+def reactivate_filter(filter_id):
+    f = db.session.get(Filter, filter_id)
+    if not f:
+        return jsonify({"error": "Filter not found"}), 404
+
+    f.is_active = True
+    db.session.commit()
+
+    return jsonify({"message": "Filter reactivated", "id": f.id}), 200
