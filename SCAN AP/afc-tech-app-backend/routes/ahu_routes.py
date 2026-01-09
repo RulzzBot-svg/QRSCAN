@@ -128,23 +128,23 @@ def get_filters_for_admin(ahu_id):
 
     active_filters = [f for f in ahu.filters if getattr(f, "is_active", True)]
 
-    return jsonify(
-        [
-            {
-                "id": f.id,
-                "phase": f.phase,
-                "part_number": f.part_number,
-                "size": f.size,
-                "quantity": f.quantity,
-                "frequency_days": f.frequency_days,
-                "last_serviced_date":(
-                    f.last_serviced_date.isoformat()
-                    if f.last_serviced_date else None
-                ),
-                "is_active":f.is_active,
-            }
-        for f in ahu.filters
+    return jsonify([
+        {
+            "id": f.id,
+            "phase": f.phase,
+            "part_number": f.part_number,
+            "size": f.size,
+            "quantity": f.quantity,
+            "frequency_days": f.frequency_days,
+            "last_service_date": (
+                f.last_service_date.isoformat()
+                if f.last_service_date else None
+            ),
+            "is_active": f.is_active,
+        }
+        for f in active_filters
     ]), 200
+
 
 
 #add fiters
