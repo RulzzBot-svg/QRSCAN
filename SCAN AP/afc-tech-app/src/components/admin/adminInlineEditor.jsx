@@ -48,7 +48,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await API.get(`/admin/ahus/${ahuId}/filters`);
+        const res = await API.get(`/admin/ahus/${ahuId}/filters?include_inactive=1`);
         setFilters(
           (Array.isArray(res.data) ? res.data : []).map((f) => ({
             ...f,

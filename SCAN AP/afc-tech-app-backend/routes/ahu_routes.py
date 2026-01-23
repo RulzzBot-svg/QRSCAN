@@ -151,8 +151,13 @@ def get_filters_for_admin(ahu_id):
         ahu = db.session.get(AHU, ahu_id)
         if not ahu:
             return jsonify({"error": "AHU not found"}), 404
+        
+        active_only = request.args.get("active_only","0")=="1"
 
-        active_filters = [f for f in ahu.filters if getattr(f, "is_active", True)]
+        filters = ahu.filters
+        if active_only:
+            filters=[f for f in filters if getattr(f, "is_active",True)]
+
 
         return jsonify([
             {
@@ -168,7 +173,7 @@ def get_filters_for_admin(ahu_id):
                 ),
                 "is_active": f.is_active,
             }
-            for f in active_filters
+            for f in filters
         ]), 200
 
     except Exception as e:
