@@ -140,7 +140,7 @@ function AdminAHUs() {
           // ✅ KEY CHANGE: flex layout that becomes 70/30 on desktop
           <div className="flex flex-col lg:flex-row gap-4">
             {/* LEFT: Dense list (70%) */}
-            <div className="w-full lg:w-[70%] min-w-0">
+            <div className="w-full lg:w-[60%] min-w-0">
               <div className="bg-base-100 border border-base-300 rounded-lg shadow">
                 <div className="p-4 border-b border-base-300 flex items-center justify-between">
                   <div className="font-semibold">Hospitals / AHUs</div>
