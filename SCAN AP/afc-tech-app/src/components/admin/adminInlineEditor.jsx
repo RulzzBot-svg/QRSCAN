@@ -1,3 +1,4 @@
+// adminInlineEditor.jsx
 import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 
@@ -82,6 +83,15 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
     window.clearTimeout(showToast._t);
     showToast._t = window.setTimeout(() => setToast(null), 1600);
   };
+
+  // ✅ IMPORTANT FOR OPTION 3:
+  // When selecting a different AHU in the right panel, we must reset and reload.
+  useEffect(() => {
+    setFilters([]);
+    setLoaded(false);
+    setLoading(false);
+    setConfirmAction(null);
+  }, [ahuId]);
 
   // Lazy-load only when opened
   useEffect(() => {
@@ -215,7 +225,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
   if (!isOpen) return null;
 
   return (
-    <div className="mt-3 bg-base-100 border border-base-300 rounded-lg p-4">
+    <div className="bg-base-100 border border-base-300 rounded-lg p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="text-sm opacity-80">
           Active Filters: <span className="font-semibold">{activeCount}</span>
@@ -254,11 +264,6 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 const st = getRowStatus(f);
                 const nextDue = computeNextDueDate(f);
 
-                // Row highlighting logic:
-                // - Inactive: muted (existing behavior)
-                // - Overdue: red background + left red stripe
-                // - Due soon: yellow background + left yellow stripe
-                // - New rows: subtle primary tint (existing behavior)
                 const rowClass = f._inactive
                   ? "opacity-40 italic"
                   : st.key === "overdue"
