@@ -112,7 +112,7 @@ function AdminAHUs() {
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
-      <main className="w-full">
+      <main className="w-full p-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold text-primary">AHU Maintenance Overview</h1>
@@ -137,16 +137,18 @@ function AdminAHUs() {
             <span className="loading loading-spinner loading-lg"></span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* LEFT: Dense list */}
-            <div className={`lg:col-span-${selectedAhu ? "7" : "10"}`}>
+          // ✅ KEY CHANGE: flex layout that becomes 70/30 on desktop
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* LEFT: Dense list (70%) */}
+            <div className="w-full lg:w-[70%] min-w-0">
               <div className="bg-base-100 border border-base-300 rounded-lg shadow">
                 <div className="p-4 border-b border-base-300 flex items-center justify-between">
                   <div className="font-semibold">Hospitals / AHUs</div>
                   <div className="text-xs opacity-70">{ahus.length} total AHUs</div>
                 </div>
 
-                <div className="divide-y divide-base-300">
+                {/* Optional: make the list scroll within viewport on large screens */}
+                <div className="divide-y divide-base-300 lg:max-h-[calc(100vh-160px)] lg:overflow-y-auto">
                   {grouped.map((group) => {
                     const isHospitalOpen = !!openHospitals[group.hospitalKey];
 
@@ -283,9 +285,9 @@ function AdminAHUs() {
               </div>
             </div>
 
-            {/* RIGHT: Inspector panel */}
-            {selectedAhu && (
-              <div className="lg:col-span-5">
+            {/* RIGHT: Inspector panel (30%) */}
+            {selectedAhu ? (
+              <div className="w-full lg:w-[30%] lg:min-w-[380px] min-w-0">
                 <div className="bg-base-100 border border-base-300 rounded-lg shadow lg:sticky lg:top-6">
                   <div className="p-4 border-b border-base-300 flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -342,12 +344,22 @@ function AdminAHUs() {
                     </button>
                   </div>
 
-                  <div className="p-4">
-                    {/* We always render the editor in the panel */}
+                  {/* Optional: make panel content scroll if it gets tall */}
+                  <div className="p-4 lg:max-h-[calc(100vh-170px)] lg:overflow-y-auto">
                     <AdminFilterEditorInline ahuId={selectedAhu.id} isOpen={true} />
                   </div>
                 </div>
               </div>
+            ) : (
+              // If no AHU selected, you can either hide the panel entirely (current behavior),
+              // or show an empty placeholder panel. If you want the placeholder, uncomment below:
+              //
+              // <div className="w-full lg:w-[30%] lg:min-w-[380px] min-w-0">
+              //   <div className="bg-base-100 border border-base-300 rounded-lg shadow p-6 opacity-70">
+              //     Select an AHU to view details.
+              //   </div>
+              // </div>
+              null
             )}
           </div>
         )}
