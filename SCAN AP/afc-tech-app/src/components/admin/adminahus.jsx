@@ -287,7 +287,7 @@ function AdminAHUs() {
 
             {/* RIGHT: Inspector panel (30%) */}
             {selectedAhu ? (
-              <div className="w-full lg:w-[30%] lg:min-w-[380px] min-w-0">
+              <div className="w-full lg:w-[40%] lg:min-w-[380px] min-w-0">
                 <div className="bg-base-100 border border-base-300 rounded-lg shadow lg:sticky lg:top-6">
                   <div className="p-4 border-b border-base-300 flex items-start justify-between gap-3">
                     <div className="min-w-0">
