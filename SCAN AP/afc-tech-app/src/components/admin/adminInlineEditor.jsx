@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 
 const FREQUENCY_OPTIONS = [
-  { label: "30 Days", value: 30},
-  { label: "60 Days", value: 60},
+  { label: "30 Days", value: 30 },
+  { label: "60 Days", value: 60 },
   { label: "90 Days", value: 90 },
   { label: "180 Days", value: 180 },
   { label: "365 Days", value: 365 },
@@ -20,11 +20,51 @@ const buildSize = ({ h, w, d }) => {
   return `${h}x${w}x${d}`;
 };
 
-const computeNextDue = (f) => {
-  if (!f.last_service_date || !f.frequency_days) return "—";
+// ------------------------------------------------------
+// Date/status helpers (frontend-only overdue highlighting)
+// ------------------------------------------------------
+const startOfDay = (d) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
+
+const computeNextDueDate = (f) => {
+  if (!f?.last_service_date || !f?.frequency_days) return null;
+
   const last = new Date(f.last_service_date);
-  last.setDate(last.getDate() + Number(f.frequency_days));
-  return last.toLocaleDateString();
+  if (Number.isNaN(last.getTime())) return null;
+
+  const next = new Date(last);
+  next.setDate(next.getDate() + Number(f.frequency_days));
+  return next;
+};
+
+const formatDate = (d) => (d ? d.toLocaleDateString() : "—");
+
+const getRowStatus = (f) => {
+  // Inactive always stays muted
+  if (f?._inactive) {
+    return { key: "inactive", label: "Inactive" };
+  }
+
+  // Can't compute due date without last_service_date/frequency_days
+  const nextDue = computeNextDueDate(f);
+  if (!nextDue) {
+    return { key: "pending", label: "Pending" };
+  }
+
+  const today = startOfDay(new Date());
+  const due = startOfDay(nextDue);
+  const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return { key: "overdue", label: `Overdue (${Math.abs(diffDays)}d)` };
+  }
+  if (diffDays <= 7) {
+    return { key: "dueSoon", label: `Due Soon (${diffDays}d)` };
+  }
+  return { key: "ok", label: `OK (${diffDays}d)` };
 };
 
 function AdminFilterEditorInline({ ahuId, isOpen }) {
@@ -50,6 +90,8 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
     const load = async () => {
       setLoading(true);
       try {
+        // NOTE: backend currently doesn't read include_inactive, but it still returns inactive rows
+        // because you aren't filtering by active_only=1. Leaving this as-is to avoid backend changes.
         const res = await API.get(`/admin/ahus/${ahuId}/filters?include_inactive=1`);
         setFilters(
           (Array.isArray(res.data) ? res.data : []).map((f) => ({
@@ -202,138 +244,187 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 <th>Last Serviced</th>
                 <th>Next Due</th>
                 <th>Save</th>
+                <th>Actions</th>
                 <th>Status</th>
               </tr>
             </thead>
 
             <tbody>
-              {filters.map((f) => (
-                <tr
-                  key={f.id}
-                  className={f._inactive ? "opacity-40 italic" : f._isNew ? "bg-primary/5" : ""}
-                >
-                  <td>
-                    <input
-                      className="input input-xs input-bordered"
-                      value={f.phase}
-                      onChange={(e) => updateFilter(f.id, "phase", e.target.value)}
-                      disabled={f._inactive}
-                    />
-                  </td>
+              {filters.map((f) => {
+                const st = getRowStatus(f);
+                const nextDue = computeNextDueDate(f);
 
-                  <td>
-                    <input
-                      className="input input-xs input-bordered"
-                      value={f.part_number}
-                      onChange={(e) => updateFilter(f.id, "part_number", e.target.value)}
-                      disabled={f._inactive}
-                    />
-                  </td>
+                // Row highlighting logic:
+                // - Inactive: muted (existing behavior)
+                // - Overdue: red background + left red stripe
+                // - Due soon: yellow background + left yellow stripe
+                // - New rows: subtle primary tint (existing behavior)
+                const rowClass = f._inactive
+                  ? "opacity-40 italic"
+                  : st.key === "overdue"
+                  ? "bg-error/15 border-l-4 border-l-error"
+                  : st.key === "dueSoon"
+                  ? "bg-warning/10 border-l-4 border-l-warning"
+                  : f._isNew
+                  ? "bg-primary/5"
+                  : "";
 
-                  <td>
-                    <div className="flex gap-1">
-                      {["h", "w", "d"].map((dim) => (
-                        <input
-                          key={dim}
-                          type="number"
-                          placeholder={dim.toUpperCase()}
-                          className="input input-xs input-bordered w-14"
-                          value={f.sizeParts?.[dim] || ""}
-                          disabled={f._inactive}
-                          onChange={(e) => updateFilter(f.id, `size.${dim}`, e.target.value)}
-                        />
-                      ))}
-                    </div>
-                  </td>
+                return (
+                  <tr key={f.id} className={rowClass}>
+                    <td>
+                      <input
+                        className="input input-xs input-bordered"
+                        value={f.phase}
+                        onChange={(e) => updateFilter(f.id, "phase", e.target.value)}
+                        disabled={f._inactive}
+                      />
+                    </td>
 
-                  <td>
-                    <input
-                      type="number"
-                      className="input input-xs input-bordered w-16"
-                      value={f.quantity}
-                      disabled={f._inactive}
-                      onChange={(e) => updateFilter(f.id, "quantity", e.target.value)}
-                    />
-                  </td>
+                    <td>
+                      <input
+                        className="input input-xs input-bordered"
+                        value={f.part_number}
+                        onChange={(e) => updateFilter(f.id, "part_number", e.target.value)}
+                        disabled={f._inactive}
+                      />
+                    </td>
 
-                  <td>
-                    <select
-                      className="select select-xs select-bordered"
-                      value={f.frequency_days}
-                      disabled={f._inactive}
-                      onChange={(e) => updateFilter(f.id, "frequency_days", e.target.value)}
-                    >
-                      {FREQUENCY_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+                    <td>
+                      <div className="flex gap-1">
+                        {["h", "w", "d"].map((dim) => (
+                          <input
+                            key={dim}
+                            type="number"
+                            placeholder={dim.toUpperCase()}
+                            className="input input-xs input-bordered w-14"
+                            value={f.sizeParts?.[dim] || ""}
+                            disabled={f._inactive}
+                            onChange={(e) => updateFilter(f.id, `size.${dim}`, e.target.value)}
+                          />
+                        ))}
+                      </div>
+                    </td>
 
-                  <td className="text-xs">
-                    {f.last_service_date ? new Date(f.last_service_date).toLocaleDateString() : "Never"}
-                  </td>
+                    <td>
+                      <input
+                        type="number"
+                        className="input input-xs input-bordered w-16"
+                        value={f.quantity}
+                        disabled={f._inactive}
+                        onChange={(e) => updateFilter(f.id, "quantity", e.target.value)}
+                      />
+                    </td>
 
-                  <td className="text-xs">{computeNextDue(f)}</td>
+                    <td>
+                      <select
+                        className="select select-xs select-bordered"
+                        value={f.frequency_days}
+                        disabled={f._inactive}
+                        onChange={(e) => updateFilter(f.id, "frequency_days", e.target.value)}
+                      >
+                        {FREQUENCY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
 
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-xs btn-primary"
-                      disabled={f._inactive}
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          if (f._isNew) await saveNew(f);
-                          else await saveFilter(f);
-                        } catch (err) {
-                          console.error(err);
-                          showToast("Save failed. Check server logs.", "info");
-                        }
-                      }}
-                    >
-                      Save
-                    </button>
-                  </td>
+                    <td className="text-xs">
+                      {f.last_service_date
+                        ? new Date(f.last_service_date).toLocaleDateString()
+                        : "Never"}
+                    </td>
 
-                  <td>
-                    {!f._inactive ? (
+                    <td className="text-xs">{formatDate(nextDue)}</td>
+
+                    <td>
                       <button
                         type="button"
-                        className="btn btn-xs btn-warning"
-                        onClick={(e) => {
+                        className="btn btn-xs btn-primary"
+                        disabled={f._inactive}
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          setConfirmAction({ mode: "deactivate", filter: f });
+                          try {
+                            if (f._isNew) await saveNew(f);
+                            else await saveFilter(f);
+                          } catch (err) {
+                            console.error(err);
+                            showToast("Save failed. Check server logs.", "info");
+                          }
                         }}
                       >
-                        Deactivate
+                        Save
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-success text-white"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmAction({ mode: "reactivate", filter: f });
-                        }}
-                      >
-                        Reactivate
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+
+                    <td>
+                      {!f._inactive ? (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-warning"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmAction({ mode: "deactivate", filter: f });
+                          }}
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-success text-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmAction({ mode: "reactivate", filter: f });
+                          }}
+                        >
+                          Reactivate
+                        </button>
+                      )}
+                    </td>
+
+                    <td>
+                      {f._inactive ? (
+                        <span className="badge badge-ghost">Inactive</span>
+                      ) : st.key === "overdue" ? (
+                        <span className="badge badge-error">{st.label}</span>
+                      ) : st.key === "dueSoon" ? (
+                        <span className="badge badge-warning">{st.label}</span>
+                      ) : st.key === "pending" ? (
+                        <span className="badge badge-ghost">Pending</span>
+                      ) : (
+                        <span className="badge badge-success text-white">{st.label}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
 
               {filters.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center py-6 opacity-70">
+                  <td colSpan={10} className="text-center py-6 opacity-70">
                     No filters found for this AHU.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+
+          <div className="mt-3 text-xs opacity-70">
+            <div>
+              <span className="font-semibold">Status logic:</span>{" "}
+              uses <span className="font-mono">last_service_date + frequency_days</span>{" "}
+              to compute Next Due. Rows without a last service date show as{" "}
+              <span className="badge badge-ghost align-middle">Pending</span>.
+            </div>
+            <div className="mt-1">
+              <span className="badge badge-error align-middle">Overdue</span>{" "}
+              is any Next Due date before today.{" "}
+              <span className="badge badge-warning align-middle">Due Soon</span>{" "}
+              is Next Due within 7 days.
+            </div>
+          </div>
         </div>
       )}
 
@@ -345,7 +436,6 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
         </div>
       )}
 
-      {/* ✅ CONFIRM MODAL (THIS TIME IT WILL ACTUALLY OPEN) */}
       {confirmAction && (
         <dialog open className="modal">
           <div className="modal-box">
@@ -376,7 +466,11 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
               </button>
 
               <button
-                className={confirmAction.mode === "deactivate" ? "btn btn-warning" : "btn btn-success text-white"}
+                className={
+                  confirmAction.mode === "deactivate"
+                    ? "btn btn-warning"
+                    : "btn btn-success text-white"
+                }
                 onClick={async () => {
                   const { mode, filter } = confirmAction;
                   setConfirmAction(null);
