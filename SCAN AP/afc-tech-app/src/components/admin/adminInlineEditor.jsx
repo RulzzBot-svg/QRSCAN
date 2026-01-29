@@ -391,15 +391,15 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
                     <td>
                       {f._inactive ? (
-                        <span className="badge badge-ghost">Inactive</span>
+                        <span className="badge badge-ghost badge-sm text-xs whitespace-nowrap">Inactive</span>
                       ) : st.key === "overdue" ? (
-                        <span className="badge badge-error">{st.label}</span>
+                        <span className="badge badge-error badge-md text-sx whitespace-nowrap">{st.label}</span>
                       ) : st.key === "dueSoon" ? (
-                        <span className="badge badge-warning">{st.label}</span>
+                        <span className="badge badge-warning badge-md text-sx whitespace-nowrap">{st.label}</span>
                       ) : st.key === "pending" ? (
-                        <span className="badge badge-ghost">Pending</span>
+                        <span className="badge badge-ghost badge-md text-sx whitespace-nowrap">Pending</span>
                       ) : (
-                        <span className="badge badge-success text-white">{st.label}</span>
+                        <span className="badge badge-success badge-md text-white text-xs whitespace-nowrap">{st.label}</span>
                       )}
                     </td>
                   </tr>
@@ -417,12 +417,6 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
           </table>
 
           <div className="mt-3 text-xs opacity-70">
-            <div>
-              <span className="font-semibold">Status logic:</span>{" "}
-              uses <span className="font-mono">last_service_date + frequency_days</span>{" "}
-              to compute Next Due. Rows without a last service date show as{" "}
-              <span className="badge badge-ghost align-middle">Pending</span>.
-            </div>
             <div className="mt-1">
               <span className="badge badge-error align-middle">Overdue</span>{" "}
               is any Next Due date before today.{" "}

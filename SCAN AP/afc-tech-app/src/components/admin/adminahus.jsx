@@ -50,7 +50,7 @@ function AdminAHUs() {
 
         // If nothing selected yet, pick the first AHU (optional behavior)
         if (!selectedAhuId && list.length) {
-          setSelectedAhuId(list[0].id);
+          setSelectedAhuId(null);
         }
       } catch (err) {
         console.error("Failed to load AHUs:", err);
@@ -96,7 +96,7 @@ function AdminAHUs() {
     setOpenHospitals((prev) => {
       if (Object.keys(prev).length) return prev;
       const next = {};
-      for (const g of grouped) next[g.hospitalKey] = true;
+      for (const g of grouped) next[g.hospitalKey] = false;
       return next;
     });
   }, [loading, grouped]);
@@ -109,6 +109,7 @@ function AdminAHUs() {
     () => ahus.find((x) => String(x.id) === String(selectedAhuId)) || null,
     [ahus, selectedAhuId]
   );
+
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
@@ -161,6 +162,19 @@ function AdminAHUs() {
                       0
                     );
 
+                    const hospitalOk = group.items.reduce((acc, a) => {
+                      const okCount =
+                        (a.filters_count ?? 0) - (a.overdue_count ?? 0) - (a.due_soon_count ?? 0);
+                      return acc + Math.max(0, okCount);
+                    }, 0);
+
+                    const hospitalFilter = group.items.reduce(
+                      (acc,a) => acc + (a.filters_count || 0), 0
+                    );
+
+
+
+
                     return (
                       <div key={group.hospitalKey} className="p-4">
                         {/* Hospital header */}
@@ -177,6 +191,15 @@ function AdminAHUs() {
                                 </div>
 
                                 <div className="flex items-center gap-2">
+
+                                  {hospitalOk > 0 ? (
+                                    <span className="badge badge-success">
+                                      {hospitalOk} OK
+                                    </span>
+                                  ) : (
+                                    <span className="badge badge-ghost">0 OK</span>
+                                  )}
+
                                   {hospitalOverdue > 0 ? (
                                     <span className="badge badge-error">
                                       {hospitalOverdue} overdue
@@ -195,6 +218,10 @@ function AdminAHUs() {
 
                                   <span className="badge badge-ghost">
                                     {group.items.length} AHUs
+                                  </span>
+                                  
+                                  <span className="badge badge-ghost">
+                                    {hospitalFilter} filters
                                   </span>
                                 </div>
                               </div>
@@ -233,6 +260,18 @@ function AdminAHUs() {
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <div className="font-semibold truncate">{a.id}</div>
+
+                                        {(() => {
+                                          const okCount =
+                                            (a.filters_count ?? 0) - (a.overdue_count ?? 0) - (a.due_soon_count ?? 0);
+
+                                          return okCount > 0 ? (
+                                            <span className="badge badge-success badge-sm">
+                                              {okCount} OK
+                                            </span>
+                                          ) : null;
+                                        })()}
+
 
                                         {a.overdue_count > 0 ? (
                                           <span className="badge badge-error badge-sm">

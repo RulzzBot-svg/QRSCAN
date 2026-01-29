@@ -1,3 +1,5 @@
+# seed_from_excel.py
+import os
 import re
 from datetime import datetime, date
 
@@ -10,7 +12,7 @@ from models import Hospital, AHU, Filter
 
 
 # Point this to your file (or build a loop later if you seed multiple hospitals)
-EXCEL_PATH = "./excel_data_raw/15 CENTINELA HOSPITAL MEDICAL CENTER.xlsx"
+EXCEL_PATH = "./excel_data_raw/3 QUEEN OF THE VALLEY (Standard).xlsx"
 
 
 # -----------------------------
@@ -47,38 +49,40 @@ def to_date(val):
     except Exception:
         return None
 
-def parse_quantity (val, default=1):
 
+def parse_quantity(val, default=1):
+    """
+    Convert excel cell values into an int quantity safely.
+    Handles None, NaN, floats, and strings like "10 ea".
+    """
     if val is None:
         return default
-    
+
     try:
         if pd.isna(val):
             return default
     except Exception:
         pass
 
-    if isinstance(val, (int,float)):
+    # already numeric
+    if isinstance(val, (int, float)):
         try:
             return int(val)
         except Exception:
             return default
-        
+
     s = str(val).strip()
     if not s:
         return default
-    
-    m = re.serach(r"\d+",s)
+
+    m = re.search(r"\d+", s)
     if m:
         try:
             return int(m.group(0))
         except Exception:
             return default
-    
+
     return default
-
-
-
 
 
 def parse_frequency_to_days(raw):
@@ -118,6 +122,11 @@ def get_sheet_title_cell(path, sheet_name="MAIN BUILDING", cell="B2"):
     return clean_str(ws[cell].value)
 
 
+def has_attr(obj, attr: str) -> bool:
+    # Works even if attr is a SQLAlchemy column
+    return hasattr(obj, attr)
+
+
 # -----------------------------
 # Upserts
 # -----------------------------
@@ -129,14 +138,13 @@ def upsert_hospital(name: str):
             h.active = True
         return h
 
-    # if your Hospital model requires other fields, add them here
     h = Hospital(name=name, active=True)
     db.session.add(h)
     db.session.flush()
     return h
 
 
-def upsert_ahu(ahu_id: str, hospital_id: int, location=None, notes=None):
+def upsert_ahu(ahu_id: str, hospital_id: int, location=None, notes=None, excel_order=None):
     ahu_id = clean_str(ahu_id)
     if not ahu_id:
         return None
@@ -150,15 +158,26 @@ def upsert_ahu(ahu_id: str, hospital_id: int, location=None, notes=None):
             a.notes = notes
         if not getattr(a, "name", None):
             a.name = ahu_id
+
+        # ✅ preserve Excel order if column exists
+        if excel_order is not None and has_attr(a, "excel_order"):
+            a.excel_order = int(excel_order)
+
         return a
 
-    a = AHU(
+    kwargs = dict(
         id=ahu_id,
         hospital_id=hospital_id,
         name=ahu_id,
         location=location,
         notes=notes,
     )
+
+    # ✅ preserve Excel order if column exists
+    if excel_order is not None and has_attr(AHU, "excel_order"):
+        kwargs["excel_order"] = int(excel_order)
+
+    a = AHU(**kwargs)
     db.session.add(a)
     return a
 
@@ -183,6 +202,7 @@ def upsert_filter(
     frequency_days,
     last_service_date,
     is_active=True,
+    excel_order=None,
 ):
     ahu_id = clean_str(ahu_id)
     phase = clean_str(phase)
@@ -195,11 +215,10 @@ def upsert_filter(
     existing = find_existing_filter(ahu_id, phase, part_number, size)
     if existing:
         # update mutable fields
-        if quantity is not None and not (isinstance(quantity, float) and pd.isna(quantity)):
-            try:
-                existing.quantity = parse_quantity(quantity, default=existing.quantity)
-            except Exception:
-                pass
+        try:
+            existing.quantity = parse_quantity(quantity, default=getattr(existing, "quantity", 1) or 1)
+        except Exception:
+            pass
 
         if frequency_days is not None:
             try:
@@ -211,12 +230,17 @@ def upsert_filter(
             existing.last_service_date = last_service_date
 
         existing.is_active = bool(is_active)
+
+        # ✅ preserve Excel order if column exists
+        if excel_order is not None and has_attr(existing, "excel_order"):
+            existing.excel_order = int(excel_order)
+
         return existing
 
     if frequency_days is None:
         frequency_days = 90  # default fallback
 
-    f = Filter(
+    kwargs = dict(
         ahu_id=ahu_id,
         phase=phase,
         part_number=part_number,
@@ -226,6 +250,12 @@ def upsert_filter(
         last_service_date=last_service_date,
         is_active=bool(is_active),
     )
+
+    # ✅ preserve Excel order if column exists
+    if excel_order is not None and has_attr(Filter, "excel_order"):
+        kwargs["excel_order"] = int(excel_order)
+
+    f = Filter(**kwargs)
     db.session.add(f)
     return f
 
@@ -234,6 +264,9 @@ def upsert_filter(
 # Main seed
 # -----------------------------
 def seed_from_excel(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Excel file not found: {path}")
+
     xls = pd.ExcelFile(path)
 
     # seed from all sheets except the legend sheet called "Filter"
@@ -254,6 +287,10 @@ def seed_from_excel(path):
         "filters_upserted": 0,
         "filters_skipped": 0,
     }
+
+    # ✅ Tracks AHU order across the workbook in encounter order
+    ahu_order_map = {}   # { "AHU-1": 1, ... }
+    next_ahu_order = 1
 
     for sheet in data_sheets:
         # your file headers are on row 5 (0-based header=4)
@@ -294,10 +331,18 @@ def seed_from_excel(path):
         stats["sheets_processed"] += 1
         stats["rows_seen"] += len(df)
 
+        # ✅ Tracks filter order per-AHU within this sheet's encounter order
+        filter_order_map = {}  # { "AHU-1": 1, ... }
+
         for _, r in df.iterrows():
             ahu_no = clean_str(r.get(col_ahu))
             if not ahu_no:
                 continue
+
+            # ✅ assign a stable Excel-order index for this AHU (first time we see it)
+            if ahu_no not in ahu_order_map:
+                ahu_order_map[ahu_no] = next_ahu_order
+                next_ahu_order += 1
 
             location = clean_str(r.get(col_loc))
             building = clean_str(r.get(col_building)) if col_building else None
@@ -315,6 +360,7 @@ def seed_from_excel(path):
                 hospital_id=hospital.id,
                 location=location,
                 notes=notes,
+                excel_order=ahu_order_map[ahu_no],
             )
             stats["ahus"].add(ahu_no)
 
@@ -339,6 +385,11 @@ def seed_from_excel(path):
                 stats["filters_skipped"] += 1
                 continue
 
+            # ✅ assign filter encounter order within the AHU
+            filter_order_map.setdefault(ahu_no, 1)
+            filter_excel_order = filter_order_map[ahu_no]
+            filter_order_map[ahu_no] += 1
+
             upsert_filter(
                 ahu_id=ahu_no,
                 phase=phase,
@@ -348,6 +399,7 @@ def seed_from_excel(path):
                 frequency_days=freq_days,
                 last_service_date=last_service_date,
                 is_active=is_active,
+                excel_order=filter_excel_order,
             )
             stats["filters_upserted"] += 1
 

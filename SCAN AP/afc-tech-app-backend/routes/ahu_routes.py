@@ -103,7 +103,12 @@ def get_ahu_by_qr(ahu_id):
             return jsonify({"error": "AHU not found"}), 404
 
         # Only ACTIVE filters should be returned/used for status
-        active_filters = [f for f in ahu.filters if getattr(f, "is_active", True)]
+        active_filters = (
+            db.session.query(Filter)
+            .filter(Filter.ahu_id == ahu_id, Filter.is_active.is_(True))
+            .order_by(Filter.excel_order.asc(), Filter.id.asc())
+            .all()
+        )
 
         filters_payload = []
         for f in active_filters:
@@ -154,7 +159,9 @@ def get_filters_for_admin(ahu_id):
         
         active_only = request.args.get("active_only","0")=="1"
 
-        filters = ahu.filters
+        q = db.session.query(Filter).filter(Filter.ahu_id == ahu_id)
+        
+        filters = q.order_by(Filter.excel_order.asc(), Filter.id.asc()).all()
         if active_only:
             filters=[f for f in filters if getattr(f, "is_active",True)]
 
@@ -285,6 +292,7 @@ def admin_get_all_ahus():
         ahus = (
             db.session.query(AHU)
             .options(joinedload(AHU.hospital), selectinload(AHU.filters))
+            .order_by(AHU.hospital_id.asc(), AHU.excel_order.asc(), AHU.id.asc())
             .all()
         )
 

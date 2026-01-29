@@ -32,6 +32,7 @@ class AHU(db.Model):
     name = Column(String(150), nullable=False)
     location = Column(String(200))
     notes = Column(Text)
+    excel_order = Column(Integer, nullable=True)
 
     hospital = relationship("Hospital", back_populates="ahus")
     filters = relationship("Filter", back_populates="ahu", cascade="all, delete-orphan")
@@ -56,6 +57,8 @@ class Filter(db.Model):
     # ✅ SERVICE LOGIC BELONGS HERE
     frequency_days = Column(Integer, nullable=False)
     last_service_date = Column(Date)
+
+    excel_order = Column(Integer, nullable=True)
 
     ahu = relationship("AHU", back_populates="filters")
     job_filters = relationship(
