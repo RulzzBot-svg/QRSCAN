@@ -147,6 +147,11 @@ def get_ahu_by_qr(ahu_id):
         return jsonify({"error": str(e)}), 500
 
 
+@ahu_bp.route("/debug/ahu-ids", methods=["GET"])
+def debug_ahu_ids():
+    ahus = db.session.query(AHU.id).order_by(AHU.id.asc()).limit(150).all()
+    return jsonify([a[0] for a in ahus]), 200
+
 # ---------------------------------------------------
 # Admin: Get filters for an AHU (ACTIVE only)
 # ---------------------------------------------------

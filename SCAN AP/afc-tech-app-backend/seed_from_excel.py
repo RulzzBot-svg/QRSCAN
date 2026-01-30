@@ -1,6 +1,7 @@
 # seed_from_excel.py
 import os
 import re
+import unicodedata
 from datetime import datetime, date
 
 import pandas as pd
@@ -64,7 +65,6 @@ def parse_quantity(val, default=1):
     except Exception:
         pass
 
-    # already numeric
     if isinstance(val, (int, float)):
         try:
             return int(val)
@@ -123,8 +123,68 @@ def get_sheet_title_cell(path, sheet_name="MAIN BUILDING", cell="B2"):
 
 
 def has_attr(obj, attr: str) -> bool:
-    # Works even if attr is a SQLAlchemy column
     return hasattr(obj, attr)
+
+
+def normalize_filter_field(s: str):
+    """Normalize fields used for finding existing filters (phase/part_number/size)."""
+    s = clean_str(s)
+    if not s:
+        return None
+    # collapse internal whitespace and normalize "x" spacing
+    s = re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r"\s*[xX]\s*", " x ", s)
+    return s
+
+
+def slugify_ahu_token(raw_ahu_no: str):
+    """
+    Make a URL-safe token from any AHU label.
+    - Removes leading '#'
+    - Normalizes unicode
+    - Replaces whitespace with dashes
+    - Removes non [a-z0-9-]
+    """
+    s = clean_str(raw_ahu_no)
+    if not s:
+        return None
+
+    # Normalize unicode (turn fancy characters into ASCII equivalents when possible)
+    s = unicodedata.normalize("NFKD", s)
+    s = s.encode("ascii", "ignore").decode("ascii")
+
+    s = s.strip()
+
+    # remove leading "#"
+    if s.startswith("#"):
+        s = s[1:].strip()
+
+    # common separators -> dashes
+    s = s.replace("_", "-")
+    s = s.replace("/", "-")
+    s = s.replace("\\", "-")
+
+    # whitespace -> dashes
+    s = re.sub(r"\s+", "-", s)
+
+    # strip anything not alnum or dash
+    s = re.sub(r"[^A-Za-z0-9\-]+", "-", s)
+
+    # collapse dashes
+    s = re.sub(r"-{2,}", "-", s).strip("-")
+
+    return s.lower() if s else None
+
+
+def canonical_ahu_id(hospital_id: int, raw_ahu_no: str):
+    """
+    Canonical ID stored in AHU.id (PRIMARY KEY):
+      H{hospital_id}-{slug}
+    """
+    slug = slugify_ahu_token(raw_ahu_no)
+    if not slug:
+        return None
+    return f"H{hospital_id}-{slug}"
 
 
 # -----------------------------
@@ -133,7 +193,6 @@ def has_attr(obj, attr: str) -> bool:
 def upsert_hospital(name: str):
     h = Hospital.query.filter_by(name=name).first()
     if h:
-        # keep active True if model supports it
         if hasattr(h, "active") and h.active is None:
             h.active = True
         return h
@@ -144,7 +203,11 @@ def upsert_hospital(name: str):
     return h
 
 
-def upsert_ahu(ahu_id: str, hospital_id: int, location=None, notes=None, excel_order=None):
+def upsert_ahu(ahu_id: str, hospital_id: int, display_name: str, location=None, notes=None, excel_order=None):
+    """
+    AHU.id is canonical.
+    AHU.name is human readable (raw excel value).
+    """
     ahu_id = clean_str(ahu_id)
     if not ahu_id:
         return None
@@ -152,14 +215,13 @@ def upsert_ahu(ahu_id: str, hospital_id: int, location=None, notes=None, excel_o
     a = db.session.get(AHU, ahu_id)
     if a:
         a.hospital_id = hospital_id
+        if display_name:
+            a.name = display_name  # keep human-readable
         if location:
             a.location = location
         if notes:
             a.notes = notes
-        if not getattr(a, "name", None):
-            a.name = ahu_id
 
-        # ✅ preserve Excel order if column exists
         if excel_order is not None and has_attr(a, "excel_order"):
             a.excel_order = int(excel_order)
 
@@ -168,12 +230,11 @@ def upsert_ahu(ahu_id: str, hospital_id: int, location=None, notes=None, excel_o
     kwargs = dict(
         id=ahu_id,
         hospital_id=hospital_id,
-        name=ahu_id,
+        name=display_name or ahu_id,  # human readable
         location=location,
         notes=notes,
     )
 
-    # ✅ preserve Excel order if column exists
     if excel_order is not None and has_attr(AHU, "excel_order"):
         kwargs["excel_order"] = int(excel_order)
 
@@ -205,16 +266,16 @@ def upsert_filter(
     excel_order=None,
 ):
     ahu_id = clean_str(ahu_id)
-    phase = clean_str(phase)
-    part_number = clean_str(part_number) or ""
-    size = clean_str(size)
+
+    phase = normalize_filter_field(phase)
+    part_number = normalize_filter_field(part_number) or ""
+    size = normalize_filter_field(size)
 
     if not ahu_id or not size:
         return None
 
     existing = find_existing_filter(ahu_id, phase, part_number, size)
     if existing:
-        # update mutable fields
         try:
             existing.quantity = parse_quantity(quantity, default=getattr(existing, "quantity", 1) or 1)
         except Exception:
@@ -231,14 +292,13 @@ def upsert_filter(
 
         existing.is_active = bool(is_active)
 
-        # ✅ preserve Excel order if column exists
         if excel_order is not None and has_attr(existing, "excel_order"):
             existing.excel_order = int(excel_order)
 
         return existing
 
     if frequency_days is None:
-        frequency_days = 90  # default fallback
+        frequency_days = 90
 
     kwargs = dict(
         ahu_id=ahu_id,
@@ -251,7 +311,6 @@ def upsert_filter(
         is_active=bool(is_active),
     )
 
-    # ✅ preserve Excel order if column exists
     if excel_order is not None and has_attr(Filter, "excel_order"):
         kwargs["excel_order"] = int(excel_order)
 
@@ -269,7 +328,6 @@ def seed_from_excel(path):
 
     xls = pd.ExcelFile(path)
 
-    # seed from all sheets except the legend sheet called "Filter"
     data_sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
     if not data_sheets:
         raise RuntimeError("No data sheets found (expected something like 'MAIN BUILDING').")
@@ -288,16 +346,14 @@ def seed_from_excel(path):
         "filters_skipped": 0,
     }
 
-    # ✅ Tracks AHU order across the workbook in encounter order
-    ahu_order_map = {}   # { "AHU-1": 1, ... }
+    # Order map keyed by canonical AHU.id
+    ahu_order_map = {}
     next_ahu_order = 1
 
     for sheet in data_sheets:
-        # your file headers are on row 5 (0-based header=4)
         df = pd.read_excel(path, sheet_name=sheet, header=4)
         df.columns = [str(c).strip() for c in df.columns]
 
-        # normalize matching so "DATE OF \nREPLACEMENT" == "DATE OF REPLACEMENT"
         def col(exact_name):
             target = re.sub(r"\s+", " ", exact_name).strip().lower()
             for c in df.columns:
@@ -311,61 +367,61 @@ def seed_from_excel(path):
         col_stage = col("STAGE")
         col_size = col("FILTER SIZE")
         col_freq = col("FREQUENCY")
-
-        # ✅ FIX: accept QUANTITY or QTY
         col_qty = col("QUANTITY") or col("QTY")
 
         col_building = col("BUILDING")
         col_floor_area = col("FLOOR/AREA")
         col_part_num = col("PART NUMBER")
         col_filter_type = col("FILTER TYPE")
-        col_repl = col("DATE OF REPLACEMENT")  # matches newline variant automatically
+        col_repl = col("DATE OF REPLACEMENT")
 
         required = [col_ahu, col_loc, col_stage, col_size, col_qty, col_freq]
         if any(x is None for x in required):
-            print(
-                f"Skipping sheet '{sheet}' (missing required columns). Found columns: {list(df.columns)}"
-            )
+            print(f"Skipping sheet '{sheet}' (missing required columns). Found columns: {list(df.columns)}")
             continue
 
         stats["sheets_processed"] += 1
         stats["rows_seen"] += len(df)
 
-        # ✅ Tracks filter order per-AHU within this sheet's encounter order
-        filter_order_map = {}  # { "AHU-1": 1, ... }
+        filter_order_map = {}  # keyed by canonical ahu_id
 
         for _, r in df.iterrows():
-            ahu_no = clean_str(r.get(col_ahu))
-            if not ahu_no:
+            raw_ahu_no = clean_str(r.get(col_ahu))
+            if not raw_ahu_no:
                 continue
 
-            # ✅ assign a stable Excel-order index for this AHU (first time we see it)
-            if ahu_no not in ahu_order_map:
-                ahu_order_map[ahu_no] = next_ahu_order
+            ahu_id = canonical_ahu_id(hospital.id, raw_ahu_no)
+            if not ahu_id:
+                continue
+
+            if ahu_id not in ahu_order_map:
+                ahu_order_map[ahu_id] = next_ahu_order
                 next_ahu_order += 1
 
             location = clean_str(r.get(col_loc))
             building = clean_str(r.get(col_building)) if col_building else None
             floor_area = clean_str(r.get(col_floor_area)) if col_floor_area else None
 
-            notes_parts = []
+            notes_parts = [f"Raw AHU: {raw_ahu_no}"]
             if building:
                 notes_parts.append(f"Building: {building}")
             if floor_area:
                 notes_parts.append(f"Floor/Area: {floor_area}")
-            notes = " | ".join(notes_parts) if notes_parts else None
+            notes = " | ".join(notes_parts)
 
             upsert_ahu(
-                ahu_id=ahu_no,
+                ahu_id=ahu_id,
                 hospital_id=hospital.id,
+                display_name=raw_ahu_no,  # human readable
                 location=location,
                 notes=notes,
-                excel_order=ahu_order_map[ahu_no],
+                excel_order=ahu_order_map[ahu_id],
             )
-            stats["ahus"].add(ahu_no)
 
-            phase = clean_str(r.get(col_stage))
-            size = clean_str(r.get(col_size))
+            stats["ahus"].add(ahu_id)
+
+            phase = r.get(col_stage)
+            size = r.get(col_size)
             qty = r.get(col_qty)
 
             freq_raw = r.get(col_freq)
@@ -381,17 +437,16 @@ def seed_from_excel(path):
             if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
                 is_active = False
 
-            if not size:
+            if not clean_str(size):
                 stats["filters_skipped"] += 1
                 continue
 
-            # ✅ assign filter encounter order within the AHU
-            filter_order_map.setdefault(ahu_no, 1)
-            filter_excel_order = filter_order_map[ahu_no]
-            filter_order_map[ahu_no] += 1
+            filter_order_map.setdefault(ahu_id, 1)
+            filter_excel_order = filter_order_map[ahu_id]
+            filter_order_map[ahu_id] += 1
 
             upsert_filter(
-                ahu_id=ahu_no,
+                ahu_id=ahu_id,
                 phase=phase,
                 part_number=part_number,
                 size=size,
@@ -407,11 +462,15 @@ def seed_from_excel(path):
 
     print("\n✅ Seed complete")
     print(f"Hospital: {stats['hospital']}")
+    print(f"Hospital ID: {hospital.id}")
     print(f"Sheets processed: {stats['sheets_processed']}")
     print(f"Rows seen: {stats['rows_seen']}")
     print(f"AHUs upserted: {len(stats['ahus'])}")
     print(f"Filters upserted: {stats['filters_upserted']}")
     print(f"Filters skipped (missing size): {stats['filters_skipped']}")
+    print("\nExample AHU IDs (first 10):")
+    for i, x in enumerate(sorted(list(stats["ahus"]))[:10], start=1):
+        print(f"  {i}. {x}")
 
 
 if __name__ == "__main__":
