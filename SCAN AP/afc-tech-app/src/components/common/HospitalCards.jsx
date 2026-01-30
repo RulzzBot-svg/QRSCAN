@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getHospitals } from "../../api/hospitals";
+import { saveHospitalBundle } from "../../offline/offlineBundle";
 import LogoutButton from "./logoutbutton";
+import { API } from "../../api/api";
+
+async function downloadHospital (hospitalId){
+
+  const res = await API.get(`/hospitals/${hospitalId}/offline-bundle`);
+  await saveHospitalBundle(res.data);
+  alert("Hospital donwload for offline use.");
+}
+
+
 
 function HospitalCards() {
   const navigate = useNavigate();
@@ -95,6 +106,10 @@ function HospitalCards() {
               >
                 Load AHUs
               </button>
+              <button className="btn btn-sm" onClick={()=>downloadHospital(hospital.id)}>
+                Download Hospital for offline
+              </button>
+              
             </div>
           </div>
         ))}
