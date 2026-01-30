@@ -20,9 +20,6 @@ function FilterInfo() {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [inspected, setInspected] = useState({});
 
-
-
-
   /* ----------------------------- */
   /* Online / Offline status watch */
   /* ----------------------------- */
@@ -54,7 +51,7 @@ function FilterInfo() {
           setAhu(res.data);
           setFilterRows(res.data.filters || []);
 
-          // 🔑 cache for offline use
+          // 🔑 cache for offline use (keyed by ahu_id)
           await cacheAHU(res.data);
         } else {
           const cached = await getCachedAHU(ahuId);
@@ -84,13 +81,8 @@ function FilterInfo() {
   /* UI helpers                    */
   /* ----------------------------- */
 
-  /*ask about this, should the tech have to check each box when they do replace or leave it seperate
-  each checkbox individual meaning inspected can be unchecked and replaced be checked?
-  or when its replaced it automatically checks inspected as well.
-  */ 
   const handleCompleted = (id) => {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
-    //delete the line below depending on the situation in the comments above line 87-90
     setInspected((prev) => ({ ...prev, [id]: true }));
   };
 
@@ -98,14 +90,11 @@ function FilterInfo() {
     setInspected((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-
   const handleNoteChange = (id, value) => {
     setNotes((prev) => ({ ...prev, [id]: value }));
   };
 
-  const completedCount = filterRows.filter(
-    (row) => checked[row.id]
-  ).length;
+  const completedCount = filterRows.filter((row) => checked[row.id]).length;
 
   const openModal = () => {
     modalRef.current?.showModal();
@@ -121,7 +110,7 @@ function FilterInfo() {
       filter_id: row.id,
       is_inspected: inspected[row.id] || false,
       is_completed: checked[row.id] || false,
-      note: notes[row.id] || ""
+      note: notes[row.id] || "",
     }));
 
     if (!filterPayload.some((f) => f.is_completed)) {
@@ -132,13 +121,16 @@ function FilterInfo() {
     setSubmitting(true);
     const location = await getCurrentLocation();
 
+    // ✅ IMPORTANT: always submit the *global* AHU ID
+    const resolvedAhuId = (ahu?.ahu_id || ahu?.id || ahuId);
+
     const jobData = {
-      ahu_id: ahuId,
+      ahu_id: resolvedAhuId,
       tech_id: 1, // TODO: replace with auth user
       overall_notes: "",
       gps_lat: location.lat,
       gps_long: location.long,
-      filters: filterPayload
+      filters: filterPayload,
     };
 
     try {
@@ -172,14 +164,13 @@ function FilterInfo() {
         (pos) =>
           resolve({
             lat: pos.coords.latitude,
-            long: pos.coords.longitude
+            long: pos.coords.longitude,
           }),
-        () =>
-          resolve({ lat: null, long: null }),
+        () => resolve({ lat: null, long: null }),
         {
           enableHighAccuracy: false,
           timeout: 20000,
-          maximumAge: 300000
+          maximumAge: 300000,
         }
       );
     });
@@ -191,7 +182,6 @@ function FilterInfo() {
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200 pb-28">
       <div className="max-w-3xl mx-auto p-4">
-
         {/* OFFLINE BANNER */}
         {offline && (
           <div className="mb-3 rounded-lg bg-warning/20 border border-warning p-2 text-sm">
@@ -214,12 +204,13 @@ function FilterInfo() {
                 </div>
 
                 <span
-                  className={`badge ${ahu.status === "Overdue"
-                    ? "badge-error"
-                    : ahu.status === "Due Soon"
+                  className={`badge ${
+                    ahu.status === "Overdue"
+                      ? "badge-error"
+                      : ahu.status === "Due Soon"
                       ? "badge-warning"
                       : "badge-success"
-                    }`}
+                  }`}
                 >
                   {ahu.status}
                 </span>
@@ -232,12 +223,12 @@ function FilterInfo() {
                   </p>
                   {filterRows.some((f) => f.last_service_date)
                     ? new Date(
-                      Math.max(
-                        ...filterRows
-                          .filter((f) => f.last_service_date)
-                          .map((f) => new Date(f.last_service_date))
-                      )
-                    ).toLocaleDateString()
+                        Math.max(
+                          ...filterRows
+                            .filter((f) => f.last_service_date)
+                            .map((f) => new Date(f.last_service_date))
+                        )
+                      ).toLocaleDateString()
                     : "Never"}
                 </div>
 
@@ -273,8 +264,12 @@ function FilterInfo() {
                 <th className="px-4 py-3">Part</th>
                 <th className="px-4 py-3">Size</th>
                 <th className="px-4 py-3">Last Serviced</th>
-                <th className="px-4 py-3 text-center text-primary">Inspected</th>
-                <th className="px-4 py-4 text-center text-primary">Replaced</th>
+                <th className="px-4 py-3 text-center text-primary">
+                  Inspected
+                </th>
+                <th className="px-4 py-4 text-center text-primary">
+                  Replaced
+                </th>
                 <th className="px-4 py-3 text-center">Notes</th>
               </tr>
             </thead>
@@ -283,23 +278,18 @@ function FilterInfo() {
               {filterRows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`border-b border-base-300 ${checked[row.id]
-                    ? "bg-success/10"
-                    : "bg-base-100"
-                    }`}
+                  className={`border-b border-base-300 ${
+                    checked[row.id] ? "bg-success/10" : "bg-base-100"
+                  }`}
                 >
-                  <td className="px-4 py-3 font-medium">
-                    {row.quantity}
-                  </td>
+                  <td className="px-4 py-3 font-medium">{row.quantity}</td>
                   <td className="px-4 py-3">{row.phase}</td>
                   <td className="px-4 py-3">{row.part_number}</td>
                   <td className="px-4 py-3">{row.size}</td>
                   <td className="px-4 py-3">
                     <span className="badge badge-success">
                       {row.last_service_date
-                        ? new Date(
-                          row.last_service_date
-                        ).toLocaleDateString()
+                        ? new Date(row.last_service_date).toLocaleDateString()
                         : "Never"}
                     </span>
                   </td>
@@ -322,9 +312,6 @@ function FilterInfo() {
                     />
                   </td>
 
-
-
-
                   <td className="px-4 py-3 text-center">
                     <textarea
                       className="textarea textarea-bordered textarea-xs w-28"
@@ -346,17 +333,12 @@ function FilterInfo() {
           <button
             className="btn btn-ghost btn-outline"
             disabled={!ahu}
-            onClick={() =>
-              navigate(`/AHU/${ahu.hospital_id}`)
-            }
+            onClick={() => navigate(`/AHU/${ahu.hospital_id}`)}
           >
             ⬅ Back to list
           </button>
 
-          <button
-            className="btn btn-outline"
-            onClick={() => navigate("/scan")}
-          >
+          <button className="btn btn-outline" onClick={() => navigate("/scan")}>
             Scan another QR Code
           </button>
         </div>
@@ -365,8 +347,7 @@ function FilterInfo() {
         <div className="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-4">
           <div className="max-w-3xl mx-auto">
             <button
-              className={`btn btn-primary w-full ${submitting ? "loading" : ""
-                }`}
+              className={`btn btn-primary w-full ${submitting ? "loading" : ""}`}
               onClick={handleJobCompletion}
               disabled={submitting}
             >
@@ -378,20 +359,15 @@ function FilterInfo() {
         {/* SUCCESS MODAL */}
         <dialog ref={modalRef} className="modal">
           <div className="modal-box text-center">
-            <h3 className="font-bold text-lg text-primary">
-              Job Saved!
-            </h3>
+            <h3 className="font-bold text-lg text-primary">Job Saved!</h3>
 
             <p className="py-4 text-base-content/70">
-              Your checklist for <strong>{ahuId}</strong> has been
-              saved.
+              Your checklist for <strong>{ahuId}</strong> has been saved.
             </p>
 
             <div className="modal-action flex flex-col gap-3">
               <form method="dialog">
-                <button className="btn btn-primary w-full">
-                  OK
-                </button>
+                <button className="btn btn-primary w-full">OK</button>
               </form>
 
               <button
