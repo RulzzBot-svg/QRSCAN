@@ -90,7 +90,7 @@ export default function QRScanner() {
 
             // ✅ ONLINE: just go to AHU route
             setStatus("Opening AHU…");
-            window.location.assign(`/ahu/${encodeURIComponent(ahuId)}`);
+            window.location.assign(`/FilterInfo/${encodeURIComponent(ahuId)}`);
           } catch (e) {
             console.error(e);
             setError("Failed to open scanned AHU");
