@@ -1,10 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import LogoutButton from "./components/common/logoutbutton";
+import { useOfflineSync } from "./offline/useOfflineSync";
 
 
 export default function App() {
   const navigate = useNavigate();
+  const {syncing, lastResult, runSync} = useOfflineSync();
   const tech = JSON.parse(localStorage.getItem("tech"));
   console.log(tech.name);
   console.log("API BASE URL:", import.meta.env.VITE_API_BASE_URL);
@@ -116,7 +118,7 @@ export default function App() {
 
         <div className="card bg-base-100 border border-base-300 shadow-sm">
           <div className="card-body p-4">
-            <LogoutButton/>
+            <LogoutButton />
           </div>
         </div>
 
@@ -125,6 +127,22 @@ export default function App() {
           <div className="flex justify-between text-xs text-base-content/60">
             <span>Today's jobs</span>
             <span className="font-semibold">—</span>
+          </div>
+
+          <div style={{ position: "fixed", bottom: 10, right: 10, zIndex: 9999 }}>
+            <button
+              onClick={runSync}
+              disabled={syncing}
+              className="btn btn-xs"
+              title="Sync queued jobs"
+            >
+              {syncing ? "Syncing..." : "Sync"}
+            </button>
+            {lastResult && (
+              <div className="text-xs mt-1 opacity-70">
+                synced: {lastResult.synced}, failed: {lastResult.failed}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between text-xs text-base-content/60">

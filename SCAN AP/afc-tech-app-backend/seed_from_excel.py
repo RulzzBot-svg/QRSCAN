@@ -12,7 +12,7 @@ from models import Hospital, AHU, Filter
 
 
 # Point this to your file (or build a loop later if you seed multiple hospitals)
-EXCEL_PATH = "./excel_data_raw/3 QUEEN OF THE VALLEY (Standard).xlsx"
+EXCEL_PATH = "./excel_data_raw/23 LA PALMA INTER (Standard).xlsx"
 
 
 # -----------------------------

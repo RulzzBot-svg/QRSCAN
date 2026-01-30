@@ -17,6 +17,9 @@ import AdminJobs from "./components/admin/adminjobs";
 import AdminLayout from "./components/admin/AdminLayout";
 import Login from "./components/common/login";
 import JobSignature from "./components/common/jobSignatures";
+import { registerSW } from "virtual:pwa-register";
+
+registerSW({ immediate: true });
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
