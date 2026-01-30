@@ -38,15 +38,7 @@ def get_ahus_for_hospital(hospital_id):
     return jsonify(result), 200
 
 
-
-from flask import Blueprint, jsonify
-from sqlalchemy.orm import selectinload
-from models import Hospital, AHU, Filter
-from db import db
-
-hospitals_bp = Blueprint("hospitals", __name__)
-
-@hospitals_bp.route("/hospitals/<int:hospital_id>/offline-bundle", methods=["GET"])
+@hospital_bp.route("/hospitals/<int:hospital_id>/offline-bundle", methods=["GET"])
 def hospital_offline_bundle(hospital_id):
     hospital = (
         db.session.query(Hospital)
