@@ -19,7 +19,11 @@ import Login from "./components/common/login";
 import JobSignature from "./components/common/jobSignatures";
 import { registerSW } from "virtual:pwa-register";
 
-registerSW({ immediate: true });
+if (import.meta.env.PROD) {
+  import("virtual:pwa-register").then(({ registerSW }) => {
+    registerSW({ immediate: true });
+  });
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -30,7 +34,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/hospitals" element={<HospitalCards />} />
         <Route path="/AHU" element={<AHU />} />
         <Route path="/AHU/:hospitalId" element={<AHUPage />} />
-        <Route path="FilterInfo/:ahuId" element={<FilterInfo />} />
+        <Route path="/FilterInfo/:ahuId" element={<FilterInfo />} />
         <Route path="/job-completed" element={<jobCompleted />} />
         <Route path="/scan" element={<QRScanner />} />
         <Route path="/jobs/:jobId/signature" element={<JobSignature/>}/>

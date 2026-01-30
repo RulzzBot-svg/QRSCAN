@@ -80,7 +80,7 @@ export default function QRScanner() {
               if (cached) {
                 setStatus("Opening cached AHU…");
                 // IMPORTANT: replace with your real route
-                window.location.assign(`/ahu/${encodeURIComponent(ahuId)}`);
+                window.location.assign(`/FilterInfo/${encodeURIComponent(ahuId)}`);
               } else {
                 setStatus("Not downloaded for offline use.");
                 window.location.assign(`/offline-not-downloaded/${encodeURIComponent(ahuId)}`);
