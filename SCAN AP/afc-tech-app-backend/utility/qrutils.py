@@ -1,7 +1,7 @@
 import qrcode
 
 
-ahu_id="AC-30"
+ahu_id="H1-ah-013"
 
 url= f"https://qrscan-lyart.vercel.app/FilterInfo/{ahu_id}"
 

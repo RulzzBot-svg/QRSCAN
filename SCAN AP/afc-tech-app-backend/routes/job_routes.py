@@ -12,57 +12,64 @@ job_bp = Blueprint("jobs", __name__)
 # -----------------------------
 @job_bp.route("/jobs", methods=["POST"])
 def create_job():
-    data = request.json
+    try:
+        data = request.json
 
-    ahu_id = data.get("ahu_id")
-    tech_id = data.get("tech_id")
-    overall_notes = data.get("overall_notes")
-    gps_lat = data.get("gps_lat")
-    gps_long = data.get("gps_long")
-    filter_results = data.get("filters", [])
+        ahu_id = data.get("ahu_id")
+        tech_id = data.get("tech_id")
+        overall_notes = data.get("overall_notes")
+        gps_lat = data.get("gps_lat")
+        gps_long = data.get("gps_long")
+        filter_results = data.get("filters", [])
 
-    # Validate AHU
-    ahu = db.session.get(AHU, ahu_id)
-    if not ahu:
-        return jsonify({"error": "Invalid AHU ID"}), 400
+        # Validate AHU
+        ahu = db.session.get(AHU, ahu_id)
+        if not ahu:
+            return jsonify({"error": "Invalid AHU ID"}), 400
 
-    # Validate technician
-    tech = db.session.get(Technician, tech_id)
-    if not tech:
-        return jsonify({"error": "Invalid technician ID"}), 400
-    
-    #ahu.last_service_date = datetime.utcnow()
+        # Validate technician
+        tech = db.session.get(Technician, tech_id)
+        if not tech:
+            return jsonify({"error": "Invalid technician ID"}), 400
+        
+        #ahu.last_service_date = datetime.utcnow()
 
-    # Create job record
-    job = Job(
-        ahu_id=ahu_id,
-        tech_id=tech_id,
-        overall_notes=overall_notes,
-        gps_lat=gps_lat,
-        gps_long=gps_long,
-        completed_at=datetime.utcnow()
-    )
-    db.session.add(job)
-    db.session.flush()  # get job.id before committing
-
-    # Add JobFilter entries
-    for f in filter_results:
-        jf = JobFilter(
-            job_id=job.id,
-            filter_id=f.get("filter_id"),
-            is_completed=f.get("is_completed", False),
-            note=f.get("note", "")
+        # Create job record
+        job = Job(
+            ahu_id=ahu_id,
+            tech_id=tech_id,
+            overall_notes=overall_notes,
+            gps_lat=gps_lat,
+            gps_long=gps_long,
+            completed_at=datetime.utcnow()
         )
-        db.session.add(jf)
+        db.session.add(job)
+        db.session.flush()  # get job.id before committing
 
-        if jf.is_completed:
-            filter_obj = db.session.get(Filter, jf.filter_id)
-            if filter_obj:
+        # Add JobFilter entries
+        for f in filter_results:
+            filter_id = f.get("filter_id")
+            filter_obj = db.session.get(Filter, filter_id)
+            if not filter_obj:
+                return jsonify({"error": f"Invalid filter ID: {filter_id}"}), 400
+
+            jf = JobFilter(
+                job_id=job.id,
+                filter_id=filter_id,
+                is_completed=f.get("is_completed", False),
+                note=f.get("note", "")
+            )
+            db.session.add(jf)
+
+            if jf.is_completed:
                 filter_obj.last_service_date = datetime.utcnow().date()
 
-    db.session.commit()
+        db.session.commit()
 
-    return jsonify({"message": "Job recorded", "job_id": job.id}), 201
+        return jsonify({"message": "Job recorded", "job_id": job.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 # -----------------------------

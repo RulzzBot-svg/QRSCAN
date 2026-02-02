@@ -19,6 +19,20 @@ function FilterInfo() {
   const [submitting, setSubmitting] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
   const [inspected, setInspected] = useState({});
+  const [tech, setTech] = useState(null);
+
+  /* ----------------------------- */
+  /* Load technician from localStorage */
+  /* ----------------------------- */
+  useEffect(() => {
+    const storedTech = localStorage.getItem("tech");
+    if (storedTech) {
+      setTech(JSON.parse(storedTech));
+    } else {
+      // If no tech logged in, redirect to login
+      navigate("/login");
+    }
+  }, [navigate]);
 
   /* ----------------------------- */
   /* Online / Offline status watch */
@@ -126,7 +140,7 @@ function FilterInfo() {
 
     const jobData = {
       ahu_id: resolvedAhuId,
-      tech_id: 1, // TODO: replace with auth user
+      tech_id: tech?.id || 1, // Use logged-in technician ID
       overall_notes: "",
       gps_lat: location.lat,
       gps_long: location.long,

@@ -1,7 +1,6 @@
 # seed_from_excel.py
 import os
 import re
-import unicodedata
 from datetime import datetime, date
 
 import pandas as pd
@@ -13,7 +12,7 @@ from models import Hospital, AHU, Filter
 
 
 # Point this to your file (or build a loop later if you seed multiple hospitals)
-EXCEL_PATH = "./excel_data_raw/23 LA PALMA INTER (Standard).xlsx"
+EXCEL_PATH = "./excel_data_raw/15 CENTINELA HOSPITAL MEDICAL CENTER.xlsx"
 
 
 # -----------------------------
@@ -126,65 +125,31 @@ def has_attr(obj, attr: str) -> bool:
     return hasattr(obj, attr)
 
 
-def normalize_filter_field(s: str):
-    """Normalize fields used for finding existing filters (phase/part_number/size)."""
-    s = clean_str(s)
-    if not s:
-        return None
-    # collapse internal whitespace and normalize "x" spacing
-    s = re.sub(r"\s+", " ", s).strip()
-    s = re.sub(r"\s*[xX]\s*", " x ", s)
-    return s
-
-
-def slugify_ahu_token(raw_ahu_no: str):
+def canonical_ahu_id(hospital_id: int, raw_ahu_no: str):
     """
-    Make a URL-safe token from any AHU label.
-    - Removes leading '#'
-    - Normalizes unicode
-    - Replaces whitespace with dashes
-    - Removes non [a-z0-9-]
+    Canonicalize messy AHU numbers into a URL-safe, duplicate-proof ID.
+
+    Examples (hospital_id=23):
+      "#1" -> "H23-1"
+      "AHU 6" -> "H23-ahu-6"
+      "AH 004A" -> "H23-ah-004a"
+      "AH-11 Telephone Room" -> "H23-ah-11-telephone-room"
+      "04-33" -> "H23-04-33"
     """
-    s = clean_str(raw_ahu_no)
-    if not s:
-        return None
-
-    # Normalize unicode (turn fancy characters into ASCII equivalents when possible)
-    s = unicodedata.normalize("NFKD", s)
-    s = s.encode("ascii", "ignore").decode("ascii")
-
+    s = clean_str(raw_ahu_no) or ""
     s = s.strip()
 
-    # remove leading "#"
     if s.startswith("#"):
         s = s[1:].strip()
 
-    # common separators -> dashes
-    s = s.replace("_", "-")
-    s = s.replace("/", "-")
-    s = s.replace("\\", "-")
+    s = re.sub(r"\s+", "-", s)                 # whitespace -> dash
+    s = re.sub(r"[^A-Za-z0-9\-]+", "-", s)     # keep only letters/numbers/dash
+    s = re.sub(r"-{2,}", "-", s).strip("-")    # collapse dashes
 
-    # whitespace -> dashes
-    s = re.sub(r"\s+", "-", s)
-
-    # strip anything not alnum or dash
-    s = re.sub(r"[^A-Za-z0-9\-]+", "-", s)
-
-    # collapse dashes
-    s = re.sub(r"-{2,}", "-", s).strip("-")
-
-    return s.lower() if s else None
-
-
-def canonical_ahu_id(hospital_id: int, raw_ahu_no: str):
-    """
-    Canonical ID stored in AHU.id (PRIMARY KEY):
-      H{hospital_id}-{slug}
-    """
-    slug = slugify_ahu_token(raw_ahu_no)
-    if not slug:
+    if not s:
         return None
-    return f"H{hospital_id}-{slug}"
+
+    return f"H{hospital_id}-{s.lower()}"
 
 
 # -----------------------------
@@ -203,11 +168,14 @@ def upsert_hospital(name: str):
     return h
 
 
-def upsert_ahu(ahu_id: str, hospital_id: int, display_name: str, location=None, notes=None, excel_order=None):
-    """
-    AHU.id is canonical.
-    AHU.name is human readable (raw excel value).
-    """
+def upsert_ahu(
+    ahu_id: str,
+    hospital_id: int,
+    display_name: str = None,
+    location=None,
+    notes=None,
+    excel_order=None
+):
     ahu_id = clean_str(ahu_id)
     if not ahu_id:
         return None
@@ -216,7 +184,7 @@ def upsert_ahu(ahu_id: str, hospital_id: int, display_name: str, location=None, 
     if a:
         a.hospital_id = hospital_id
         if display_name:
-            a.name = display_name  # keep human-readable
+            a.name = display_name
         if location:
             a.location = location
         if notes:
@@ -230,7 +198,7 @@ def upsert_ahu(ahu_id: str, hospital_id: int, display_name: str, location=None, 
     kwargs = dict(
         id=ahu_id,
         hospital_id=hospital_id,
-        name=display_name or ahu_id,  # human readable
+        name=display_name or ahu_id,  # show human-friendly name
         location=location,
         notes=notes,
     )
@@ -266,10 +234,9 @@ def upsert_filter(
     excel_order=None,
 ):
     ahu_id = clean_str(ahu_id)
-
-    phase = normalize_filter_field(phase)
-    part_number = normalize_filter_field(part_number) or ""
-    size = normalize_filter_field(size)
+    phase = clean_str(phase)
+    part_number = clean_str(part_number) or ""
+    size = clean_str(size)
 
     if not ahu_id or not size:
         return None
@@ -346,7 +313,6 @@ def seed_from_excel(path):
         "filters_skipped": 0,
     }
 
-    # Order map keyed by canonical AHU.id
     ahu_order_map = {}
     next_ahu_order = 1
 
@@ -383,7 +349,7 @@ def seed_from_excel(path):
         stats["sheets_processed"] += 1
         stats["rows_seen"] += len(df)
 
-        filter_order_map = {}  # keyed by canonical ahu_id
+        filter_order_map = {}
 
         for _, r in df.iterrows():
             raw_ahu_no = clean_str(r.get(col_ahu))
@@ -407,21 +373,20 @@ def seed_from_excel(path):
                 notes_parts.append(f"Building: {building}")
             if floor_area:
                 notes_parts.append(f"Floor/Area: {floor_area}")
-            notes = " | ".join(notes_parts)
+            notes = " | ".join(notes_parts) if notes_parts else None
 
             upsert_ahu(
                 ahu_id=ahu_id,
                 hospital_id=hospital.id,
-                display_name=raw_ahu_no,  # human readable
+                display_name=raw_ahu_no,  # human label stays here
                 location=location,
                 notes=notes,
                 excel_order=ahu_order_map[ahu_id],
             )
-
             stats["ahus"].add(ahu_id)
 
-            phase = r.get(col_stage)
-            size = r.get(col_size)
+            phase = clean_str(r.get(col_stage))
+            size = clean_str(r.get(col_size))
             qty = r.get(col_qty)
 
             freq_raw = r.get(col_freq)
@@ -437,7 +402,7 @@ def seed_from_excel(path):
             if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
                 is_active = False
 
-            if not clean_str(size):
+            if not size:
                 stats["filters_skipped"] += 1
                 continue
 
@@ -469,7 +434,7 @@ def seed_from_excel(path):
     print(f"Filters upserted: {stats['filters_upserted']}")
     print(f"Filters skipped (missing size): {stats['filters_skipped']}")
     print("\nExample AHU IDs (first 10):")
-    for i, x in enumerate(sorted(list(stats["ahus"]))[:10], start=1):
+    for i, x in enumerate(sorted(list(stats['ahus']))[:10], start=1):
         print(f"  {i}. {x}")
 
 

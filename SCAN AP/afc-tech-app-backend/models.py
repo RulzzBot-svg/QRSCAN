@@ -116,7 +116,7 @@ class JobFilter(db.Model):
     id = Column(Integer, primary_key=True)
     job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
     filter_id = Column(Integer, ForeignKey("filters.id"), nullable=False)
-
+    is_inspected = Column(Boolean, default=False, nullable=False)
     is_completed = Column(Boolean, default=False)
     note = Column(Text)
 
