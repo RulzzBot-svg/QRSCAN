@@ -28,7 +28,7 @@ def admin_overview():
 
 @admin_bp.route("/jobs", methods=["GET"])
 def get_all_jobs():
-    print("DEBUG: get_all_jobs called with is_inspected support")  # Debug log
+    print("DEBUG: get_all_jobs called with is_inspected support - VERSION 2")  # Debug log
     # Updated to include is_inspected
     jobs = db.session.query(Job).options(
         joinedload(Job.technician),
