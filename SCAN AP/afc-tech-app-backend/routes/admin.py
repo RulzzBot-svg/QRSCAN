@@ -41,7 +41,7 @@ def get_all_jobs():
             "ahu_id": job.ahu_id,
             "ahu_name": job.ahu.name if job.ahu else "Unknown AHU",
             "technician": job.technician.name if job.technician else "Unknown Tech",
-            "completed_at": job.completed_at.isoformat(),
+            "completed_at": job.completed_at.isoformat() + "Z",
             "overall_notes": job.overall_notes,
             "gps_lat": job.gps_lat,
             "gps_long": job.gps_long,
