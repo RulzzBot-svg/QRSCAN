@@ -1,6 +1,7 @@
 # seed_from_excel.py
 import os
 import re
+import sys
 from datetime import datetime, date
 
 import pandas as pd
@@ -12,7 +13,12 @@ from models import Hospital, AHU, Filter
 
 
 # Point this to your file (or build a loop later if you seed multiple hospitals)
-EXCEL_PATH = "./excel_data_raw/15 CENTINELA HOSPITAL MEDICAL CENTER.xlsx"
+EXCEL_PATH = "./excel_data_raw/filter-datasheet.xlsm"
+
+
+# -----------------------------
+# Helpers
+# -----------------------------
 
 
 # -----------------------------
@@ -289,18 +295,24 @@ def upsert_filter(
 # -----------------------------
 # Main seed
 # -----------------------------
-def seed_from_excel(path):
+def seed_from_excel(path, selected_sheet=None):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Excel file not found: {path}")
 
     xls = pd.ExcelFile(path)
 
-    data_sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
-    if not data_sheets:
-        raise RuntimeError("No data sheets found (expected something like 'MAIN BUILDING').")
+    if selected_sheet:
+        if selected_sheet not in xls.sheet_names:
+            raise ValueError(f"Sheet '{selected_sheet}' not found. Available: {xls.sheet_names}")
+        data_sheets = [selected_sheet]
+        preferred_sheet = selected_sheet
+    else:
+        data_sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
+        if not data_sheets:
+            raise RuntimeError("No data sheets found (expected something like 'MAIN BUILDING').")
+        preferred_sheet = "MAIN BUILDING" if "MAIN BUILDING" in data_sheets else data_sheets[0]
 
-    preferred_sheet = "MAIN BUILDING" if "MAIN BUILDING" in data_sheets else data_sheets[0]
-    hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or "Unknown Hospital"
+    hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or preferred_sheet.upper().replace('_', ' ')
 
     hospital = upsert_hospital(hospital_name)
 
@@ -439,5 +451,14 @@ def seed_from_excel(path):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python seed_from_excel.py <sheet_name>")
+        print("Available sheets:")
+        xls = pd.ExcelFile(EXCEL_PATH)
+        for sheet in xls.sheet_names:
+            print(f"  - {sheet}")
+        sys.exit(1)
+
+    selected_sheet = sys.argv[1]
     with app.app_context():
-        seed_from_excel(EXCEL_PATH)
+        seed_from_excel(EXCEL_PATH, selected_sheet)

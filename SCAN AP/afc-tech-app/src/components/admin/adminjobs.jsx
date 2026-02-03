@@ -75,6 +75,8 @@ function AdminJobs() {
                     className={`p-3 rounded border ${
                       f.is_completed
                         ? "border-success bg-success/5"
+                        : f.is_inspected
+                        ? "border-info bg-info/5"
                         : "border-base-300"
                     }`}
                   >
@@ -88,10 +90,12 @@ function AdminJobs() {
                         className={`badge badge-sm ${
                           f.is_completed
                             ? "badge-success"
+                            : f.is_inspected
+                            ? "badge-info"
                             : "badge-ghost"
                         }`}
                       >
-                        {f.is_completed ? "Completed" : "Not Done"}
+                        {f.is_completed ? "Replaced" : f.is_inspected ? "Inspected" : "Not Done"}
                       </span>
                     </div>
 

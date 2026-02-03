@@ -51,6 +51,7 @@ def get_all_jobs():
                     "part_number": jf.filter.part_number,
                     "size": jf.filter.size,
                     "is_completed": jf.is_completed,
+                    "is_inspected": jf.is_inspected,
                     "note": jf.note
                 }
                 for jf in job.job_filters

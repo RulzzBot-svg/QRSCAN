@@ -57,6 +57,7 @@ def create_job():
                 job_id=job.id,
                 filter_id=filter_id,
                 is_completed=f.get("is_completed", False),
+                is_inspected=f.get("is_inspected", False),
                 note=f.get("note", "")
             )
             db.session.add(jf)

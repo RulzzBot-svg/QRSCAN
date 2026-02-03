@@ -109,6 +109,8 @@ function FilterInfo() {
   };
 
   const completedCount = filterRows.filter((row) => checked[row.id]).length;
+  const inspectedCount = filterRows.filter((row) => inspected[row.id] && !checked[row.id]).length;
+  const doneCount = filterRows.filter((row) => checked[row.id] || inspected[row.id]).length;
 
   const openModal = () => {
     modalRef.current?.showModal();
@@ -127,8 +129,8 @@ function FilterInfo() {
       note: notes[row.id] || "",
     }));
 
-    if (!filterPayload.some((f) => f.is_completed)) {
-      alert("Please complete at least one filter before submitting.");
+    if (!filterPayload.some((f) => f.is_completed || f.is_inspected)) {
+      alert("Please complete or inspect at least one filter before submitting.");
       return;
     }
 
@@ -259,12 +261,12 @@ function FilterInfo() {
 
         {/* PROGRESS */}
         <div className="mb-3 text-sm text-base-content/70">
-          Completed {completedCount} of {filterRows.length} filters
+          Processed {doneCount} of {filterRows.length} filters
         </div>
 
         <progress
           className="progress progress-primary w-full mb-4"
-          value={completedCount}
+          value={doneCount}
           max={filterRows.length}
         />
 
