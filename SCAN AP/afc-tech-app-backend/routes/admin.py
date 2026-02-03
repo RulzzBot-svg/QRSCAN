@@ -28,6 +28,7 @@ def admin_overview():
 
 @admin_bp.route("/jobs", methods=["GET"])
 def get_all_jobs():
+    # Updated to include is_inspected
     jobs = db.session.query(Job).options(
         joinedload(Job.technician),
         joinedload(Job.ahu),
