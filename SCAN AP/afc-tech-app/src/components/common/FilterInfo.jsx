@@ -157,6 +157,12 @@ function FilterInfo() {
       }
 
       await submitJob(jobData);
+      if (!offline) {
+        // Refetch and update cache with new last_service_date
+        const res = await getAHUbyQR(ahuId);
+        setAhu(res.data);
+        await cacheAHU(res.data);
+      }
       openModal();
     } catch (err) {
       console.error("Error submitting job:", err);
