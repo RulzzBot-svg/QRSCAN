@@ -6,6 +6,24 @@ import re
 
 admin_bp = Blueprint("admin", __name__)
 
+@admin_bp.route("/hospitals", methods=["GET"])
+def get_hospitals():
+    """Get all hospitals for dropdown selections."""
+    try:
+        hospitals = Hospital.query.all()
+        result = [
+            {
+                "id": h.id,
+                "name": h.name,
+                "active": getattr(h, "active", True)
+            }
+            for h in hospitals
+        ]
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error fetching hospitals: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @admin_bp.route("/overview", methods=["GET"])
 def admin_overview():
     hospitals = Hospital.query.all()
