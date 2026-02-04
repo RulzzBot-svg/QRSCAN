@@ -40,6 +40,15 @@ function AdminAHUs() {
   // Option 3: selected AHU drives a right-side inspector panel
   const [selectedAhuId, setSelectedAhuId] = useState(null);
 
+  // Form state for creating new AHU
+  const [showNewAhuForm, setShowNewAhuForm] = useState(false);
+  const [hospitals, setHospitals] = useState([]);
+  const [newAhuFormData, setNewAhuFormData] = useState({
+    hospital_id: "",
+    ahu_name: "",
+  });
+  const [newAhuLoading, setNewAhuLoading] = useState(false);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -47,6 +56,11 @@ function AdminAHUs() {
         const res = await API.get("/admin/ahus");
         const list = Array.isArray(res.data) ? res.data : [];
         setAhus(list);
+
+        // Fetch hospitals for the form
+        const hospitalsRes = await API.get("/admin/hospitals");
+        const hospitalsList = Array.isArray(hospitalsRes.data) ? hospitalsRes.data : [];
+        setHospitals(hospitalsList);
 
         // If nothing selected yet, pick the first AHU (optional behavior)
         if (!selectedAhuId && list.length) {
@@ -110,6 +124,35 @@ function AdminAHUs() {
     [ahus, selectedAhuId]
   );
 
+  const handleCreateAhu = async () => {
+    if (!newAhuFormData.hospital_id || !newAhuFormData.ahu_name.trim()) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    setNewAhuLoading(true);
+    try {
+      await API.post("/admin/ahu", {
+        hospital_id: parseInt(newAhuFormData.hospital_id, 10),
+        ahu_name: newAhuFormData.ahu_name,
+      });
+
+      // Reset form and refresh AHU list
+      setNewAhuFormData({ hospital_id: "", ahu_name: "" });
+      setShowNewAhuForm(false);
+
+      // Reload AHUs
+      const res = await API.get("/admin/ahus");
+      const list = Array.isArray(res.data) ? res.data : [];
+      setAhus(list);
+    } catch (err) {
+      console.error("Failed to create AHU:", err);
+      alert("Error creating AHU: " + (err.response?.data?.error || err.message));
+    } finally {
+      setNewAhuLoading(false);
+    }
+  };
+
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
@@ -138,10 +181,79 @@ function AdminAHUs() {
             <span className="loading loading-spinner loading-lg"></span>
           </div>
         ) : (
-          // ✅ KEY CHANGE: flex layout that becomes 70/30 on desktop
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* LEFT: Dense list (70%) */}
-            <div className="w-full lg:w-[60%] min-w-0">
+          <>
+            {/* Add New AHU Form */}
+            <div className="mb-4">
+              {!showNewAhuForm ? (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowNewAhuForm(true)}
+                  type="button"
+                >
+                  + Add New AHU
+                </button>
+              ) : (
+                <div className="bg-base-100 border border-base-300 rounded-lg shadow p-4">
+                  <div className="font-semibold mb-3">Create New AHU</div>
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="text-sm font-medium">Hospital *</label>
+                      <select
+                        className="select select-bordered w-full"
+                        value={newAhuFormData.hospital_id}
+                        onChange={(e) =>
+                          setNewAhuFormData({ ...newAhuFormData, hospital_id: e.target.value })
+                        }
+                      >
+                        <option value="">Select a hospital</option>
+                        {hospitals.map((h) => (
+                          <option key={h.id} value={h.id}>
+                            {h.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">AHU Name *</label>
+                      <input
+                        type="text"
+                        className="input input-bordered w-full"
+                        placeholder="e.g., AHU-1, Main Floor Unit"
+                        value={newAhuFormData.ahu_name}
+                        onChange={(e) =>
+                          setNewAhuFormData({ ...newAhuFormData, ahu_name: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        className="btn btn-primary btn-sm flex-1"
+                        onClick={handleCreateAhu}
+                        disabled={newAhuLoading}
+                        type="button"
+                      >
+                        {newAhuLoading ? <span className="loading loading-spinner loading-xs"></span> : "Create"}
+                      </button>
+                      <button
+                        className="btn btn-outline btn-sm flex-1"
+                        onClick={() => setShowNewAhuForm(false)}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* AHU List */}
+            {/* ✅ KEY CHANGE: flex layout that becomes 70/30 on desktop */}
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* LEFT: Dense list (70%) */}
+              <div className="w-full lg:w-[60%] min-w-0">
               <div className="bg-base-100 border border-base-300 rounded-lg shadow">
                 <div className="p-4 border-b border-base-300 flex items-center justify-between">
                   <div className="font-semibold">Hospitals / AHUs</div>
@@ -401,6 +513,7 @@ function AdminAHUs() {
               null
             )}
           </div>
+            </>
         )}
       </main>
     </div>
