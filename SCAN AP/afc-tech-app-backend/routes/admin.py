@@ -1,7 +1,8 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from models import Hospital, AHU, Job, Technician
 from db import db
 from sqlalchemy.orm import joinedload
+import re
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -61,3 +62,65 @@ def get_all_jobs():
         })
 
     return jsonify(result), 200
+
+
+@admin_bp.route("/ahu", methods=["POST"])
+def create_ahu():
+    """Create a new AHU manually."""
+    try:
+        data = request.get_json()
+        hospital_id = data.get("hospital_id")
+        ahu_name = data.get("ahu_name")
+        location = data.get("location")
+        notes = data.get("notes")
+
+        if not hospital_id or not ahu_name:
+            return jsonify({"error": "Missing hospital_id or ahu_name"}), 400
+
+        # Verify hospital exists
+        hospital = Hospital.query.get(hospital_id)
+        if not hospital:
+            return jsonify({"error": "Hospital not found"}), 404
+
+        # Create canonical AHU ID
+        def canonical_ahu_id(h_id: int, raw_name: str):
+            s = str(raw_name).strip()
+            if s.startswith("#"):
+                s = s[1:].strip()
+            s = re.sub(r"\s+", "-", s)
+            s = re.sub(r"[^A-Za-z0-9\-]+", "-", s)
+            s = re.sub(r"-{2,}", "-", s).strip("-")
+            return f"H{h_id}-{s.lower()}" if s else None
+
+        ahu_id = canonical_ahu_id(hospital_id, ahu_name)
+        if not ahu_id:
+            return jsonify({"error": "Invalid AHU name"}), 400
+
+        # Check if AHU already exists
+        existing = AHU.query.get(ahu_id)
+        if existing:
+            return jsonify({"error": f"AHU with ID {ahu_id} already exists"}), 409
+
+        # Create new AHU
+        new_ahu = AHU(
+            id=ahu_id,
+            hospital_id=hospital_id,
+            name=ahu_name,
+            location=location,
+            notes=notes
+        )
+        db.session.add(new_ahu)
+        db.session.commit()
+
+        return jsonify({
+            "id": new_ahu.id,
+            "hospital_id": new_ahu.hospital_id,
+            "name": new_ahu.name,
+            "location": new_ahu.location,
+            "notes": new_ahu.notes
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating AHU: {e}")
+        return jsonify({"error": str(e)}), 500
