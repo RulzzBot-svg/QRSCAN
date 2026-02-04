@@ -31,6 +31,15 @@ def clean_str(x):
     return s if s else None
 
 
+def is_placeholder(s):
+    """Check if a string is a placeholder for missing data."""
+    if not s:
+        return True
+    normalized = str(s).strip().lower()
+    placeholders = ["empty", "nan", "n/a", "na", "-", "none", "null"]
+    return normalized in placeholders
+
+
 def to_date(val):
     """Convert excel/pandas timestamp/string into a python date."""
     if val is None:
@@ -363,12 +372,52 @@ def seed_from_excel(path, selected_sheet=None):
 
         filter_order_map = {}
 
+        # Track last seen display name and whether the previous row contained an AHU
+        last_display_name = None
+        last_row_had_ahu = False
+
         for _, r in df.iterrows():
             raw_ahu_no = clean_str(r.get(col_ahu))
-            if not raw_ahu_no:
+            location = clean_str(r.get(col_loc)) if col_loc else None
+
+            # Determine whether this row contains any filter-related data
+            has_filter_data = False
+            for c in (col_stage, col_size, col_qty, col_part_num, col_filter_type, col_freq, col_repl):
+                if c:
+                    val = clean_str(r.get(c))
+                    if val and not is_placeholder(val):
+                        has_filter_data = True
+                        break
+
+            # Decide display name for AHU when AHU cell is missing
+            if not is_placeholder(raw_ahu_no):
+                display_name = raw_ahu_no
+                last_display_name = display_name
+                last_row_had_ahu = True
+            else:
+                if has_filter_data:
+                    # This row likely belongs to the previous AHU
+                    if last_row_had_ahu and last_display_name:
+                        display_name = last_display_name
+                    else:
+                        # Start a new unnamed AHU; prefer location if available
+                        if location and not is_placeholder(location):
+                            display_name = f"Unnamed — {location}"
+                        else:
+                            display_name = f"Unnamed — {next_ahu_order}"
+                        last_display_name = display_name
+                        last_row_had_ahu = True
+                else:
+                    # pure separator row (no AHU, no filters)
+                    display_name = None
+                    last_display_name = None
+                    last_row_had_ahu = False
+
+            if display_name is None:
+                # no AHU on this row; skip to next
                 continue
 
-            ahu_id = canonical_ahu_id(hospital.id, raw_ahu_no)
+            ahu_id = canonical_ahu_id(hospital.id, display_name)
             if not ahu_id:
                 continue
 
@@ -390,7 +439,7 @@ def seed_from_excel(path, selected_sheet=None):
             upsert_ahu(
                 ahu_id=ahu_id,
                 hospital_id=hospital.id,
-                display_name=raw_ahu_no,  # human label stays here
+                display_name=display_name,  # human label stays here (use location/unnamed if missing)
                 location=location,
                 notes=notes,
                 excel_order=ahu_order_map[ahu_id],
