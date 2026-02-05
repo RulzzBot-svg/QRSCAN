@@ -45,6 +45,8 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
     }
   }, [startDate, endDate])
 
+  // Initialize hospitalId when hospitals are loaded
+  // Note: hospitalId is intentionally not in the dependency array to avoid re-running when it changes
   useEffect(()=>{
     if(hospitals.length && !hospitalId) setHospitalId(hospitals[0].id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -318,23 +320,26 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {summaryJobs.map(j => (
-                      <div key={j.id || j.job_id} className="p-2 border-b last:border-b-0 hover:bg-gray-50 transition-colors rounded">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-semibold text-gray-800">
-                              {j.ahu_id} {j.ahu_name && `— ${j.ahu_name}`}
+                    {summaryJobs.map(j => {
+                      const jobId = j.job_id || j.id;
+                      return (
+                        <div key={`job-${jobId}`} className="p-2 border-b last:border-b-0 hover:bg-gray-50 transition-colors rounded">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-semibold text-gray-800">
+                                {j.ahu_id} {j.ahu_name && `— ${j.ahu_name}`}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                Job #{jobId} • {new Date(j.completed_at).toLocaleString()}
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-600">
-                              Job #{j.id || j.job_id} • {new Date(j.completed_at).toLocaleString()}
-                            </div>
+                            {j.technician && (
+                              <div className="badge badge-sm badge-ghost">{j.technician}</div>
+                            )}
                           </div>
-                          {j.technician && (
-                            <div className="badge badge-sm badge-ghost">{j.technician}</div>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

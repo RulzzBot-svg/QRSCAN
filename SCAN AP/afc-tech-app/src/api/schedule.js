@@ -2,7 +2,7 @@ import { API } from "./api";
 
 /**
  * Get schedule summary for a given schedule_id
- * @param {number} scheduleId - The schedule ID (typically hospital_id)
+ * @param {number} scheduleId - The schedule ID. In the current implementation, this is interpreted as the hospital_id.
  * @param {object} params - Query parameters
  * @param {string} params.start_date - Start date in YYYY-MM-DD format
  * @param {string} params.end_date - End date in YYYY-MM-DD format
