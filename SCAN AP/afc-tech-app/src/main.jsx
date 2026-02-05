@@ -17,6 +17,7 @@ import AdminJobs from "./components/admin/adminjobs";
 import AdminLayout from "./components/admin/AdminLayout";
 import Login from "./components/common/login";
 import JobSignature from "./components/common/jobSignatures";
+import SummaryExample from "./pages/SummaryExample";
 import { registerSW } from "virtual:pwa-register";
 
 if (import.meta.env.PROD) {
@@ -38,6 +39,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/job-completed" element={<jobCompleted />} />
         <Route path="/scan" element={<QRScanner />} />
         <Route path="/jobs/:jobId/signature" element={<JobSignature/>}/>
+        <Route path="/summary-example" element={<SummaryExample/>}/>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="hospitals" element={<Hospitals />} />
