@@ -185,7 +185,11 @@ def get_schedule(schedule_id):
             return jsonify({"error": "Hospital not found"}), 404
         
         # Build query for jobs at this hospital
-        query = db.session.query(Job).join(AHU).filter(AHU.hospital_id == hospital_id)
+        # Only include completed jobs (those with completed_at timestamp)
+        query = db.session.query(Job).join(AHU).filter(
+            AHU.hospital_id == hospital_id,
+            Job.completed_at.isnot(None)
+        )
         
         # Apply date filters if provided
         if start_date_str:
