@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify
 from models import Hospital, AHU, Filter
 from sqlalchemy.orm import selectinload
 from db import db
+from datetime import date, timedelta
 
 hospital_bp = Blueprint("hospital", __name__)
 
@@ -28,11 +29,59 @@ def get_ahus_for_hospital(hospital_id):
 
     result = []
     for a in ahus:
+        # Compute filter counts and due dates if filters are available
+        overdue_count = 0
+        due_soon_count = 0
+        filters_count = 0
+        latest_service = None
+        next_due_dates = []
+
+        for f in (a.filters or []):
+            filters_count += 1
+            last = getattr(f, "last_service_date", None)
+            freq = getattr(f, "frequency_days", None)
+
+            if last:
+                # ensure date object
+                last_dt = last if isinstance(last, date) else last
+                if latest_service is None or (last_dt and last_dt > latest_service):
+                    latest_service = last_dt
+
+            if last and freq:
+                try:
+                    next_due = last + timedelta(days=int(freq))
+                    next_due_dates.append(next_due)
+                    delta = (next_due - date.today()).days
+                    if delta < 0:
+                        overdue_count += 1
+                    elif delta <= 7:
+                        due_soon_count += 1
+                except Exception:
+                    pass
+
+        # derive a simple overall status
+        if overdue_count > 0:
+            status = "Overdue"
+        elif due_soon_count > 0:
+            status = "Due Soon"
+        elif filters_count > 0:
+            status = "Completed"
+        else:
+            status = "Pending"
+
+        # earliest upcoming next_due if available
+        next_due_date = min(next_due_dates).isoformat() if next_due_dates else None
 
         result.append({
             "id": a.id,
             "name": a.name,
             "location": a.location,
+            "filters_count": filters_count,
+            "overdue_count": overdue_count,
+            "due_soon_count": due_soon_count,
+            "last_serviced": latest_service.isoformat() if latest_service else None,
+            "next_due_date": next_due_date,
+            "status": status,
         })
 
     return jsonify(result), 200

@@ -101,12 +101,24 @@ function AHUPage() {
                   {/* Header */}
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="card-title text-lg text-primary">
-                        {ahu.id}
-                      </h2>
-                      <p className="text-sm text-base-content/70">
-                        📍 {ahu.location || "Unknown location"}
-                      </p>
+                        <h2 className="card-title text-lg text-primary">
+                          {ahu.id}
+                        </h2>
+                        <p className="text-sm text-base-content/70">
+                          📍 {ahu.location || "Unknown location"}
+                        </p>
+
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        {ahu.overdue_count > 0 ? (
+                          <span className="badge badge-error badge-sm">{ahu.overdue_count} overdue</span>
+                        ) : null}
+
+                        {ahu.due_soon_count > 0 ? (
+                          <span className="badge badge-warning badge-sm">{ahu.due_soon_count} due soon</span>
+                        ) : null}
+
+                        <span className="badge badge-ghost badge-sm">{ahu.filters_count ?? 0} filters</span>
+                      </div>
                     </div>
 
                     <span className={statusBadge(ahu.status)}>

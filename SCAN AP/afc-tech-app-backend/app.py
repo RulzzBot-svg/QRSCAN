@@ -29,7 +29,14 @@ def create_app():
     
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    CORS(app)
+    # Allow CORS for API routes from our frontends and localhost (for dev).
+    # In production, restrict origins to your deployed frontend domains.
+    CORS(app, resources={r"/api/*": {"origins": [
+        "https://qrscan-lyart.vercel.app",
+        "https://qrscan-8ql2.onrender.com",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174"
+    ]}}, supports_credentials=True)
 
     db.init_app(app)
 
