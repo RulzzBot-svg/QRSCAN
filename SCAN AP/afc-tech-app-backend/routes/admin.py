@@ -4,7 +4,7 @@ from models import SupervisorSignoff
 from db import db
 from sqlalchemy.orm import joinedload
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -202,9 +202,9 @@ def get_schedule(schedule_id):
         if end_date_str:
             try:
                 end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-                # Set to end of day
-                end_date = end_date.replace(hour=23, minute=59, second=59)
-                query = query.filter(Job.completed_at <= end_date)
+                # Set to end of day by adding one day and using less-than comparison
+                end_date = end_date + timedelta(days=1)
+                query = query.filter(Job.completed_at < end_date)
             except ValueError:
                 return jsonify({"error": "Invalid end_date format, should be YYYY-MM-DD"}), 400
         
