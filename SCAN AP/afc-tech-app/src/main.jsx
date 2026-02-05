@@ -17,6 +17,7 @@ import AdminJobs from "./components/admin/adminjobs";
 import AdminLayout from "./components/admin/AdminLayout";
 import Login from "./components/common/login";
 import JobSignature from "./components/common/jobSignatures";
+import SummaryExample from "./pages/SummaryExample";
 import { registerSW } from "virtual:pwa-register";
 
 if (import.meta.env.PROD) {
@@ -44,6 +45,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="ahus" element={<AdminAHUs />} />
           <Route path="jobs" element={<AdminJobs />} />
         </Route>
+
+        {import.meta.env.DEV ? (
+          <Route path="/dev/summary" element={<SummaryExample />} />
+        ) : null}
 
 
 
