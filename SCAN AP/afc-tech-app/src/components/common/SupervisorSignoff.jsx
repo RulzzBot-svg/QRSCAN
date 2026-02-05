@@ -1,7 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus = [] }){
+export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus = [], initialHospitalId = null }){
   const canvasRef = useRef(null)
+  const navigate = useNavigate()
   const [isDrawing, setIsDrawing] = useState(false)
   const [supervisorName, setSupervisorName] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0,10))
@@ -13,8 +15,13 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
   const [summaryJobs, setSummaryJobs] = useState([])
 
   useEffect(()=>{
-    if(hospitals.length && !hospitalId) setHospitalId(hospitals[0].id)
-  },[hospitals])
+    if(!hospitals.length) return
+    if(initialHospitalId) {
+      setHospitalId(initialHospitalId)
+      return
+    }
+    if(!hospitalId) setHospitalId(hospitals[0].id)
+  },[hospitals, initialHospitalId])
 
   useEffect(()=>{
     if(!open) return
@@ -121,10 +128,19 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
     }
   }
 
+  function handleClose(){
+    if(initialHospitalId){
+      navigate(`/hospitals`)
+      return
+    }
+    onClose && onClose()
+  }
+
   if(!open) return null
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded shadow-lg w-11/12 max-w-2xl p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-base-200/60 backdrop-blur-sm" onClick={handleClose} />
+      <div className="relative bg-base-100 rounded-lg shadow-lg w-11/12 max-w-2xl p-4">
         <h3 className="text-lg font-bold mb-2">Supervisor Sign-off</h3>
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -167,7 +183,7 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
                 <div className="text-xs opacity-60">No jobs loaded for the selected range.</div>
               ) : (
                 summaryJobs.map(j => (
-                  <div key={j.id} className="text-sm py-1 border-b last:border-b-0">
+                  <div key={j.id} className="text-sm py-1 border-b last:border-b-0 bg-green-50">
                     <div className="font-semibold">{j.ahu_id} — Job #{j.id}</div>
                     <div className="text-xs opacity-70">{new Date(j.completed_at).toLocaleString()}</div>
                   </div>
@@ -177,11 +193,13 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
           </div>
           <div className="col-span-2">
             <label className="block text-sm">Signature</label>
-            <canvas ref={canvasRef} width={700} height={200} className="border" onMouseDown={start} onMouseMove={draw} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={draw} onTouchEnd={end} />
+            <div className="border rounded p-2 mt-2">
+              <canvas ref={canvasRef} width={600} height={140} className="w-full h-28 bg-white" onMouseDown={start} onMouseMove={draw} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={draw} onTouchEnd={end} />
+            </div>
             <div className="mt-2 flex gap-2">
               <button className="btn btn-sm" onClick={clear}>Clear</button>
               <button className="btn btn-sm btn-primary" onClick={submit}>Submit</button>
-              <button className="btn btn-sm" onClick={onClose}>Cancel</button>
+              <button className="btn btn-sm" onClick={handleClose}>Cancel</button>
             </div>
           </div>
         </div>
