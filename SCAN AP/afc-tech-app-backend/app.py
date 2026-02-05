@@ -9,6 +9,7 @@ from routes.ahu_routes import ahu_bp
 from routes.tech_routes import tech_bp
 from routes.job_routes import job_bp
 from routes.admin import admin_bp
+from signature import bp as signature_bp
 
 load_dotenv()
 
@@ -31,6 +32,9 @@ def create_app():
     CORS(app)
 
     db.init_app(app)
+
+    # signature demo endpoints (sample schedules + sign saves)
+    app.register_blueprint(signature_bp)
 
     app.register_blueprint(ahu_bp, url_prefix="/api")
     app.register_blueprint(job_bp, url_prefix="/api")

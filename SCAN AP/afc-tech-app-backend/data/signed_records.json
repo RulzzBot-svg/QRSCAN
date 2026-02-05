@@ -1,0 +1,11 @@
+[
+  {
+    "id": "sign_1",
+    "schedule_id": "sample-schedule-1",
+    "supervisor_name": "Unit Tester",
+    "jobs": [],
+    "signed_at": "2026-02-05T12:00:00Z",
+    "signature_image": false,
+    "recorded_at": "2026-02-05T16:26:23.339074"
+  }
+]
