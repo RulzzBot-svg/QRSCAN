@@ -126,22 +126,35 @@ class JobFilter(db.Model):
 #added a "inspected" checbox
 
 
-
-
+# -------------------------
+# JOB SIGNATURE
+# -------------------------
 class JobSignature(db.Model):
     __tablename__ = "job_signatures"
 
     id = Column(Integer, primary_key=True)
-    job_id = Column(
-        Integer,
-        ForeignKey("jobs.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True
-    )
-
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
     signer_name = Column(String(150))
-    signer_role = Column(String(150))
+    signer_role = Column(String(100))
     signature_data = Column(Text, nullable=False)
-    signed_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     job = relationship("Job", back_populates="signature")
+
+
+# -------------------------
+# SUPERVISOR SIGNOFF
+# -------------------------
+class SupervisorSignoff(db.Model):
+    __tablename__ = "supervisor_signoffs"
+
+    id = Column(Integer, primary_key=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    supervisor_name = Column(String(150), nullable=False)
+    summary = Column(Text)
+    signature_data = Column(Text, nullable=False)  # base64 PNG
+    job_ids = Column(Text)  # Comma-separated job IDs for simplicity
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    hospital = relationship("Hospital")

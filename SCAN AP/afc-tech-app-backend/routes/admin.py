@@ -1,10 +1,89 @@
 from flask import Blueprint, jsonify, request
 from models import Hospital, AHU, Job, Technician
+from models import SupervisorSignoff
 from db import db
 from sqlalchemy.orm import joinedload
 import re
+from datetime import datetime
 
 admin_bp = Blueprint("admin", __name__)
+
+@admin_bp.route("/supervisor-signoff", methods=["POST"])
+def create_supervisor_signoff():
+    """Create a new supervisor signoff record."""
+    try:
+        data = request.get_json()
+        hospital_id = data.get("hospital_id")
+        date_str = data.get("date")
+        supervisor_name = data.get("supervisor_name")
+        summary = data.get("summary")
+        signature_data = data.get("signature_data")
+        job_ids = data.get("job_ids")  # Should be a comma-separated string or list
+
+        if not (hospital_id and date_str and supervisor_name and signature_data and job_ids):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Parse date
+        try:
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except Exception:
+            return jsonify({"error": "Invalid date format, should be YYYY-MM-DD"}), 400
+
+        # Accept job_ids as list or comma-separated string
+        if isinstance(job_ids, list):
+            job_ids_str = ",".join(str(j) for j in job_ids)
+        else:
+            job_ids_str = str(job_ids)
+
+        new_signoff = SupervisorSignoff(
+            hospital_id=hospital_id,
+            date=date,
+            supervisor_name=supervisor_name,
+            summary=summary,
+            signature_data=signature_data,
+            job_ids=job_ids_str
+        )
+        db.session.add(new_signoff)
+        db.session.commit()
+        return jsonify({"id": new_signoff.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating supervisor signoff: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@admin_bp.route("/supervisor-signoff", methods=["GET"])
+def get_supervisor_signoffs():
+    """Get supervisor signoff records, optionally filtered by hospital_id and/or date."""
+    try:
+        hospital_id = request.args.get("hospital_id")
+        date_str = request.args.get("date")
+        query = SupervisorSignoff.query
+        if hospital_id:
+            query = query.filter_by(hospital_id=hospital_id)
+        if date_str:
+            try:
+                date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                query = query.filter_by(date=date)
+            except Exception:
+                return jsonify({"error": "Invalid date format, should be YYYY-MM-DD"}), 400
+        signoffs = query.order_by(SupervisorSignoff.date.desc()).all()
+        result = []
+        for s in signoffs:
+            result.append({
+                "id": s.id,
+                "hospital_id": s.hospital_id,
+                "date": s.date.isoformat(),
+                "supervisor_name": s.supervisor_name,
+                "summary": s.summary,
+                "signature_data": s.signature_data,
+                "job_ids": s.job_ids,
+                "created_at": s.created_at.isoformat() if s.created_at else None
+            })
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error fetching supervisor signoffs: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @admin_bp.route("/hospitals", methods=["GET"])
 def get_hospitals():

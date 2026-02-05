@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
+import SupervisorSignoff from "../common/SupervisorSignoff";
 
 // Natural sort for IDs like "AHU-1", "AHU 1", "AHU-46", "46", etc.
 const naturalAhuSort = (a, b) => {
@@ -48,6 +49,7 @@ function AdminAHUs() {
     ahu_name: "",
   });
   const [newAhuLoading, setNewAhuLoading] = useState(false);
+  const [showSignoff, setShowSignoff] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -185,13 +187,22 @@ function AdminAHUs() {
             {/* Add New AHU Form */}
             <div className="mb-4">
               {!showNewAhuForm ? (
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setShowNewAhuForm(true)}
-                  type="button"
-                >
-                  + Add New AHU
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowNewAhuForm(true)}
+                    type="button"
+                  >
+                    + Add New AHU
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setShowSignoff(true)}
+                    type="button"
+                  >
+                    Supervisor Sign-off
+                  </button>
+                </div>
               ) : (
                 <div className="bg-base-100 border border-base-300 rounded-lg shadow p-4">
                   <div className="font-semibold mb-3">Create New AHU</div>
@@ -249,7 +260,7 @@ function AdminAHUs() {
               )}
             </div>
 
-            {/* AHU List */}
+              {/* AHU List */}
             {/* ✅ KEY CHANGE: flex layout that becomes 70/30 on desktop */}
             <div className="flex flex-col lg:flex-row gap-4">
               {/* LEFT: Dense list (70%) */}
@@ -515,6 +526,7 @@ function AdminAHUs() {
           </div>
             </>
         )}
+        <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} />
       </main>
     </div>
   );
