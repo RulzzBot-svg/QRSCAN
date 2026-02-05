@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
 
-export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus = [] }){
+export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus = [], scheduleId = null }){
   const canvasRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [supervisorName, setSupervisorName] = useState('')
@@ -11,10 +11,53 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10))
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0,10))
   const [summaryJobs, setSummaryJobs] = useState([])
+  const [scheduleData, setScheduleData] = useState(null)
+  const [loading, setLoading] = useState(false)
 
+  const loadSchedule = useCallback(async (schedId) => {
+    try{
+      setLoading(true)
+      const params = new URLSearchParams()
+      if(startDate) params.append('start_date', startDate)
+      if(endDate) params.append('end_date', endDate)
+      
+      const res = await fetch(`/api/schedule/${schedId}?${params}`)
+      if(!res.ok) throw new Error('Failed to fetch schedule')
+      
+      const data = await res.json()
+      setScheduleData(data)
+      
+      // Pre-populate form with schedule data
+      if(data.hospital_id) setHospitalId(data.hospital_id)
+      if(data.jobs) {
+        setSummaryJobs(data.jobs)
+        setJobIds(data.jobs.map(j=>j.job_id).join(','))
+        
+        // Auto-generate summary
+        const autoSummary = `${data.hospital_name}\n${data.total_jobs} jobs completed\n${data.unique_ahus_serviced} AHUs serviced\n${data.total_filters_serviced} filters serviced\nPeriod: ${data.start_date} to ${data.end_date}`
+        setSummary(autoSummary)
+      }
+    }catch(err){
+      console.error('Failed to load schedule', err)
+      alert('Failed to load schedule data')
+    }finally{
+      setLoading(false)
+    }
+  }, [startDate, endDate])
+
+  // Initialize hospitalId when hospitals are loaded
+  // Note: hospitalId is intentionally not in the dependency array to avoid re-running when it changes
   useEffect(()=>{
     if(hospitals.length && !hospitalId) setHospitalId(hospitals[0].id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[hospitals])
+
+  // Load schedule data if scheduleId is provided
+  useEffect(()=>{
+    if(scheduleId && open) {
+      loadSchedule(scheduleId)
+    }
+  },[scheduleId, open, loadSchedule])
 
   useEffect(()=>{
     if(!open) return
@@ -86,13 +129,20 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
         const err = await res.json()
         alert('Error: ' + (err.error || res.statusText))
       }
-    }catch(e){
+    }catch{
       alert('Network error')
     }
   }
 
   async function loadSummary(){
+    // If scheduleId is provided, use the schedule endpoint instead
+    if(scheduleId){
+      await loadSchedule(scheduleId)
+      return
+    }
+    
     try{
+      setLoading(true)
       const res = await fetch('/api/admin/jobs')
       if(!res.ok) throw new Error('Failed to fetch jobs')
       const jobs = await res.json()
@@ -118,71 +168,219 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
     }catch(err){
       console.error('Failed to load summary', err)
       alert('Failed to load completed work')
+    }finally{
+      setLoading(false)
     }
   }
 
   if(!open) return null
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded shadow-lg w-11/12 max-w-2xl p-4">
-        <h3 className="text-lg font-bold mb-2">Supervisor Sign-off</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-sm">Hospital</label>
-            <select className="input input-bordered w-full" value={hospitalId} onChange={e=>setHospitalId(e.target.value)}>
-              {hospitals.map(h=> <option key={h.id} value={h.id}>{h.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm">Sign Date</label>
-            <input type="date" className="input input-bordered w-full" value={date} onChange={e=>setDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm">From</label>
-            <input type="date" className="input input-bordered w-full" value={startDate} onChange={e=>setStartDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm">To</label>
-            <input type="date" className="input input-bordered w-full" value={endDate} onChange={e=>setEndDate(e.target.value)} />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm">Supervisor Name</label>
-            <input className="input input-bordered w-full" value={supervisorName} onChange={e=>setSupervisorName(e.target.value)} />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm">Summary (optional)</label>
-            <textarea className="textarea textarea-bordered w-full" value={summary} onChange={e=>setSummary(e.target.value)} />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm">Related Job IDs (comma-separated)</label>
-            <input className="input input-bordered w-full" value={jobIds} onChange={e=>setJobIds(e.target.value)} />
-          </div>
-          <div className="col-span-2">
-            <div className="flex items-center gap-2">
-              <button className="btn btn-sm" onClick={loadSummary} type="button">Load Completed Work</button>
-              <div className="text-sm opacity-70">Loaded: {summaryJobs.length} jobs, {new Set(summaryJobs.map(j=>j.ahu_id)).size} AHUs</div>
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 p-4">
+      <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-xl">
+          <h3 className="text-2xl font-bold flex items-center gap-2">
+            <span className="text-3xl">✍️</span>
+            Supervisor Sign-off
+          </h3>
+          <p className="text-blue-100 text-sm mt-1">Complete and authorize work for the selected period</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Hospital & Date Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">🏥 Hospital</span>
+              </label>
+              <select 
+                className="select select-bordered w-full focus:border-blue-500 transition-colors" 
+                value={hospitalId} 
+                onChange={e=>setHospitalId(e.target.value)}
+              >
+                {hospitals.map(h=> <option key={h.id} value={h.id}>{h.name}</option>)}
+              </select>
             </div>
-            <div className="mt-2 max-h-40 overflow-y-auto border rounded p-2 bg-base-100">
-              {summaryJobs.length === 0 ? (
-                <div className="text-xs opacity-60">No jobs loaded for the selected range.</div>
-              ) : (
-                summaryJobs.map(j => (
-                  <div key={j.id} className="text-sm py-1 border-b last:border-b-0">
-                    <div className="font-semibold">{j.ahu_id} — Job #{j.id}</div>
-                    <div className="text-xs opacity-70">{new Date(j.completed_at).toLocaleString()}</div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">📅 Sign-off Date</span>
+              </label>
+              <input 
+                type="date" 
+                className="input input-bordered w-full focus:border-blue-500 transition-colors" 
+                value={date} 
+                onChange={e=>setDate(e.target.value)} 
+              />
+            </div>
+          </div>
+
+          {/* Date Range */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">📆 Period From</span>
+              </label>
+              <input 
+                type="date" 
+                className="input input-bordered w-full focus:border-blue-500 transition-colors" 
+                value={startDate} 
+                onChange={e=>setStartDate(e.target.value)} 
+              />
+            </div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">📆 Period To</span>
+              </label>
+              <input 
+                type="date" 
+                className="input input-bordered w-full focus:border-blue-500 transition-colors" 
+                value={endDate} 
+                onChange={e=>setEndDate(e.target.value)} 
+              />
+            </div>
+          </div>
+
+          {/* Supervisor Name */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-semibold">👤 Supervisor Name *</span>
+            </label>
+            <input 
+              className="input input-bordered w-full focus:border-blue-500 transition-colors" 
+              placeholder="Enter supervisor name"
+              value={supervisorName} 
+              onChange={e=>setSupervisorName(e.target.value)} 
+            />
+          </div>
+
+          {/* Summary */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-semibold">📝 Summary (Optional)</span>
+            </label>
+            <textarea 
+              className="textarea textarea-bordered w-full h-24 focus:border-blue-500 transition-colors" 
+              placeholder="Enter a summary of the work completed..."
+              value={summary} 
+              onChange={e=>setSummary(e.target.value)} 
+            />
+          </div>
+
+          {/* Job IDs */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-semibold">🔢 Related Job IDs (comma-separated)</span>
+            </label>
+            <input 
+              className="input input-bordered w-full focus:border-blue-500 transition-colors" 
+              placeholder="e.g., 123,124,125"
+              value={jobIds} 
+              onChange={e=>setJobIds(e.target.value)} 
+            />
+          </div>
+
+          {/* Load Summary Section */}
+          <div className="card bg-base-200 border border-gray-300 shadow-sm">
+            <div className="card-body p-4">
+              <div className="flex flex-wrap items-center gap-3 mb-2">
+                <button 
+                  className="btn btn-sm btn-primary"
+                  onClick={loadSummary} 
+                  type="button"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Loading...
+                    </>
+                  ) : (
+                    <>📊 Load Completed Work</>
+                  )}
+                </button>
+                {scheduleData && (
+                  <div className="badge badge-info gap-2">
+                    📋 Schedule #{scheduleData.schedule_id}
                   </div>
-                ))
-              )}
+                )}
+                <div className="text-sm font-medium text-gray-700">
+                  {summaryJobs.length > 0 && (
+                    <>
+                      <span className="text-blue-600">{summaryJobs.length}</span> jobs, 
+                      <span className="text-green-600 ml-1">{new Set(summaryJobs.map(j=>j.ahu_id)).size}</span> AHUs
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              <div className="max-h-48 overflow-y-auto border rounded-lg p-3 bg-white">
+                {summaryJobs.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-4">
+                    📭 No jobs loaded yet. Click "Load Completed Work" to fetch jobs.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {summaryJobs.map(j => {
+                      const jobId = j.job_id || j.id;
+                      return (
+                        <div key={`job-${jobId}`} className="p-2 border-b last:border-b-0 hover:bg-gray-50 transition-colors rounded">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-semibold text-gray-800">
+                                {j.ahu_id} {j.ahu_name && `— ${j.ahu_name}`}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                Job #{jobId} • {new Date(j.completed_at).toLocaleString()}
+                              </div>
+                            </div>
+                            {j.technician && (
+                              <div className="badge badge-sm badge-ghost">{j.technician}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div className="col-span-2">
-            <label className="block text-sm">Signature</label>
-            <canvas ref={canvasRef} width={700} height={200} className="border" onMouseDown={start} onMouseMove={draw} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={draw} onTouchEnd={end} />
-            <div className="mt-2 flex gap-2">
-              <button className="btn btn-sm" onClick={clear}>Clear</button>
-              <button className="btn btn-sm btn-primary" onClick={submit}>Submit</button>
-              <button className="btn btn-sm" onClick={onClose}>Cancel</button>
+
+          {/* Signature Canvas */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-semibold">✍️ Signature *</span>
+              <span className="label-text-alt text-gray-500">Sign in the box below</span>
+            </label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white hover:border-blue-400 transition-colors">
+              <canvas 
+                ref={canvasRef} 
+                width={700} 
+                height={200} 
+                className="w-full cursor-crosshair touch-none" 
+                onMouseDown={start} 
+                onMouseMove={draw} 
+                onMouseUp={end} 
+                onMouseLeave={end} 
+                onTouchStart={start} 
+                onTouchMove={draw} 
+                onTouchEnd={end} 
+              />
             </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 pt-4 border-t">
+            <button className="btn btn-outline btn-sm" onClick={clear}>
+              🗑️ Clear Signature
+            </button>
+            <div className="flex-1"></div>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>
+              ❌ Cancel
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={submit}>
+              ✅ Submit Sign-off
+            </button>
           </div>
         </div>
       </div>
