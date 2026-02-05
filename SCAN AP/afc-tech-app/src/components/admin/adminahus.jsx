@@ -526,7 +526,7 @@ function AdminAHUs() {
           </div>
             </>
         )}
-        <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} />
+        <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} ahus={ahus} />
       </main>
     </div>
   );
