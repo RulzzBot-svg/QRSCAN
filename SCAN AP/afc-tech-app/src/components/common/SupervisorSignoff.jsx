@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react'
+import { API } from '../../api/api'
 import { useNavigate } from 'react-router-dom'
 
 export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus = [], initialHospitalId = null }){
@@ -100,9 +101,8 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 
   async function loadSummary(){
     try{
-      const res = await fetch('/api/admin/jobs')
-      if(!res.ok) throw new Error('Failed to fetch jobs')
-      const jobs = await res.json()
+      const res = await API.get('/admin/jobs')
+      const jobs = Array.isArray(res.data) ? res.data : []
 
       // build a map of ahu_id -> hospital_id from passed `ahus`
       const ahuMap = new Map()
