@@ -93,28 +93,23 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 
   async function loadSummary(){
     try{
-      const res = await fetch('/api/admin/jobs')
-      if(!res.ok) throw new Error('Failed to fetch jobs')
-      const jobs = await res.json()
-
-      // build a map of ahu_id -> hospital_id from passed `ahus`
-      const ahuMap = new Map()
-      for(const a of ahus) ahuMap.set(String(a.id), a.hospital_id)
-
-      const s = new Date(startDate)
-      const e = new Date(endDate)
-      e.setHours(23,59,59,999)
-
-      const filtered = jobs.filter(j => {
-        const jobAhu = String(j.ahu_id)
-        const hospId = ahuMap.get(jobAhu)
-        if(String(hospId) !== String(hospitalId)) return false
-        const dt = new Date(j.completed_at)
-        return dt >= s && dt <= e
+      // Use the new schedule endpoint with date range filtering
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate
       })
+      const res = await fetch(`/api/admin/schedule/${hospitalId}?${params}`)
+      if(!res.ok) throw new Error('Failed to fetch schedule')
+      const scheduleData = await res.json()
 
-      setSummaryJobs(filtered)
-      setJobIds(filtered.map(j=>j.id).join(','))
+      const jobs = scheduleData.jobs || []
+      setSummaryJobs(jobs)
+      setJobIds(jobs.map(j=>j.id).join(','))
+      
+      // Update summary with schedule info
+      if(scheduleData.summary){
+        setSummary(`${scheduleData.summary.total_jobs} jobs completed across ${scheduleData.summary.unique_ahus} AHUs`)
+      }
     }catch(err){
       console.error('Failed to load summary', err)
       alert('Failed to load completed work')

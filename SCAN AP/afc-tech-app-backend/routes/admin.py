@@ -161,6 +161,98 @@ def get_all_jobs():
     return jsonify(result), 200
 
 
+@admin_bp.route("/schedule/<schedule_id>", methods=["GET"])
+def get_schedule(schedule_id):
+    """
+    Get schedule summary for a given schedule_id.
+    schedule_id can be a hospital_id or a composite identifier.
+    Query params: start_date, end_date for filtering jobs.
+    """
+    try:
+        # Get optional date range from query params
+        start_date_str = request.args.get("start_date")
+        end_date_str = request.args.get("end_date")
+        
+        # Try to interpret schedule_id as hospital_id (integer)
+        try:
+            hospital_id = int(schedule_id)
+        except ValueError:
+            return jsonify({"error": "Invalid schedule_id format"}), 400
+        
+        # Verify hospital exists
+        hospital = Hospital.query.get(hospital_id)
+        if not hospital:
+            return jsonify({"error": "Hospital not found"}), 404
+        
+        # Build query for jobs at this hospital
+        query = db.session.query(Job).join(AHU).filter(AHU.hospital_id == hospital_id)
+        
+        # Apply date filters if provided
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+                query = query.filter(Job.completed_at >= start_date)
+            except ValueError:
+                return jsonify({"error": "Invalid start_date format, should be YYYY-MM-DD"}), 400
+        
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+                # Set to end of day
+                end_date = end_date.replace(hour=23, minute=59, second=59)
+                query = query.filter(Job.completed_at <= end_date)
+            except ValueError:
+                return jsonify({"error": "Invalid end_date format, should be YYYY-MM-DD"}), 400
+        
+        # Load jobs with related data
+        jobs = query.options(
+            joinedload(Job.technician),
+            joinedload(Job.ahu),
+            joinedload(Job.job_filters)
+        ).order_by(Job.completed_at.desc()).all()
+        
+        # Build response
+        job_list = []
+        for job in jobs:
+            job_list.append({
+                "id": job.id,
+                "ahu_id": job.ahu_id,
+                "ahu_name": job.ahu.name if job.ahu else "Unknown",
+                "ahu_location": job.ahu.location if job.ahu else None,
+                "technician": job.technician.name if job.technician else "Unknown",
+                "technician_id": job.tech_id,
+                "completed_at": job.completed_at.isoformat() + "Z",
+                "overall_notes": job.overall_notes,
+                "filter_count": len(job.job_filters),
+                "completed_filters": sum(1 for jf in job.job_filters if jf.is_completed)
+            })
+        
+        # Get AHU count for this hospital
+        ahu_count = AHU.query.filter_by(hospital_id=hospital_id).count()
+        
+        return jsonify({
+            "schedule_id": schedule_id,
+            "hospital": {
+                "id": hospital.id,
+                "name": hospital.name,
+                "address": hospital.address,
+                "city": hospital.city
+            },
+            "ahu_count": ahu_count,
+            "job_count": len(jobs),
+            "jobs": job_list,
+            "summary": {
+                "total_jobs": len(jobs),
+                "unique_ahus": len(set(j.ahu_id for j in jobs)),
+                "technicians": list(set(j.technician.name for j in jobs if j.technician))
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching schedule: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @admin_bp.route("/ahu", methods=["POST"])
 def create_ahu():
     """Create a new AHU manually."""
