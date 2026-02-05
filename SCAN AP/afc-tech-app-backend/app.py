@@ -9,6 +9,7 @@ from routes.ahu_routes import ahu_bp
 from routes.tech_routes import tech_bp
 from routes.job_routes import job_bp
 from routes.admin import admin_bp
+from routes.signature import signature_bp
 
 load_dotenv()
 
@@ -37,6 +38,7 @@ def create_app():
     app.register_blueprint(tech_bp, url_prefix="/api")
     app.register_blueprint(hospital_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
+    app.register_blueprint(signature_bp, url_prefix="/api")
 
     @app.route("/")
     def home():
