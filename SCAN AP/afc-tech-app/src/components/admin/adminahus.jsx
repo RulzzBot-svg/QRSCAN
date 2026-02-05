@@ -127,7 +127,7 @@ function AdminAHUs() {
     [ahus, selectedAhuId]
   );
 
-  const hospitalIdForSelected = getHospitalIdForSelectedAhu();
+  
 
   const handleCreateAhu = async () => {
     if (!newAhuFormData.hospital_id || !newAhuFormData.ahu_name.trim()) {
@@ -167,6 +167,8 @@ function AdminAHUs() {
     }
     return null;
   };
+
+  const hospitalIdForSelected = getHospitalIdForSelectedAhu();
 
 
   return (

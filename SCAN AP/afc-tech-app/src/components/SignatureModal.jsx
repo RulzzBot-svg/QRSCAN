@@ -124,8 +124,9 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ width: '95%', maxWidth: 980, background: '#fff', borderRadius: 10, padding: 18, maxHeight: '90vh', overflowY: 'auto' }} role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-base-200/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative modal-box w-11/12 max-w-3xl max-h-[90vh] overflow-y-auto bg-base-100" role="dialog" aria-modal="true">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0 }}>Supervisor Sign-off</h2>
           <button aria-label="Close" onClick={onClose} style={{ border: 'none', background: 'transparent', fontSize: 22, cursor: 'pointer' }}>×</button>
@@ -153,9 +154,9 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
           <input value={supervisorName} onChange={e => setSupervisorName(e.target.value)} placeholder="Type name here..." style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #ccc', marginTop: 8 }} disabled={saving} />
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <label style={{ fontWeight: 600 }}>Signature (optional)</label>
-          <div style={{ border: '1px solid #ddd', borderRadius: 6, padding: 8, marginTop: 8 }}>
+        <div className="mt-4">
+          <label className="font-semibold">Signature (optional)</label>
+          <div className="border rounded p-2 mt-2">
             <canvas
               ref={canvasRef}
               onMouseDown={start}
@@ -165,18 +166,21 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
               onTouchStart={start}
               onTouchMove={move}
               onTouchEnd={end}
-              style={{ width: '100%', height: 160, background: '#fff', touchAction: 'none' }}
+              width={520}
+              height={140}
+              className="w-full h-28 bg-white"
+              style={{ touchAction: 'none' }}
             />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => clear()} style={{ padding: '6px 10px', borderRadius: 6 }}>Clear</button>
-              <button type="button" onClick={() => undo()} style={{ padding: '6px 10px', borderRadius: 6 }}>Undo</button>
+            <div className="flex gap-2 mt-2">
+              <button type="button" onClick={() => clear()} className="btn btn-sm">Clear</button>
+              <button type="button" onClick={() => undo()} className="btn btn-sm">Undo</button>
             </div>
           </div>
         </div>
 
-        <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} disabled={saving} style={{ background: '#f0f0f0', color: '#333', border: 'none', padding: '8px 14px', borderRadius: 6 }}>Cancel</button>
-          <button onClick={handleSign} disabled={saving || loading} style={{ background: '#2f9e44', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 6 }}>{saving ? 'Saving…' : 'Sign & Complete'}</button>
+        <div className="mt-4 flex gap-2 justify-end">
+          <button onClick={onClose} disabled={saving} className="btn btn-outline">Cancel</button>
+          <button onClick={handleSign} disabled={saving || loading} className="btn btn-success">{saving ? 'Saving…' : 'Sign & Complete'}</button>
         </div>
       </div>
     </div>

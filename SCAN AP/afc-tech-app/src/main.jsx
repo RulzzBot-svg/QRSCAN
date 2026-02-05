@@ -18,6 +18,7 @@ import AdminLayout from "./components/admin/AdminLayout";
 import Login from "./components/common/login";
 import JobSignature from "./components/common/jobSignatures";
 import SummaryExample from "./pages/SummaryExample";
+import TechSignoff from "./pages/TechSignoff";
 import { registerSW } from "virtual:pwa-register";
 
 if (import.meta.env.PROD) {
@@ -49,6 +50,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         {import.meta.env.DEV ? (
           <Route path="/dev/summary" element={<SummaryExample />} />
         ) : null}
+
+        <Route path="/tech/signoff" element={<TechSignoff />} />
 
 
 

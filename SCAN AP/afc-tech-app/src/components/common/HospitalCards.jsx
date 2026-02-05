@@ -109,6 +109,12 @@ function HospitalCards() {
               <button className="btn btn-sm" onClick={()=>downloadHospital(hospital.id)}>
                 Download Hospital for offline
               </button>
+              <button
+                className="btn btn-success btn-sm w-full mt-2"
+                onClick={(e) => { e.stopPropagation(); navigate(`/tech/signoff?h=${hospital.id}`); }}
+              >
+                Tech Sign-off
+              </button>
               
             </div>
           </div>
