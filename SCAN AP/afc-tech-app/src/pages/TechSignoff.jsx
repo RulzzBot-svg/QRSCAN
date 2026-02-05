@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SupervisorSignoff from '../components/common/SupervisorSignoff'
+import { API } from '../api/api'
 
 export default function TechSignoff(){
   const [open, setOpen] = useState(true)
@@ -13,10 +14,10 @@ export default function TechSignoff(){
   useEffect(()=>{
     async function load(){
       try{
-        const h = await fetch('/api/admin/hospitals')
-        const ah = await fetch('/api/admin/ahus')
-        const hospitalsJson = h.ok ? await h.json() : []
-        const ahusJson = ah.ok ? await ah.json() : []
+        const h = await API.get('/admin/hospitals')
+        const ah = await API.get('/admin/ahus')
+        const hospitalsJson = Array.isArray(h.data) ? h.data : []
+        const ahusJson = Array.isArray(ah.data) ? ah.data : []
         setHospitals(hospitalsJson)
         setAhus(ahusJson)
       }catch(e){ console.error('Failed to load hospitals/ahus', e) }
