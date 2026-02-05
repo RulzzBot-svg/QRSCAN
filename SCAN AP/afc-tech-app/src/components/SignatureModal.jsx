@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import { API } from '../../api/api';
+import { API } from '../api/api';
 
 export default function SignatureModal({ isOpen, onClose, scheduleId }) {
   const sigRef = useRef(null);
@@ -15,6 +15,7 @@ export default function SignatureModal({ isOpen, onClose, scheduleId }) {
     if (isOpen && scheduleId) {
       fetchScheduleSummary();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, scheduleId]);
 
   const fetchScheduleSummary = async () => {
