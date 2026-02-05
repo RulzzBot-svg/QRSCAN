@@ -9,6 +9,7 @@ export default function SignatureModal({ isOpen, onClose, scheduleId }) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [validationError, setValidationError] = useState(null);
 
   // Fetch schedule summary when modal opens
   useEffect(() => {
@@ -37,14 +38,17 @@ export default function SignatureModal({ isOpen, onClose, scheduleId }) {
   };
 
   const handleSubmit = async () => {
+    // Clear previous validation errors
+    setValidationError(null);
+    
     // Validation
     if (!supervisorName.trim()) {
-      alert('Please enter supervisor name');
+      setValidationError('Please enter supervisor name');
       return;
     }
 
     if (!sigRef.current || sigRef.current.isEmpty()) {
-      alert('Please provide a signature');
+      setValidationError('Please provide a signature');
       return;
     }
 
@@ -66,15 +70,14 @@ export default function SignatureModal({ isOpen, onClose, scheduleId }) {
 
       await API.post('/supervisor_sign', payload);
       
-      alert('Supervisor signature recorded successfully!');
+      // Success - close modal and reset form
       onClose();
-      // Reset form
       setSupervisorName('');
       clearSignature();
+      setValidationError(null);
     } catch (err) {
       console.error('Error submitting signature:', err);
       setError(err.response?.data?.error || 'Failed to submit signature');
-      alert('Error: ' + (err.response?.data?.error || 'Failed to submit signature'));
     } finally {
       setSubmitting(false);
     }
@@ -99,10 +102,16 @@ export default function SignatureModal({ isOpen, onClose, scheduleId }) {
             </button>
           </div>
 
-          {/* Error Message */}
+          {/* Error Messages */}
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
+            </div>
+          )}
+          
+          {validationError && (
+            <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+              {validationError}
             </div>
           )}
 

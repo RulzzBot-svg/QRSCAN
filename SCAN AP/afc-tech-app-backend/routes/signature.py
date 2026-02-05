@@ -11,12 +11,16 @@ signature_bp = Blueprint("signature", __name__)
 def get_schedule_summary(schedule_id):
     """
     Get summary of jobs for a schedule.
-    For demo purposes, schedule_id can be used to filter jobs.
+    
+    NOTE: For demo purposes, this implementation fetches recent jobs.
+    In production, schedule_id should be mapped to specific jobs via
+    a Schedule model or similar mechanism.
+    
     Returns jobs with their details for supervisor review.
     """
     try:
+        # TODO: In production, filter by actual schedule_id mapping
         # For this implementation, we'll fetch recent jobs
-        # In a real scenario, schedule_id would map to specific jobs
         jobs = (
             Job.query
             .options(
@@ -25,7 +29,7 @@ def get_schedule_summary(schedule_id):
                 joinedload(Job.job_filters).joinedload('filter')
             )
             .order_by(Job.completed_at.desc())
-            .limit(10)  # Limit to recent 10 jobs for demo
+            .limit(10)  # TODO: Make configurable or add pagination
             .all()
         )
 
@@ -69,6 +73,7 @@ def supervisor_sign():
     {
         "schedule_id": "sample-schedule-1",
         "supervisor_name": "John Doe",
+        "hospital_id": 1,  # Required: hospital for this signoff
         "jobs": [1, 2, 3],  # list of job IDs
         "signed_at": "2026-02-05T16:00:00Z",
         "signature_image": "data:image/png;base64,..."
@@ -79,6 +84,7 @@ def supervisor_sign():
         
         schedule_id = data.get("schedule_id")
         supervisor_name = data.get("supervisor_name")
+        hospital_id = data.get("hospital_id", 1)  # Default to 1 for backward compatibility
         jobs = data.get("jobs", [])
         signed_at_str = data.get("signed_at")
         signature_image = data.get("signature_image")
@@ -98,10 +104,8 @@ def supervisor_sign():
         # Convert jobs list to comma-separated string
         job_ids_str = ",".join(str(j) for j in jobs) if jobs else ""
 
-        # For this implementation, we'll use hospital_id = 1 as default
-        # In a real scenario, schedule_id would be linked to a specific hospital
         new_signoff = SupervisorSignoff(
-            hospital_id=1,  # Default hospital for demo
+            hospital_id=hospital_id,
             date=signed_at.date(),
             supervisor_name=supervisor_name,
             summary=f"Supervisor sign-off for schedule {schedule_id}",
