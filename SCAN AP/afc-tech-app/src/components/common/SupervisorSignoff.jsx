@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
 
 export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus = [], scheduleId = null }){
   const canvasRef = useRef(null)
@@ -14,8 +14,40 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
   const [scheduleData, setScheduleData] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  const loadSchedule = useCallback(async (schedId) => {
+    try{
+      setLoading(true)
+      const params = new URLSearchParams()
+      if(startDate) params.append('start_date', startDate)
+      if(endDate) params.append('end_date', endDate)
+      
+      const res = await fetch(`/api/schedule/${schedId}?${params}`)
+      if(!res.ok) throw new Error('Failed to fetch schedule')
+      
+      const data = await res.json()
+      setScheduleData(data)
+      
+      // Pre-populate form with schedule data
+      if(data.hospital_id) setHospitalId(data.hospital_id)
+      if(data.jobs) {
+        setSummaryJobs(data.jobs)
+        setJobIds(data.jobs.map(j=>j.job_id).join(','))
+        
+        // Auto-generate summary
+        const autoSummary = `${data.hospital_name}\n${data.total_jobs} jobs completed\n${data.unique_ahus_serviced} AHUs serviced\n${data.total_filters_serviced} filters serviced\nPeriod: ${data.start_date} to ${data.end_date}`
+        setSummary(autoSummary)
+      }
+    }catch(err){
+      console.error('Failed to load schedule', err)
+      alert('Failed to load schedule data')
+    }finally{
+      setLoading(false)
+    }
+  }, [startDate, endDate])
+
   useEffect(()=>{
     if(hospitals.length && !hospitalId) setHospitalId(hospitals[0].id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[hospitals])
 
   // Load schedule data if scheduleId is provided
@@ -23,7 +55,7 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
     if(scheduleId && open) {
       loadSchedule(scheduleId)
     }
-  },[scheduleId, open])
+  },[scheduleId, open, loadSchedule])
 
   useEffect(()=>{
     if(!open) return
@@ -67,37 +99,6 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
     ctx.clearRect(0,0,c.width,c.height)
   }
 
-  async function loadSchedule(schedId){
-    try{
-      setLoading(true)
-      const params = new URLSearchParams()
-      if(startDate) params.append('start_date', startDate)
-      if(endDate) params.append('end_date', endDate)
-      
-      const res = await fetch(`/api/schedule/${schedId}?${params}`)
-      if(!res.ok) throw new Error('Failed to fetch schedule')
-      
-      const data = await res.json()
-      setScheduleData(data)
-      
-      // Pre-populate form with schedule data
-      if(data.hospital_id) setHospitalId(data.hospital_id)
-      if(data.jobs) {
-        setSummaryJobs(data.jobs)
-        setJobIds(data.jobs.map(j=>j.job_id).join(','))
-        
-        // Auto-generate summary
-        const autoSummary = `${data.hospital_name}\n${data.total_jobs} jobs completed\n${data.unique_ahus_serviced} AHUs serviced\n${data.total_filters_serviced} filters serviced\nPeriod: ${data.start_date} to ${data.end_date}`
-        setSummary(autoSummary)
-      }
-    }catch(err){
-      console.error('Failed to load schedule', err)
-      alert('Failed to load schedule data')
-    }finally{
-      setLoading(false)
-    }
-  }
-
   async function submit(){
     const canvas = canvasRef.current
     const dataUrl = canvas.toDataURL('image/png')
@@ -126,7 +127,7 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
         const err = await res.json()
         alert('Error: ' + (err.error || res.statusText))
       }
-    }catch(e){
+    }catch{
       alert('Network error')
     }
   }
