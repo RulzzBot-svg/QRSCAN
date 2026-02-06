@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAHUsForHospital } from "../../api/hospitals";
+import { API } from "../../api/api";
 
 function AHUPage() {
   const { hospitalId } = useParams();
@@ -13,9 +14,16 @@ function AHUPage() {
 
   useEffect(() => {
     setLoading(true);
-    getAHUsForHospital(hospitalId)
-      .then((res) => setAhus(res.data))
-      .catch((err) => console.error("Error loading AHUs", err))
+    // Use admin endpoint which includes filter counts and status per AHU
+    API.get("/admin/ahus")
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        const filteredList = list.filter((a) => String(a.hospital_id) === String(hospitalId));
+        setAhus(filteredList);
+      })
+      .catch((err) => {
+        console.error("Error loading AHUs via admin endpoint", err);
+      })
       .finally(() => setLoading(false));
   }, [hospitalId]);
 
@@ -118,6 +126,9 @@ function AHUPage() {
                         ) : null}
 
                         <span className="badge badge-ghost badge-sm">{ahu.filters_count ?? 0} filters</span>
+                        {ahu.status ? (
+                          <span className={`${statusBadge(ahu.status)} badge-sm ml-1`}>{ahu.status}</span>
+                        ) : null}
                       </div>
                     </div>
 
