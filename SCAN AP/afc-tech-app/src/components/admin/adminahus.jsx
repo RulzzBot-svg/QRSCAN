@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
-import HospitalJobsSummary from "../common/HospitalJobsSummary";
+
 
 // Natural sort for IDs like "AHU-1", "AHU 1", "AHU-46", "46", etc.
 const naturalAhuSort = (a, b) => {
@@ -525,10 +525,6 @@ function AdminAHUs() {
                   <div className="p-4 lg:max-h-[calc(100vh-170px)] lg:overflow-y-auto space-y-4">
                     <AdminFilterEditorInline ahuId={selectedAhu.id} isOpen={true} />
 
-                    <div>
-                      <h3 className="font-semibold mb-2">Completed Work Summary</h3>
-                      <HospitalJobsSummary hospitalId={hospitalIdForSelected} />
-                    </div>
                   </div>
                 </div>
               </div>
