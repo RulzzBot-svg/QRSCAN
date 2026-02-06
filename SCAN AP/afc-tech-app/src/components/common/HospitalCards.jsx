@@ -146,10 +146,10 @@ function HospitalCards() {
                     const c = countsMap[hospital.id] || { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 };
                     return (
                       <>
-                        {c.ahus_ok > 0 ? <span className="badge badge-success">{c.ahus_ok} OK</span> : null}
-                        {c.ahus_overdue > 0 ? <span className="badge badge-error">{c.ahus_overdue} overdue</span> : null}
-                        {c.ahus_due_soon > 0 ? <span className="badge badge-warning">{c.ahus_due_soon} due soon</span> : null}
-                        <span className="badge badge-ghost">{c.ahu_count} Air Handlers</span>
+                        {c.ahus_ok > 0 ? <span className="badge badge-sm badge-success">{c.ahus_ok} OK</span> : null}
+                        {c.ahus_overdue > 0 ? <span className="badge badge-sm badge-error">{c.ahus_overdue} overdue</span> : null}
+                        {c.ahus_due_soon > 0 ? <span className="badge badge-sm badge-warning">{c.ahus_due_soon} due soon</span> : null}
+                        <span className="badge badge-sm badge-ghost">{c.ahu_count} Air Handlers</span>
                       </>
                     );
                   })()}
