@@ -27,6 +27,9 @@ function HospitalCards() {
   // Pagination: how many hospitals to show at once
   const [visible, setVisible] = useState(4);
 
+  // Per-hospital computed counts: { [hospitalId]: { filters_count, overdue_count, due_soon_count, ok_count } }
+  const [countsMap, setCountsMap] = useState({});
+
   // Search bar state
   const [search, setSearch] = useState("");
 
@@ -34,6 +37,45 @@ function HospitalCards() {
   const filtered = hospitals.filter((h) =>
     h.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Load counts for hospitals in view (avoids firing for all at once)
+  useEffect(() => {
+    const idsToLoad = filtered.slice(0, visible).map((h) => h.id).filter((id) => !(id in countsMap));
+    if (idsToLoad.length === 0) return;
+
+    const today = new Date();
+
+    idsToLoad.forEach(async (hospitalId) => {
+      try {
+        const res = await API.get(`/hospitals/${hospitalId}/offline-bundle`);
+        const payload = res.data;
+        let filters_count = 0;
+        let overdue_count = 0;
+        let due_soon_count = 0;
+
+        for (const a of (payload.ahus || [])) {
+          for (const f of (a.filters || [])) {
+            filters_count += 1;
+            const last = f.last_service_date ? new Date(f.last_service_date) : null;
+            const freq = f.frequency_days || null;
+            if (last && freq) {
+              const nextDue = new Date(last.getTime() + freq * 24 * 60 * 60 * 1000);
+              const delta = Math.ceil((nextDue - today) / (1000 * 60 * 60 * 24));
+              if (delta < 0) overdue_count += 1;
+              else if (delta <= 14) due_soon_count += 1;
+            }
+          }
+        }
+
+        const ok_count = Math.max(0, filters_count - overdue_count - due_soon_count);
+        setCountsMap((m) => ({ ...m, [hospitalId]: { filters_count, overdue_count, due_soon_count, ok_count } }));
+      } catch (err) {
+        console.error('Failed to load hospital bundle', hospitalId, err);
+        setCountsMap((m) => ({ ...m, [hospitalId]: { filters_count: 0, overdue_count: 0, due_soon_count: 0, ok_count: 0 } }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, visible]);
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200 p-4">
@@ -76,15 +118,30 @@ function HospitalCards() {
           >
             <div className="card-body p-5 ">
 
-              <h2 className="card-title text-lg text-primary">
-                {hospital.name}
-              </h2>
+              <div className="flex items-start gap-3">
+                <div className="min-w-0">
+                  <h2 className="card-title text-lg text-primary truncate">{hospital.name}</h2>
+                  <p className="text-xs text-base-content/60 truncate">{hospital.city}</p>
+                </div>
 
-              <p className="text-xs text-base-content/60"> {hospital.city} </p>
+                <div className="ml-auto flex items-center gap-2">
+                  <span className={`badge badge-sm ${hospital.active ? "badge-success" : "badge-ghost"}`}>
+                    {hospital.active ? "Active" : "Inactive"}
+                  </span>
 
-              <span className={`badge badge-sm ${hospital.active ? "badge-success" : "badge-ghost"}`}>
-                {hospital.active ? "Active" : "Inactive"}
-              </span>
+                  {(() => {
+                    const c = countsMap[hospital.id] || { filters_count: 0, overdue_count: 0, due_soon_count: 0, ok_count: 0 };
+                    return (
+                      <>
+                        {c.ok_count > 0 ? <span className="badge badge-success">{c.ok_count} OK</span> : null}
+                        {c.overdue_count > 0 ? <span className="badge badge-error">{c.overdue_count} overdue</span> : null}
+                        {c.due_soon_count > 0 ? <span className="badge badge-warning">{c.due_soon_count} due soon</span> : null}
+                        <span className="badge badge-ghost">{c.filters_count} filters</span>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
 
               {/* STAT COMPONENT */}
               <div className="stats shadow w-full mb-3 mt-1">
