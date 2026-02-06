@@ -49,29 +49,42 @@ function HospitalCards() {
       try {
         const res = await API.get(`/hospitals/${hospitalId}/offline-bundle`);
         const payload = res.data;
-        let filters_count = 0;
-        let overdue_count = 0;
-        let due_soon_count = 0;
+
+        // Compute AHU-level counts (Air Handlers): how many AHUs are overdue / due soon / ok
+        let ahu_count = 0;
+        let ahus_overdue = 0;
+        let ahus_due_soon = 0;
+        let ahus_ok = 0;
 
         for (const a of (payload.ahus || [])) {
+          ahu_count += 1;
+
+          // determine AHU status from its filters
+          let has_overdue = false;
+          let has_due_soon = false;
+          let has_filters = false;
+
           for (const f of (a.filters || [])) {
-            filters_count += 1;
+            has_filters = true;
             const last = f.last_service_date ? new Date(f.last_service_date) : null;
             const freq = f.frequency_days || null;
             if (last && freq) {
               const nextDue = new Date(last.getTime() + freq * 24 * 60 * 60 * 1000);
               const delta = Math.ceil((nextDue - today) / (1000 * 60 * 60 * 24));
-              if (delta < 0) overdue_count += 1;
-              else if (delta <= 14) due_soon_count += 1;
+              if (delta < 0) has_overdue = true;
+              else if (delta <= 14) has_due_soon = true;
             }
           }
+
+          if (has_overdue) ahus_overdue += 1;
+          else if (has_due_soon) ahus_due_soon += 1;
+          else if (has_filters) ahus_ok += 1;
         }
 
-        const ok_count = Math.max(0, filters_count - overdue_count - due_soon_count);
-        setCountsMap((m) => ({ ...m, [hospitalId]: { filters_count, overdue_count, due_soon_count, ok_count } }));
+        setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count, ahus_overdue, ahus_due_soon, ahus_ok } }));
       } catch (err) {
         console.error('Failed to load hospital bundle', hospitalId, err);
-        setCountsMap((m) => ({ ...m, [hospitalId]: { filters_count: 0, overdue_count: 0, due_soon_count: 0, ok_count: 0 } }));
+        setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 } }));
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,13 +143,13 @@ function HospitalCards() {
                   </span>
 
                   {(() => {
-                    const c = countsMap[hospital.id] || { filters_count: 0, overdue_count: 0, due_soon_count: 0, ok_count: 0 };
+                    const c = countsMap[hospital.id] || { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 };
                     return (
                       <>
-                        {c.ok_count > 0 ? <span className="badge badge-success">{c.ok_count} OK</span> : null}
-                        {c.overdue_count > 0 ? <span className="badge badge-error">{c.overdue_count} overdue</span> : null}
-                        {c.due_soon_count > 0 ? <span className="badge badge-warning">{c.due_soon_count} due soon</span> : null}
-                        <span className="badge badge-ghost">{c.filters_count} filters</span>
+                        {c.ahus_ok > 0 ? <span className="badge badge-success">{c.ahus_ok} OK</span> : null}
+                        {c.ahus_overdue > 0 ? <span className="badge badge-error">{c.ahus_overdue} overdue</span> : null}
+                        {c.ahus_due_soon > 0 ? <span className="badge badge-warning">{c.ahus_due_soon} due soon</span> : null}
+                        <span className="badge badge-ghost">{c.ahu_count} Air Handlers</span>
                       </>
                     );
                   })()}
