@@ -4,7 +4,6 @@ import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
 
-
 // Natural sort for IDs like "AHU-1", "AHU 1", "AHU-46", "46", etc.
 const naturalAhuSort = (a, b) => {
   const A = String(a ?? "");
@@ -39,6 +38,10 @@ function AdminAHUs() {
   // which hospitals are collapsed/expanded
   const [openHospitals, setOpenHospitals] = useState({}); // { [hospitalKey]: true/false }
 
+  // NEW: which buildings are collapsed/expanded per hospital
+  // shape: { [hospitalKey]: { [buildingName]: true/false } }
+  const [openBuildings, setOpenBuildings] = useState({});
+
   // Inline dropdown mode: expanded AHU in list
   const [expandedAhuId, setExpandedAhuId] = useState(null);
 
@@ -64,8 +67,6 @@ function AdminAHUs() {
         const hospitalsRes = await API.get("/admin/hospitals");
         const hospitalsList = Array.isArray(hospitalsRes.data) ? hospitalsRes.data : [];
         setHospitals(hospitalsList);
-
-        // nothing selected by default
       } catch (err) {
         console.error("Failed to load AHUs:", err);
         setAhus([]);
@@ -77,7 +78,7 @@ function AdminAHUs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Group AHUs by hospital
+  // Group AHUs by hospital -> building
   const grouped = useMemo(() => {
     const map = new Map();
 
@@ -96,9 +97,8 @@ function AdminAHUs() {
       g1.hospitalName.localeCompare(g2.hospitalName)
     );
 
-    // sort AHUs inside each hospital by natural numeric order
+    // sort AHUs inside each hospital by natural numeric order, and group by building
     for (const g of groups) {
-      // further group by building inside each hospital
       const buildingMap = new Map();
       for (const a of g.items) {
         const bname = a.building || "(No building)";
@@ -106,26 +106,42 @@ function AdminAHUs() {
         buildingMap.get(bname).push(a);
       }
 
-      // sort AHUs inside each building
       const buildings = Array.from(buildingMap.entries()).map(([name, items]) => {
         items.sort((x, y) => naturalAhuSort(x.id, y.id));
         return { buildingName: name, items };
       });
 
-      // replace items with grouped-by-building structure
+      // sort buildings by name
+      buildings.sort((x, y) => x.buildingName.localeCompare(y.buildingName));
+
       g.buildings = buildings;
     }
 
     return groups;
   }, [ahus]);
 
-  // Expand all hospitals by default after first load
+  // Expand all hospitals by default after first load (you set them to false originally; keeping your behavior)
   useEffect(() => {
     if (loading) return;
+
     setOpenHospitals((prev) => {
       if (Object.keys(prev).length) return prev;
       const next = {};
-      for (const g of grouped) next[g.hospitalKey] = false;
+      for (const g of grouped) next[g.hospitalKey] = false; // default collapsed like your original
+      return next;
+    });
+
+    // Also initialize building open map so buildings start collapsed (or you can set true if you want open)
+    setOpenBuildings((prev) => {
+      if (Object.keys(prev).length) return prev;
+      const next = {};
+      for (const g of grouped) {
+        const hKey = g.hospitalKey;
+        next[hKey] = {};
+        for (const b of g.buildings || []) {
+          next[hKey][b.buildingName] = false; // default collapsed
+        }
+      }
       return next;
     });
   }, [loading, grouped]);
@@ -134,15 +150,24 @@ function AdminAHUs() {
     setOpenHospitals((prev) => ({ ...prev, [hospitalKey]: !prev[hospitalKey] }));
   };
 
-  // no right-side inspector; filters open inline per AHU
+  const toggleOpenBuilding = (hospitalKey, buildingName) => {
+    setOpenBuildings((prev) => {
+      const h = prev[hospitalKey] || {};
+      return {
+        ...prev,
+        [hospitalKey]: {
+          ...h,
+          [buildingName]: !h[buildingName],
+        },
+      };
+    });
+  };
 
   const labelFor = (id) => {
     if (!id) return "";
-    const idx = String(id).indexOf('-');
+    const idx = String(id).indexOf("-");
     return idx >= 0 ? String(id).slice(idx + 1) : String(id);
   };
-
-  
 
   const handleCreateAhu = async () => {
     if (!newAhuFormData.hospital_id || !newAhuFormData.ahu_name.trim()) {
@@ -173,9 +198,6 @@ function AdminAHUs() {
     }
   };
 
-  // filters now open inline under each AHU (dropdown style)
-
-
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
       <main className="w-full p-6">
@@ -183,7 +205,7 @@ function AdminAHUs() {
           <div>
             <h1 className="text-3xl font-bold text-primary">AHU Maintenance Overview</h1>
             <div className="text-sm opacity-70 mt-1">
-              Click an AHU to expand its filters inline for editing.
+              Hospital → Building → AHU → Filters (accordion dropdowns).
             </div>
           </div>
 
@@ -265,7 +287,11 @@ function AdminAHUs() {
                         disabled={newAhuLoading}
                         type="button"
                       >
-                        {newAhuLoading ? <span className="loading loading-spinner loading-xs"></span> : "Create"}
+                        {newAhuLoading ? (
+                          <span className="loading loading-spinner loading-xs"></span>
+                        ) : (
+                          "Create"
+                        )}
                       </button>
                       <button
                         className="btn btn-outline btn-sm flex-1"
@@ -280,214 +306,256 @@ function AdminAHUs() {
               )}
             </div>
 
-              {/* AHU List */}
-            {/* ✅ KEY CHANGE: flex layout that becomes 70/30 on desktop */}
+            {/* AHU List */}
             <div className="flex flex-col lg:flex-row gap-4">
-              {/* LEFT: Dense list (now 40%) */}
               <div className="w-full lg:w-full min-w-0">
-              <div className="bg-base-100 border border-base-300 rounded-lg shadow">
-                <div className="p-4 border-b border-base-300 flex items-center justify-between">
-                  <div className="font-semibold">Hospitals / AHUs</div>
-                  <div className="text-xs opacity-70">{ahus.length} total AHUs</div>
-                </div>
+                <div className="bg-base-100 border border-base-300 rounded-lg shadow">
+                  <div className="p-4 border-b border-base-300 flex items-center justify-between">
+                    <div className="font-semibold">Hospitals / AHUs</div>
+                    <div className="text-xs opacity-70">{ahus.length} total AHUs</div>
+                  </div>
 
-                {/* Optional: make the list scroll within viewport on large screens */}
-                <div className="divide-y divide-base-300 lg:max-h-[calc(100vh-160px)] lg:overflow-y-auto">
-                  {grouped.map((group) => {
-                    const isHospitalOpen = !!openHospitals[group.hospitalKey];
+                  <div className="divide-y divide-base-300 lg:max-h-[calc(100vh-160px)] lg:overflow-y-auto">
+                    {grouped.map((group) => {
+                      const isHospitalOpen = !!openHospitals[group.hospitalKey];
 
-                    const hospitalOverdue = group.items.reduce(
-                      (acc, a) => acc + (a.overdue_count || 0),
-                      0
-                    );
-                    const hospitalDueSoon = group.items.reduce(
-                      (acc, a) => acc + (a.due_soon_count || 0),
-                      0
-                    );
+                      const hospitalOverdue = group.items.reduce(
+                        (acc, a) => acc + (a.overdue_count || 0),
+                        0
+                      );
+                      const hospitalDueSoon = group.items.reduce(
+                        (acc, a) => acc + (a.due_soon_count || 0),
+                        0
+                      );
 
-                    const hospitalOk = group.items.reduce((acc, a) => {
-                      const okCount =
-                        (a.filters_count ?? 0) - (a.overdue_count ?? 0) - (a.due_soon_count ?? 0);
-                      return acc + Math.max(0, okCount);
-                    }, 0);
+                      const hospitalOk = group.items.reduce((acc, a) => {
+                        const okCount =
+                          (a.filters_count ?? 0) -
+                          (a.overdue_count ?? 0) -
+                          (a.due_soon_count ?? 0);
+                        return acc + Math.max(0, okCount);
+                      }, 0);
 
-                    const hospitalFilter = group.items.reduce(
-                      (acc,a) => acc + (a.filters_count || 0), 0
-                    );
+                      const hospitalFilter = group.items.reduce(
+                        (acc, a) => acc + (a.filters_count || 0),
+                        0
+                      );
 
-
-
-
-                    return (
-                      <div key={group.hospitalKey} className="p-4">
-                        {/* Hospital header */}
-                        <button
-                          className="w-full text-left"
-                          onClick={() => toggleOpenHospital(group.hospitalKey)}
-                          type="button"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-3">
-                                <div className="font-bold text-lg truncate">
-                                  {group.hospitalName}
-                                </div>
-
-                                <div className="flex items-center gap-2">
-
-                                  {hospitalOk > 0 ? (
-                                    <span className="badge badge-sm badge-success">
-                                      {hospitalOk} OK
-                                    </span>
-                                  ) : (
-                                    <span className="badge badge-sm badge-ghost">0 OK</span>
-                                  )}
-
-                                  {hospitalOverdue > 0 ? (
-                                    <span className="badge badge-sm badge-error">
-                                      {hospitalOverdue} overdue
-                                    </span>
-                                  ) : (
-                                    <span className="badge badge-sm badge-ghost">0 overdue</span>
-                                  )}
-
-                                  {hospitalDueSoon > 0 ? (
-                                    <span className="badge badge-sm badge-warning">
-                                      {hospitalDueSoon} due soon
-                                    </span>
-                                  ) : (
-                                    <span className="badge badge-sm badge-ghost">0 due soon</span>
-                                  )}
-
-                                  <span className="badge badge-sm badge-ghost">
-                                    {group.items.length} AHUs
-                                  </span>
-                                  
-                                  <span className="badge badge-sm badge-ghost">
-                                    {hospitalFilter} filters
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="text-xs opacity-70 mt-1">
-                                Click to {isHospitalOpen ? "collapse" : "expand"} hospital
-                              </div>
-                            </div>
-
-                            <span className="btn btn-xs btn-outline shrink-0">
-                              {isHospitalOpen ? "Hide" : "View"}
-                            </span>
-                          </div>
-                        </button>
-
-                        {/* Dense AHU rows */}
-                        {isHospitalOpen && (
-                          <div className="mt-3">
-                            <div className="space-y-3">
-                              {group.buildings.map((b) => (
-                                <div key={b.buildingName} className="border border-base-300 rounded-md overflow-hidden">
-                                  <div className="p-2 bg-base-200 flex items-center justify-between">
-                                    <div className="font-medium truncate">{b.buildingName}</div>
-                                    <div className="text-xs opacity-70">{b.items.length} AHUs</div>
+                      return (
+                        <div key={group.hospitalKey} className="p-4">
+                          {/* Hospital header (level 1) */}
+                          <button
+                            className="w-full text-left"
+                            onClick={() => toggleOpenHospital(group.hospitalKey)}
+                            type="button"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-3">
+                                  <div className="font-bold text-lg truncate">
+                                    {group.hospitalName}
                                   </div>
-                                  {b.items.map((a) => {
-                                    const isSelected = String(expandedAhuId) === String(a.id);
 
-                                    return (
-                                      <div key={a.id}>
-                                        <button
-                                          type="button"
-                                          onClick={() => setExpandedAhuId(expandedAhuId === a.id ? null : a.id)}
-                                          className={[
-                                            "w-full text-left px-3 py-2",
-                                            "flex items-center justify-between gap-3",
-                                            "hover:bg-base-200/60",
-                                            "border-b border-base-300 last:border-b-0",
-                                            isSelected ? "bg-primary/10 ring-1 ring-primary/30" : "",
-                                          ].join(" ")}
-                                        >
-                                          <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                              <div className="font-semibold truncate">{labelFor(a.id)}</div>
+                                  <div className="flex items-center gap-2">
+                                    {hospitalOk > 0 ? (
+                                      <span className="badge badge-sm badge-success">
+                                        {hospitalOk} OK
+                                      </span>
+                                    ) : (
+                                      <span className="badge badge-sm badge-ghost">0 OK</span>
+                                    )}
 
-                                              {(() => {
-                                                const okCount =
-                                                  (a.filters_count ?? 0) - (a.overdue_count ?? 0) - (a.due_soon_count ?? 0);
+                                    {hospitalOverdue > 0 ? (
+                                      <span className="badge badge-sm badge-error">
+                                        {hospitalOverdue} overdue
+                                      </span>
+                                    ) : (
+                                      <span className="badge badge-sm badge-ghost">0 overdue</span>
+                                    )}
 
-                                                return okCount > 0 ? (
-                                                  <span className="badge badge-success badge-sm">
-                                                    {okCount} OK
-                                                  </span>
-                                                ) : null;
-                                              })()}
+                                    {hospitalDueSoon > 0 ? (
+                                      <span className="badge badge-sm badge-warning">
+                                        {hospitalDueSoon} due soon
+                                      </span>
+                                    ) : (
+                                      <span className="badge badge-sm badge-ghost">0 due soon</span>
+                                    )}
 
+                                    <span className="badge badge-sm badge-ghost">
+                                      {group.items.length} AHUs
+                                    </span>
 
-                                          {a.overdue_count > 0 ? (
-                                            <span className="badge badge-error badge-sm">
-                                              {a.overdue_count} overdue
-                                            </span>
-                                          ) : null}
+                                    <span className="badge badge-sm badge-ghost">
+                                      {hospitalFilter} filters
+                                    </span>
+                                  </div>
+                                </div>
 
-                                          {a.due_soon_count > 0 ? (
-                                            <span className="badge badge-warning badge-sm">
-                                              {a.due_soon_count} due soon
-                                            </span>
-                                          ) : null}
+                                <div className="text-xs opacity-70 mt-1">
+                                  Click to {isHospitalOpen ? "collapse" : "expand"} hospital
+                                </div>
+                              </div>
 
-                                          <span className="badge badge-ghost badge-sm">
-                                            {a.filters_count ?? 0} filters
-                                          </span>
-                                        </div>
+                              <span className="btn btn-xs btn-outline shrink-0">
+                                {isHospitalOpen ? "Hide" : "View"}
+                              </span>
+                            </div>
+                          </button>
 
-                                        <div className="text-xs opacity-70 truncate mt-0.5">
-                                          {a.location ? `${a.location} • ` : ""}
-                                          Last:{" "}
-                                          {a.last_serviced
-                                            ? new Date(a.last_serviced).toLocaleDateString()
-                                            : "Never"}
-                                          {" • "}
-                                          Next:{" "}
-                                          {a.next_due_date
-                                            ? new Date(a.next_due_date).toLocaleDateString()
-                                            : "—"}
+                          {/* Buildings (level 2) */}
+                          {isHospitalOpen && (
+                            <div className="mt-3 space-y-3">
+                              {group.buildings.map((b) => {
+                                const isBuildingOpen =
+                                  !!openBuildings[group.hospitalKey]?.[b.buildingName];
+
+                                return (
+                                  <div
+                                    key={`${group.hospitalKey}__${b.buildingName}`}
+                                    className="border border-base-300 rounded-md overflow-hidden"
+                                  >
+                                    {/* Building toggle: NOW CLICKABLE */}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleOpenBuilding(group.hospitalKey, b.buildingName)
+                                      }
+                                      className={[
+                                        "w-full text-left p-2",
+                                        "bg-base-200",
+                                        "flex items-center justify-between gap-3",
+                                        "hover:bg-base-200/80",
+                                      ].join(" ")}
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="font-medium truncate">{b.buildingName}</div>
+                                        <div className="text-xs opacity-70">
+                                          Click to {isBuildingOpen ? "collapse" : "expand"} building
                                         </div>
                                       </div>
 
-                                      <div className="shrink-0 text-xs opacity-70">
-                                        {isSelected ? "Selected" : "Open"}
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <div className="text-xs opacity-70">{b.items.length} AHUs</div>
+                                        <span className="btn btn-xs btn-outline">
+                                          {isBuildingOpen ? "Hide" : "View"}
+                                        </span>
                                       </div>
                                     </button>
 
-                                                {String(expandedAhuId) === String(a.id) && (
-                                                  <div className="mt-2 p-3 bg-base-100 border border-base-200 rounded">
-                                                    <AdminFilterEditorInline ahuId={a.id} isOpen={true} />
-                                                  </div>
-                                                )}
-                                              </div>
-                                            );
-                                          })}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                      </div>
-                    );
-                  })}
+                                    {/* AHUs inside building (level 3) */}
+                                    {isBuildingOpen && (
+                                      <div className="divide-y divide-base-300">
+                                        {b.items.map((a) => {
+                                          const isSelected =
+                                            String(expandedAhuId) === String(a.id);
 
-                  {ahus.length === 0 && (
-                    <div className="p-6 text-center opacity-70">No AHUs found.</div>
-                  )}
+                                          const okCount =
+                                            (a.filters_count ?? 0) -
+                                            (a.overdue_count ?? 0) -
+                                            (a.due_soon_count ?? 0);
+
+                                          return (
+                                            <div key={a.id} className="p-0">
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  setExpandedAhuId(
+                                                    expandedAhuId === a.id ? null : a.id
+                                                  )
+                                                }
+                                                className={[
+                                                  "w-full text-left px-3 py-2",
+                                                  "flex items-center justify-between gap-3",
+                                                  "hover:bg-base-200/60",
+                                                  isSelected
+                                                    ? "bg-primary/10 ring-1 ring-primary/30"
+                                                    : "",
+                                                ].join(" ")}
+                                              >
+                                                <div className="min-w-0">
+                                                  <div className="flex items-center gap-2 flex-wrap">
+                                                    <div className="font-semibold truncate">
+                                                      {labelFor(a.id)}
+                                                    </div>
+
+                                                    {okCount > 0 ? (
+                                                      <span className="badge badge-success badge-sm">
+                                                        {okCount} OK
+                                                      </span>
+                                                    ) : null}
+
+                                                    {a.overdue_count > 0 ? (
+                                                      <span className="badge badge-error badge-sm">
+                                                        {a.overdue_count} overdue
+                                                      </span>
+                                                    ) : null}
+
+                                                    {a.due_soon_count > 0 ? (
+                                                      <span className="badge badge-warning badge-sm">
+                                                        {a.due_soon_count} due soon
+                                                      </span>
+                                                    ) : null}
+
+                                                    <span className="badge badge-ghost badge-sm">
+                                                      {a.filters_count ?? 0} filters
+                                                    </span>
+                                                  </div>
+
+                                                  <div className="text-xs opacity-70 truncate mt-0.5">
+                                                    {a.location ? `${a.location} • ` : ""}
+                                                    Last:{" "}
+                                                    {a.last_serviced
+                                                      ? new Date(a.last_serviced).toLocaleDateString()
+                                                      : "Never"}
+                                                    {" • "}
+                                                    Next:{" "}
+                                                    {a.next_due_date
+                                                      ? new Date(a.next_due_date).toLocaleDateString()
+                                                      : "—"}
+                                                  </div>
+                                                </div>
+
+                                                <div className="shrink-0 text-xs opacity-70">
+                                                  {isSelected ? "Selected" : "Open"}
+                                                </div>
+                                              </button>
+
+                                              {/* Filters inline (level 4) */}
+                                              {String(expandedAhuId) === String(a.id) && (
+                                                <div className="p-3 bg-base-100 border-t border-base-200">
+                                                  <AdminFilterEditorInline ahuId={a.id} isOpen={true} />
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {ahus.length === 0 && (
+                      <div className="p-6 text-center opacity-70">No AHUs found.</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Right-side inspector removed — now inline dropdowns are used */}
-          </div>
-            </>
+          </>
         )}
-        <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} ahus={ahus} />
+
+        <SupervisorSignoff
+          open={showSignoff}
+          onClose={() => setShowSignoff(false)}
+          hospitals={hospitals}
+          ahus={ahus}
+        />
       </main>
     </div>
   );

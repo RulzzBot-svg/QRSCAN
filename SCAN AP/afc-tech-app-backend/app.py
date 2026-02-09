@@ -35,7 +35,8 @@ def create_app():
         "https://qrscan-lyart.vercel.app",
         "https://qrscan-8ql2.onrender.com",
         "http://localhost:5174",
-        "http://127.0.0.1:5174"
+        "http://127.0.0.1:5174",
+        "http://192.168.1.131:5173"
     ]}}, supports_credentials=True)
 
     db.init_app(app)
