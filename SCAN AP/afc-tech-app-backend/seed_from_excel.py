@@ -12,36 +12,38 @@ from db import db
 from models import Hospital, AHU, Filter, Building
 
 
-# Point this to your file (or build a loop later if you seed multiple hospitals)
 EXCEL_PATH = "./excel_data_raw/filter-datasheet.xlsm"
 
 
 # -----------------------------
 # Helpers
 # -----------------------------
-
-
-# -----------------------------
-# Helpers
-# -----------------------------
 def clean_str(x):
+    """Trim strings safely; treat NaN/None/empty as None."""
     if x is None:
         return None
+    try:
+        if pd.isna(x):
+            return None
+    except Exception:
+        pass
     s = str(x).strip()
-    return s if s else None
+    if not s:
+        return None
+    # normalize common NaN-ish strings
+    if s.strip().lower() in ("nan", "none", "null", "n/a", "na", "-", "empty"):
+        return None
+    return s
 
 
 def is_placeholder(s):
-    """Check if a string is a placeholder for missing data."""
     if not s:
         return True
     normalized = str(s).strip().lower()
-    placeholders = ["empty", "nan", "n/a", "na", "-", "none", "null"]
-    return normalized in placeholders
+    return normalized in ["empty", "nan", "n/a", "na", "-", "none", "null"]
 
 
 def to_date(val):
-    """Convert excel/pandas timestamp/string into a python date."""
     if val is None:
         return None
     try:
@@ -52,13 +54,10 @@ def to_date(val):
 
     if isinstance(val, pd.Timestamp):
         return val.date()
-
     if isinstance(val, datetime):
         return val.date()
-
     if isinstance(val, date):
         return val
-
     try:
         return pd.to_datetime(val).date()
     except Exception:
@@ -66,13 +65,8 @@ def to_date(val):
 
 
 def parse_quantity(val, default=1):
-    """
-    Convert excel cell values into an int quantity safely.
-    Handles None, NaN, floats, and strings like "10 ea".
-    """
     if val is None:
         return default
-
     try:
         if pd.isna(val):
             return default
@@ -100,11 +94,6 @@ def parse_quantity(val, default=1):
 
 
 def parse_frequency_to_days(raw):
-    """
-    Convert strings like:
-      "30 Days", "90 Days", "18 Months", "2 Years", "Removed"
-    into an integer day count. If unknown, return None.
-    """
     if raw is None:
         return None
 
@@ -121,7 +110,7 @@ def parse_frequency_to_days(raw):
 
     m = re.search(r"(\d+)\s*month", s, re.IGNORECASE)
     if m:
-        return int(m.group(1)) * 30  # approximation
+        return int(m.group(1)) * 30
 
     m = re.search(r"(\d+)\s*year", s, re.IGNORECASE)
     if m:
@@ -140,31 +129,20 @@ def has_attr(obj, attr: str) -> bool:
     return hasattr(obj, attr)
 
 
-def canonical_ahu_id(hospital_id: int, raw_ahu_no: str):
+def normalize_ahu_key(display_name: str, building: str = None) -> str:
     """
-    Canonicalize messy AHU numbers into a URL-safe, duplicate-proof ID.
-
-    Examples (hospital_id=23):
-      "#1" -> "H23-1"
-      "AHU 6" -> "H23-ahu-6"
-      "AH 004A" -> "H23-ah-004a"
-      "AH-11 Telephone Room" -> "H23-ah-11-telephone-room"
-      "04-33" -> "H23-04-33"
+    Logical grouping key so multiple filter rows map to the same AHU.
+    Include building so 'AHU-1' in different buildings won't collide.
     """
-    s = clean_str(raw_ahu_no) or ""
-    s = s.strip()
+    dn = clean_str(display_name) or ""
+    b = clean_str(building) or ""
+    raw = f"{b}::{dn}".strip().lower()
+    raw = re.sub(r"\s+", " ", raw).strip()
+    return raw or "unnamed"
 
-    if s.startswith("#"):
-        s = s[1:].strip()
 
-    s = re.sub(r"\s+", "-", s)                 # whitespace -> dash
-    s = re.sub(r"[^A-Za-z0-9\-]+", "-", s)     # keep only letters/numbers/dash
-    s = re.sub(r"-{2,}", "-", s).strip("-")    # collapse dashes
-
-    if not s:
-        return None
-
-    return f"H{hospital_id}-{s.lower()}"
+def make_sequential_ahu_id(seq: int) -> str:
+    return f"AHU-{seq:03d}"
 
 
 # -----------------------------
@@ -183,8 +161,21 @@ def upsert_hospital(name: str):
     return h
 
 
+def upsert_building(hospital_id: int, name: str, floor_area: str = None):
+    name = clean_str(name)
+    if not name:
+        return None
 
+    b = Building.query.filter_by(hospital_id=hospital_id, name=name).first()
+    if b:
+        if floor_area and has_attr(b, "floor_area") and not b.floor_area:
+            b.floor_area = floor_area
+        return b
 
+    b = Building(hospital_id=hospital_id, name=name, floor_area=floor_area, active=True)
+    db.session.add(b)
+    db.session.flush()
+    return b
 
 
 def upsert_ahu(
@@ -196,42 +187,33 @@ def upsert_ahu(
     excel_order=None,
     building_id=None
 ):
-    ahu_id = clean_str(ahu_id)
-    if not ahu_id:
+    # Accept either an integer AHU id or a logical label. When seeding
+    # we generally create AHU records directly and then map logical keys
+    # to the assigned integer id. This helper will try to fetch by id
+    # when possible; otherwise it will return None (seeding logic will
+    # create new AHU records explicitly).
+    if ahu_id is None:
+        return None
+    try:
+        aid = int(ahu_id)
+    except Exception:
         return None
 
-    a = db.session.get(AHU, ahu_id)
+    a = db.session.get(AHU, aid)
     if a:
         a.hospital_id = hospital_id
-        if building_id is not None and has_attr(a, 'building_id'):
+        if building_id is not None and has_attr(a, "building_id"):
             a.building_id = building_id
         if display_name:
             a.name = display_name
-        if location:
-            a.location = location
-        if notes:
-            a.notes = notes
+        a.location = clean_str(location) or a.location
+        a.notes = clean_str(notes) or a.notes
 
         if excel_order is not None and has_attr(a, "excel_order"):
             a.excel_order = int(excel_order)
-
         return a
 
-    kwargs = dict(
-        id=ahu_id,
-        hospital_id=hospital_id,
-        building_id=building_id,
-        name=display_name or ahu_id,  # show human-friendly name
-        location=location,
-        notes=notes,
-    )
-
-    if excel_order is not None and has_attr(AHU, "excel_order"):
-        kwargs["excel_order"] = int(excel_order)
-
-    a = AHU(**kwargs)
-    db.session.add(a)
-    return a
+    return None
 
 
 def find_existing_filter(ahu_id, phase, part_number, size):
@@ -243,20 +225,6 @@ def find_existing_filter(ahu_id, phase, part_number, size):
             size=size,
         ).first()
     )
-
-def upsert_building(hospital_id: int, name: str, floor_area: str = None):
-    name = clean_str(name)
-    if not name:
-        return None
-
-    b = Building.query.filter_by(hospital_id=hospital_id, name=name).first()
-    if b:
-        return b
-
-    b = Building(hospital_id=hospital_id, name=name, floor_area=floor_area, active=True)
-    db.session.add(b)
-    db.session.flush()
-    return b
 
 
 def upsert_filter(
@@ -270,15 +238,26 @@ def upsert_filter(
     is_active=True,
     excel_order=None,
 ):
-    ahu_id = clean_str(ahu_id)
+    # ahu_id may be an integer (preferred) or a label string; support both
+    if isinstance(ahu_id, str):
+        ahu_id_clean = clean_str(ahu_id)
+        if not ahu_id_clean:
+            return None
+        try:
+            ahu_id_val = int(ahu_id_clean)
+        except Exception:
+            # if it's not numeric, abort (we expect numeric AHU IDs now)
+            return None
+    else:
+        ahu_id_val = ahu_id
+
     phase = clean_str(phase)
     part_number = clean_str(part_number) or ""
     size = clean_str(size)
 
-    if not ahu_id or not size:
+    if not ahu_id_val or not size:
         return None
-
-    existing = find_existing_filter(ahu_id, phase, part_number, size)
+    existing = find_existing_filter(ahu_id_val, phase, part_number, size)
     if existing:
         try:
             existing.quantity = parse_quantity(quantity, default=getattr(existing, "quantity", 1) or 1)
@@ -305,7 +284,7 @@ def upsert_filter(
         frequency_days = 90
 
     kwargs = dict(
-        ahu_id=ahu_id,
+        ahu_id=ahu_id_val,
         phase=phase,
         part_number=part_number,
         size=size,
@@ -340,11 +319,10 @@ def seed_from_excel(path, selected_sheet=None):
     else:
         data_sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
         if not data_sheets:
-            raise RuntimeError("No data sheets found (expected something like 'MAIN BUILDING').")
+            raise RuntimeError("No data sheets found.")
         preferred_sheet = "MAIN BUILDING" if "MAIN BUILDING" in data_sheets else data_sheets[0]
 
-    hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or preferred_sheet.upper().replace('_', ' ')
-
+    hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or preferred_sheet.upper().replace("_", " ")
     hospital = upsert_hospital(hospital_name)
 
     stats = {
@@ -356,8 +334,9 @@ def seed_from_excel(path, selected_sheet=None):
         "filters_skipped": 0,
     }
 
-    ahu_order_map = {}
-    next_ahu_order = 1
+    # logical key -> sequential id
+    ahu_key_to_id = {}
+    next_seq = 1
 
     for sheet in data_sheets:
         df = pd.read_excel(path, sheet_name=sheet, header=4)
@@ -394,13 +373,14 @@ def seed_from_excel(path, selected_sheet=None):
 
         filter_order_map = {}
 
-        # Track last seen display name and whether the previous row contained an AHU
         last_display_name = None
         last_row_had_ahu = False
 
         for _, r in df.iterrows():
             raw_ahu_no = clean_str(r.get(col_ahu))
             location = clean_str(r.get(col_loc)) if col_loc else None
+            building = clean_str(r.get(col_building)) if col_building else None
+            floor_area = clean_str(r.get(col_floor_area)) if col_floor_area else None
 
             # Determine whether this row contains any filter-related data
             has_filter_data = False
@@ -411,71 +391,77 @@ def seed_from_excel(path, selected_sheet=None):
                         has_filter_data = True
                         break
 
-            # Decide display name for AHU when AHU cell is missing
+            # Decide display name
             if not is_placeholder(raw_ahu_no):
                 display_name = raw_ahu_no
                 last_display_name = display_name
                 last_row_had_ahu = True
             else:
                 if has_filter_data:
-                    # This row likely belongs to the previous AHU
                     if last_row_had_ahu and last_display_name:
                         display_name = last_display_name
                     else:
-                        # Start a new unnamed AHU; prefer location if available
-                        if location and not is_placeholder(location):
-                            display_name = f"Unnamed — {location}"
-                        else:
-                            display_name = f"Unnamed — {next_ahu_order}"
+                        display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
                         last_display_name = display_name
                         last_row_had_ahu = True
                 else:
-                    # pure separator row (no AHU, no filters)
                     display_name = None
                     last_display_name = None
                     last_row_had_ahu = False
 
             if display_name is None:
-                # no AHU on this row; skip to next
                 continue
 
-            ahu_id = canonical_ahu_id(hospital.id, display_name)
-            if not ahu_id:
-                continue
+            ahu_key = normalize_ahu_key(display_name, building=building)
 
-            if ahu_id not in ahu_order_map:
-                ahu_order_map[ahu_id] = next_ahu_order
-                next_ahu_order += 1
+            # ensure building exists before creating AHU so we can set building_id
+            building_obj = None
+            building_id = None
+            if building:
+                building_obj = upsert_building(hospital.id, building, floor_area=floor_area)
+                building_id = building_obj.id if building_obj else None
 
-            location = clean_str(r.get(col_loc))
-            building = clean_str(r.get(col_building)) if col_building else None
-            floor_area = clean_str(r.get(col_floor_area)) if col_floor_area else None
-
-            notes_parts = [f"Raw AHU: {raw_ahu_no}"]
+            if ahu_key not in ahu_key_to_id:
+                # create a new AHU row; DB will assign a numeric id
+                display_label = make_sequential_ahu_id(next_seq)
+                a = AHU(
+                    hospital_id=hospital.id,
+                    building_id=building_id,
+                    name=display_name or display_label,
+                    location=location,
+                    notes=None,
+                    excel_order=next_seq,
+                )
+                db.session.add(a)
+                db.session.flush()  # assign id
+                ahu_id = a.id
+                ahu_key_to_id[ahu_key] = ahu_id
+                excel_order = next_seq
+                next_seq += 1
+            else:
+                ahu_id = ahu_key_to_id[ahu_key]
+                # try to fetch existing excel_order if present
+                existing_ahu = db.session.get(AHU, ahu_id)
+                excel_order = getattr(existing_ahu, "excel_order", None) if existing_ahu else None
+            notes_parts = [
+                f"Excel AHU: {raw_ahu_no or '(blank)'}",
+                f"Excel Display: {display_name}",
+            ]
             if building:
                 notes_parts.append(f"Building: {building}")
             if floor_area:
                 notes_parts.append(f"Floor/Area: {floor_area}")
-            notes = " | ".join(notes_parts) if notes_parts else None
+            notes = " | ".join(notes_parts)
 
-            # ensure building exists and attach its id to the AHU
-            building_obj = None
-            building_id = None
-            if building:
-                building_obj = upsert_building(hospital.id, building)
-                building_id = building_obj.id if building_obj else None
-
-            upsert_ahu(
-                ahu_id=ahu_id,
-                hospital_id=hospital.id,
-                display_name=display_name,  # human label stays here (use location/unnamed if missing)
-                location=location,
-                notes=notes,
-                excel_order=ahu_order_map[ahu_id],
-                building_id=building_id,
-            )
+            # Ensure AHU object exists and update notes/excel_order if needed
+            ahu_obj = db.session.get(AHU, ahu_id)
+            if ahu_obj:
+                ahu_obj.notes = notes or ahu_obj.notes
+                if excel_order is not None and hasattr(ahu_obj, "excel_order"):
+                    ahu_obj.excel_order = int(excel_order)
             stats["ahus"].add(ahu_id)
 
+            # filters
             phase = clean_str(r.get(col_stage))
             size = clean_str(r.get(col_size))
             qty = r.get(col_qty)
@@ -517,16 +503,17 @@ def seed_from_excel(path, selected_sheet=None):
     db.session.commit()
 
     print("\n✅ Seed complete")
-    print(f"Hospital: {stats['hospital']}")
-    print(f"Hospital ID: {hospital.id}")
+    print(f"Hospital: {stats['hospital']} (ID {hospital.id})")
     print(f"Sheets processed: {stats['sheets_processed']}")
     print(f"Rows seen: {stats['rows_seen']}")
     print(f"AHUs upserted: {len(stats['ahus'])}")
     print(f"Filters upserted: {stats['filters_upserted']}")
     print(f"Filters skipped (missing size): {stats['filters_skipped']}")
-    print("\nExample AHU IDs (first 10):")
-    for i, x in enumerate(sorted(list(stats['ahus']))[:10], start=1):
-        print(f"  {i}. {x}")
+
+    ordered = sorted(list(stats["ahus"]))
+    print("\nExample AHU IDs (first 15):")
+    for i, x in enumerate(ordered[:15], start=1):
+        print(f"  {i}. AHU-{int(x):03d} (db id: {x})")
 
 
 if __name__ == "__main__":

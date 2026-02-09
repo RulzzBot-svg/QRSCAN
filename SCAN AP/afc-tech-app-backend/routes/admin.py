@@ -178,26 +178,30 @@ def create_ahu():
         if not hospital:
             return jsonify({"error": "Hospital not found"}), 404
 
-        # Find next sequence from existing AHU ids like "AHU-001"
-        max_seq = 0
-        existing_ids = db.session.query(AHU.id).all()
-        for (aid,) in existing_ids:
-            try:
-                if isinstance(aid, str) and aid.startswith("AHU-"):
-                    n = int(aid.split("-")[1])
-                    if n > max_seq:
-                        max_seq = n
-            except Exception:
-                continue
+        # Create AHU record and let the database assign a sequential integer ID
+        note_bits = []
+        if ahu_name_input:
+            note_bits.append(f"Manual label: {ahu_name_input}")
+        if notes:
+            note_bits.append(str(notes))
+        final_notes = " | ".join(note_bits) if note_bits else None
 
-        next_seq = max_seq + 1
-        ahu_id = f"AHU-{next_seq:03d}"
+        new_ahu = AHU(
+            hospital_id=hospital_id,
+            name=ahu_name_input or None,
+            location=location,
+            notes=final_notes,
+        )
+        db.session.add(new_ahu)
+        db.session.commit()  # commit to get autoincremented id
 
-        if AHU.query.get(ahu_id):
-            return jsonify({"error": f"AHU with ID {ahu_id} already exists"}), 409
-
-        # Name should be sequential label
-        ahu_name = ahu_id
+        # If no explicit name provided, set a human-friendly label using the new numeric id
+        if not new_ahu.name:
+            new_ahu.name = f"AHU-{new_ahu.id:03d}"
+        # Keep excel_order aligned with the numeric id for simple sequencing
+        if hasattr(new_ahu, "excel_order") and not new_ahu.excel_order:
+            new_ahu.excel_order = int(new_ahu.id)
+        db.session.commit()
 
         # Keep whatever user typed as context
         note_bits = []
@@ -207,16 +211,6 @@ def create_ahu():
             note_bits.append(str(notes))
         final_notes = " | ".join(note_bits) if note_bits else None
 
-        new_ahu = AHU(
-            id=ahu_id,
-            hospital_id=hospital_id,
-            name=ahu_name,
-            location=location,
-            notes=final_notes,
-            excel_order=next_seq
-        )
-        db.session.add(new_ahu)
-        db.session.commit()
 
         return jsonify({
             "id": new_ahu.id,

@@ -15,7 +15,18 @@ def create_job():
     try:
         data = request.json
 
-        ahu_id = data.get("ahu_id")
+        ahu_id_raw = data.get("ahu_id")
+        ahu_id = None
+        if ahu_id_raw is None:
+            return jsonify({"error": "Missing AHU ID"}), 400
+        # Accept numeric ID or legacy label
+        try:
+            ahu_id = int(ahu_id_raw)
+        except Exception:
+            ahu_obj = AHU.query.filter_by(name=str(ahu_id_raw)).first()
+            if not ahu_obj:
+                return jsonify({"error": "Invalid AHU ID"}), 400
+            ahu_id = ahu_obj.id
         tech_id = data.get("tech_id")
         overall_notes = data.get("overall_notes")
         gps_lat = data.get("gps_lat")

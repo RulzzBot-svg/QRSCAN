@@ -42,34 +42,34 @@ def seed_data():
         # -------------------------------------------------
         ahus = [
             # Cedars
-            AHU(id="AHU-127", hospital_id=hospitals[0].id, name="Surgery Wing AHU 127", location="2nd Floor Mech Room"),
-            AHU(id="AHU-210", hospital_id=hospitals[0].id, name="Main Lobby AHU 210", location="Lobby East"),
+            AHU(hospital_id=hospitals[0].id, name="Surgery Wing AHU 127", location="2nd Floor Mech Room"),
+            AHU(hospital_id=hospitals[0].id, name="Main Lobby AHU 210", location="Lobby East"),
 
             # St Francis
-            AHU(id="AHU-3A", hospital_id=hospitals[1].id, name="ICU Block AHU 3A", location="3rd Floor ICU"),
-            AHU(id="AHU-3B", hospital_id=hospitals[1].id, name="ER Intake AHU 3B", location="Emergency Dept"),
+            AHU(hospital_id=hospitals[1].id, name="ICU Block AHU 3A", location="3rd Floor ICU"),
+            AHU(hospital_id=hospitals[1].id, name="ER Intake AHU 3B", location="Emergency Dept"),
 
             # California Hospital
-            AHU(id="AHU-4B", hospital_id=hospitals[2].id, name="Radiology AHU 4B", location="Basement"),
-            AHU(id="AHU-5A", hospital_id=hospitals[2].id, name="Patient Tower AHU 5A", location="5th Floor"),
+            AHU(hospital_id=hospitals[2].id, name="Radiology AHU 4B", location="Basement"),
+            AHU(hospital_id=hospitals[2].id, name="Patient Tower AHU 5A", location="5th Floor"),
 
             # Queen of the Valley
-            AHU(id="AHU-QV-1", hospital_id=hospitals[3].id, name="OR Suite AHU 1", location="OR Wing"),
-            AHU(id="AHU-QV-2", hospital_id=hospitals[3].id, name="PACU AHU 2", location="Recovery"),
+            AHU(hospital_id=hospitals[3].id, name="OR Suite AHU 1", location="OR Wing"),
+            AHU(hospital_id=hospitals[3].id, name="PACU AHU 2", location="Recovery"),
 
             # Encino
-            AHU(id="AHU-EN-1", hospital_id=hospitals[4].id, name="Lobby AHU 1", location="Main Lobby"),
-            AHU(id="AHU-EN-2", hospital_id=hospitals[4].id, name="Med Surg AHU 2", location="2nd Floor"),
+            AHU(hospital_id=hospitals[4].id, name="Lobby AHU 1", location="Main Lobby"),
+            AHU(hospital_id=hospitals[4].id, name="Med Surg AHU 2", location="2nd Floor"),
 
             # Glendale
-            AHU(id="AHU-GA-1", hospital_id=hospitals[5].id, name="ICU AHU 1", location="ICU Wing"),
+            AHU(hospital_id=hospitals[5].id, name="ICU AHU 1", location="ICU Wing"),
 
             # Good Samaritan
-            AHU(id="AHU-GS-1", hospital_id=hospitals[6].id, name="Central Plant AHU 1", location="Roof"),
-            AHU(id="AHU-GS-2", hospital_id=hospitals[6].id, name="Admin Wing AHU 2", location="Admin"),
+            AHU(hospital_id=hospitals[6].id, name="Central Plant AHU 1", location="Roof"),
+            AHU(hospital_id=hospitals[6].id, name="Admin Wing AHU 2", location="Admin"),
 
             # White Memorial
-            AHU(id="AHU-WM-1", hospital_id=hospitals[7].id, name="NICU AHU 1", location="NICU"),
+            AHU(hospital_id=hospitals[7].id, name="NICU AHU 1", location="NICU"),
         ]
 
         db.session.add_all(ahus)

@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 
 const DB_NAME = "afc-tech";
-const DB_VERSION = 3; // <-- bump
+const DB_VERSION = 4; // <-- bumped to add legacy mapping
 
 export const dbPromise = openDB(DB_NAME, DB_VERSION, {
   upgrade(db, oldVersion) {
@@ -24,6 +24,11 @@ export const dbPromise = openDB(DB_NAME, DB_VERSION, {
     // NEW: index of which AHUs belong to a downloaded hospital (for deletion)
     if (!db.objectStoreNames.contains("hospitalAhuIndex")) {
       db.createObjectStore("hospitalAhuIndex", { keyPath: "hospital_id" });
+    }
+
+    // NEW: mapping of legacy AHU labels (e.g., 'AHU-001') to numeric AHU ids
+    if (!db.objectStoreNames.contains("ahuLegacyMap")) {
+      db.createObjectStore("ahuLegacyMap", { keyPath: "label" });
     }
   },
 });

@@ -25,7 +25,7 @@ class Hospital(db.Model):
 # -------------------------
 class AHU(db.Model):
     __tablename__ = "ahus"
-    id = Column(String(100), primary_key=True)  # QR CODE = ID
+    id = Column(Integer, primary_key=True)  # QR CODE = ID
     hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
     building_id = Column(Integer, ForeignKey("buildings.id"), nullable=True)
 
@@ -63,7 +63,7 @@ class Filter(db.Model):
     __tablename__ = "filters"
 
     id = Column(Integer, primary_key=True)
-    ahu_id = Column(String(100), ForeignKey("ahus.id"), nullable=False)
+    ahu_id = Column(Integer, ForeignKey("ahus.id"), nullable=False)
 
     phase = Column(String(50))
     part_number = Column(String(100))
@@ -105,7 +105,7 @@ class Job(db.Model):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True)
-    ahu_id = Column(String(100), ForeignKey("ahus.id"), nullable=False)
+    ahu_id = Column(Integer, ForeignKey("ahus.id"), nullable=False)
     tech_id = Column(Integer, ForeignKey("technicians.id"), nullable=False)
 
     completed_at = Column(DateTime, default=datetime.utcnow)

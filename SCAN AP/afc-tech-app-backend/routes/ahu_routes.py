@@ -98,14 +98,22 @@ def compute_ahu_status_from_filters(filters):
 @ahu_bp.route("/qr/<string:ahu_id>", methods=["GET"])
 def get_ahu_by_qr(ahu_id):
     try:
-        ahu = db.session.get(AHU, ahu_id)
-        if not ahu:
+        # Support both numeric IDs (new) and legacy labels like "AHU-001".
+        ahu_obj = None
+        try:
+            aid = int(ahu_id)
+            ahu_obj = db.session.get(AHU, aid)
+        except Exception:
+            # not numeric — try to find by canonical name
+            ahu_obj = AHU.query.filter_by(name=ahu_id).first()
+
+        if not ahu_obj:
             return jsonify({"error": "AHU not found"}), 404
 
         # Only ACTIVE filters should be returned/used for status
         active_filters = (
             db.session.query(Filter)
-            .filter(Filter.ahu_id == ahu_id, Filter.is_active.is_(True))
+            .filter(Filter.ahu_id == ahu_obj.id, Filter.is_active.is_(True))
             .order_by(Filter.excel_order.asc(), Filter.id.asc())
             .all()
         )
@@ -130,12 +138,12 @@ def get_ahu_by_qr(ahu_id):
         ahu_status = compute_ahu_status_from_filters(active_filters)
 
         payload = {
-            "ahu_id": ahu.id,
-            "hospital_id": ahu.hospital_id,
-            "hospital_name": ahu.hospital.name if ahu.hospital else None,
-            "name": ahu.name,
-            "location": ahu.location,
-            "notes": ahu.notes,
+            "ahu_id": ahu_obj.id,
+            "hospital_id": ahu_obj.hospital_id,
+            "hospital_name": ahu_obj.hospital.name if ahu_obj.hospital else None,
+            "name": ahu_obj.name,
+            "location": ahu_obj.location,
+            "notes": ahu_obj.notes,
             **ahu_status,
             "filters": filters_payload,
         }
@@ -158,7 +166,14 @@ def debug_ahu_ids():
 @ahu_bp.route("/admin/ahus/<string:ahu_id>/filters", methods=["GET"])
 def get_filters_for_admin(ahu_id):
     try:
-        ahu = db.session.get(AHU, ahu_id)
+        # Accept either numeric id or legacy label
+        ahu = None
+        try:
+            aid = int(ahu_id)
+            ahu = db.session.get(AHU, aid)
+        except Exception:
+            ahu = AHU.query.filter_by(name=ahu_id).first()
+
         if not ahu:
             return jsonify({"error": "AHU not found"}), 404
         
@@ -201,9 +216,18 @@ def add_filter(ahu_id):
     try:
         data = request.json or {}
 
+        # Resolve AHU id (support numeric and legacy label)
+        try:
+            aid = int(ahu_id)
+        except Exception:
+            ahu_obj = AHU.query.filter_by(name=ahu_id).first()
+            if not ahu_obj:
+                return jsonify({"error": "AHU not found"}), 404
+            aid = ahu_obj.id
+
         # defensive defaults (prevents KeyError 500)
         f = Filter(
-            ahu_id=ahu_id,
+            ahu_id=aid,
             phase=data.get("phase", ""),
             part_number=data.get("part_number", ""),
             size=data.get("size", ""),
