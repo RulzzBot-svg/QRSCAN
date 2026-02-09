@@ -163,48 +163,57 @@ def get_all_jobs():
 
 @admin_bp.route("/ahu", methods=["POST"])
 def create_ahu():
-    """Create a new AHU manually."""
+    """Create a new AHU manually with sequential AHU-### ids."""
     try:
         data = request.get_json()
         hospital_id = data.get("hospital_id")
-        ahu_name = data.get("ahu_name")
+        ahu_name_input = data.get("ahu_name")  # we'll store this in notes
         location = data.get("location")
         notes = data.get("notes")
 
-        if not hospital_id or not ahu_name:
-            return jsonify({"error": "Missing hospital_id or ahu_name"}), 400
+        if not hospital_id:
+            return jsonify({"error": "Missing hospital_id"}), 400
 
-        # Verify hospital exists
         hospital = Hospital.query.get(hospital_id)
         if not hospital:
             return jsonify({"error": "Hospital not found"}), 404
 
-        # Create canonical AHU ID
-        def canonical_ahu_id(h_id: int, raw_name: str):
-            s = str(raw_name).strip()
-            if s.startswith("#"):
-                s = s[1:].strip()
-            s = re.sub(r"\s+", "-", s)
-            s = re.sub(r"[^A-Za-z0-9\-]+", "-", s)
-            s = re.sub(r"-{2,}", "-", s).strip("-")
-            return f"H{h_id}-{s.lower()}" if s else None
+        # Find next sequence from existing AHU ids like "AHU-001"
+        max_seq = 0
+        existing_ids = db.session.query(AHU.id).all()
+        for (aid,) in existing_ids:
+            try:
+                if isinstance(aid, str) and aid.startswith("AHU-"):
+                    n = int(aid.split("-")[1])
+                    if n > max_seq:
+                        max_seq = n
+            except Exception:
+                continue
 
-        ahu_id = canonical_ahu_id(hospital_id, ahu_name)
-        if not ahu_id:
-            return jsonify({"error": "Invalid AHU name"}), 400
+        next_seq = max_seq + 1
+        ahu_id = f"AHU-{next_seq:03d}"
 
-        # Check if AHU already exists
-        existing = AHU.query.get(ahu_id)
-        if existing:
+        if AHU.query.get(ahu_id):
             return jsonify({"error": f"AHU with ID {ahu_id} already exists"}), 409
 
-        # Create new AHU
+        # Name should be sequential label
+        ahu_name = ahu_id
+
+        # Keep whatever user typed as context
+        note_bits = []
+        if ahu_name_input:
+            note_bits.append(f"Manual label: {ahu_name_input}")
+        if notes:
+            note_bits.append(str(notes))
+        final_notes = " | ".join(note_bits) if note_bits else None
+
         new_ahu = AHU(
             id=ahu_id,
             hospital_id=hospital_id,
             name=ahu_name,
             location=location,
-            notes=notes
+            notes=final_notes,
+            excel_order=next_seq
         )
         db.session.add(new_ahu)
         db.session.commit()
@@ -214,10 +223,10 @@ def create_ahu():
             "hospital_id": new_ahu.hospital_id,
             "name": new_ahu.name,
             "location": new_ahu.location,
-            "notes": new_ahu.notes
+            "notes": new_ahu.notes,
+            "excel_order": new_ahu.excel_order
         }), 201
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error creating AHU: {e}")
         return jsonify({"error": str(e)}), 500
