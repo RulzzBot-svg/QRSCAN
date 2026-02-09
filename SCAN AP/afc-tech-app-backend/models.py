@@ -25,9 +25,9 @@ class Hospital(db.Model):
 # -------------------------
 class AHU(db.Model):
     __tablename__ = "ahus"
-
     id = Column(String(100), primary_key=True)  # QR CODE = ID
     hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
+    building_id = Column(Integer, ForeignKey("buildings.id"), nullable=True)
 
     name = Column(String(150), nullable=False)
     location = Column(String(200))
@@ -35,8 +35,25 @@ class AHU(db.Model):
     excel_order = Column(Integer, nullable=True)
 
     hospital = relationship("Hospital", back_populates="ahus")
+    building = relationship("Building", back_populates="ahus")
     filters = relationship("Filter", back_populates="ahu", cascade="all, delete-orphan")
     jobs = relationship("Job", back_populates="ahu", cascade="all, delete-orphan")
+
+
+# -------------------------
+# BUILDING
+# -------------------------
+class Building(db.Model):
+    __tablename__ = "buildings"
+
+    id = Column(Integer, primary_key=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    floor_area = Column(String(200))
+    active = Column(Boolean, default=True)
+
+    hospital = relationship("Hospital")
+    ahus = relationship("AHU", back_populates="building", cascade="all, delete-orphan")
 
 
 # -------------------------

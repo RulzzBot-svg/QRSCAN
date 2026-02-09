@@ -9,7 +9,7 @@ import openpyxl
 
 from app import app
 from db import db
-from models import Hospital, AHU, Filter
+from models import Hospital, AHU, Filter, Building
 
 
 # Point this to your file (or build a loop later if you seed multiple hospitals)
@@ -183,13 +183,18 @@ def upsert_hospital(name: str):
     return h
 
 
+
+
+
+
 def upsert_ahu(
     ahu_id: str,
     hospital_id: int,
     display_name: str = None,
     location=None,
     notes=None,
-    excel_order=None
+    excel_order=None,
+    building_id=None
 ):
     ahu_id = clean_str(ahu_id)
     if not ahu_id:
@@ -198,6 +203,8 @@ def upsert_ahu(
     a = db.session.get(AHU, ahu_id)
     if a:
         a.hospital_id = hospital_id
+        if building_id is not None and has_attr(a, 'building_id'):
+            a.building_id = building_id
         if display_name:
             a.name = display_name
         if location:
@@ -213,6 +220,7 @@ def upsert_ahu(
     kwargs = dict(
         id=ahu_id,
         hospital_id=hospital_id,
+        building_id=building_id,
         name=display_name or ahu_id,  # show human-friendly name
         location=location,
         notes=notes,
@@ -235,6 +243,20 @@ def find_existing_filter(ahu_id, phase, part_number, size):
             size=size,
         ).first()
     )
+
+def upsert_building(hospital_id: int, name: str, floor_area: str = None):
+    name = clean_str(name)
+    if not name:
+        return None
+
+    b = Building.query.filter_by(hospital_id=hospital_id, name=name).first()
+    if b:
+        return b
+
+    b = Building(hospital_id=hospital_id, name=name, floor_area=floor_area, active=True)
+    db.session.add(b)
+    db.session.flush()
+    return b
 
 
 def upsert_filter(
@@ -436,6 +458,13 @@ def seed_from_excel(path, selected_sheet=None):
                 notes_parts.append(f"Floor/Area: {floor_area}")
             notes = " | ".join(notes_parts) if notes_parts else None
 
+            # ensure building exists and attach its id to the AHU
+            building_obj = None
+            building_id = None
+            if building:
+                building_obj = upsert_building(hospital.id, building)
+                building_id = building_obj.id if building_obj else None
+
             upsert_ahu(
                 ahu_id=ahu_id,
                 hospital_id=hospital.id,
@@ -443,6 +472,7 @@ def seed_from_excel(path, selected_sheet=None):
                 location=location,
                 notes=notes,
                 excel_order=ahu_order_map[ahu_id],
+                building_id=building_id,
             )
             stats["ahus"].add(ahu_id)
 

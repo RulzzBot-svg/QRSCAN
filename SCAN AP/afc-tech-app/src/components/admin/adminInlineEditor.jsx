@@ -62,10 +62,28 @@ const getRowStatus = (f) => {
   if (diffDays < 0) {
     return { key: "overdue", label: `Overdue (${Math.abs(diffDays)}d)` };
   }
-  if (diffDays <= 7) {
+  if (diffDays <= 14) {
     return { key: "dueSoon", label: `Due Soon (${diffDays}d)` };
   }
   return { key: "ok", label: `OK (${diffDays}d)` };
+};
+
+const getFrequencyColor = (freqDays) => {
+  if (!freqDays && freqDays !== 0) return null;
+  const m = Number(freqDays);
+  const map = {
+    30: "#FFFF99",
+    60: "#F2CEEF",
+    90: "#CCFFFF",
+    120: "#E5A065",
+    180: "#C5E0B3",
+    365: "#FBE4D5",
+    540: "#F3F0D9", // 18 months approx
+    730: "#49BFBC", // 2 years
+    1095: "#FFD965", // 3 years
+  };
+
+  return map[m] || null;
 };
 
 function AdminFilterEditorInline({ ahuId, isOpen }) {
@@ -253,9 +271,9 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 <th>Frequency</th>
                 <th>Last Serviced</th>
                 <th>Next Due</th>
+                <th>Status</th>
                 <th>Save</th>
                 <th>Actions</th>
-                <th>Status</th>
               </tr>
             </thead>
 
@@ -267,18 +285,25 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 const rowClass = f._inactive
                   ? "opacity-40 italic"
                   : st.key === "overdue"
-                  ? "bg-error/15 border-l-4 border-l-error"
-                  : st.key === "dueSoon"
-                  ? "bg-warning/10 border-l-4 border-l-warning"
-                  : f._isNew
-                  ? "bg-primary/5"
-                  : "";
+                    ? "bg-error/15 border-l-4 border-l-error"
+                    : st.key === "dueSoon"
+                      ? "bg-warning/10 border-l-4 border-l-warning"
+                      : f._isNew
+                        ? "bg-primary/5"
+                        : "";
+
+                const freqColor = getFrequencyColor(f.frequency_days);
+                const rowStyle = {};
+                // Only apply frequency color when not overdue/dueSoon or inactive
+                if (!f._inactive && st.key !== "overdue" && st.key !== "dueSoon" && freqColor) {
+                  rowStyle.backgroundColor = freqColor;
+                }
 
                 return (
-                  <tr key={f.id} className={rowClass}>
+                  <tr key={f.id} className={rowClass} style={rowStyle}>
                     <td>
                       <input
-                        className="input input-xs input-bordered"
+                        className="input input-xs input-bordered w-12"
                         value={f.phase}
                         onChange={(e) => updateFilter(f.id, "phase", e.target.value)}
                         disabled={f._inactive}
@@ -287,7 +312,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
                     <td>
                       <input
-                        className="input input-xs input-bordered"
+                        className="input input-xs input-bordered w-44"
                         value={f.part_number}
                         onChange={(e) => updateFilter(f.id, "part_number", e.target.value)}
                         disabled={f._inactive}
@@ -301,7 +326,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                             key={dim}
                             type="number"
                             placeholder={dim.toUpperCase()}
-                            className="input input-xs input-bordered w-14"
+                            className="input input-xs input-bordered w-12"
                             value={f.sizeParts?.[dim] || ""}
                             disabled={f._inactive}
                             onChange={(e) => updateFilter(f.id, `size.${dim}`, e.target.value)}
@@ -313,7 +338,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                     <td>
                       <input
                         type="number"
-                        className="input input-xs input-bordered w-16"
+                        className="input input-xs input-bordered w-12"
                         value={f.quantity}
                         disabled={f._inactive}
                         onChange={(e) => updateFilter(f.id, "quantity", e.target.value)}
@@ -343,6 +368,19 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
                     <td className="text-xs">{formatDate(nextDue)}</td>
 
+                    <td>
+                      {f._inactive ? (
+                        <span className="badge badge-ghost badge-md text-xs whitespace-nowrap">Inactive</span>
+                      ) : st.key === "overdue" ? (
+                        <span className="badge badge-error badge-md text-xs whitespace-nowrap">{st.label}</span>
+                      ) : st.key === "dueSoon" ? (
+                        <span className="badge badge-warning badge-md text-xs whitespace-nowrap">{st.label}</span>
+                      ) : st.key === "pending" ? (
+                        <span className="badge badge-ghost badge-md text-xs whitespace-nowrap">Pending</span>
+                      ) : (
+                        <span className="badge badge-success badge-md text-white text-xs whitespace-nowrap">{st.label}</span>
+                      )}
+                    </td>
                     <td>
                       <button
                         type="button"
@@ -389,19 +427,6 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                       )}
                     </td>
 
-                    <td>
-                      {f._inactive ? (
-                        <span className="badge badge-ghost badge-sm text-xs whitespace-nowrap">Inactive</span>
-                      ) : st.key === "overdue" ? (
-                        <span className="badge badge-error badge-md text-sx whitespace-nowrap">{st.label}</span>
-                      ) : st.key === "dueSoon" ? (
-                        <span className="badge badge-warning badge-md text-sx whitespace-nowrap">{st.label}</span>
-                      ) : st.key === "pending" ? (
-                        <span className="badge badge-ghost badge-md text-sx whitespace-nowrap">Pending</span>
-                      ) : (
-                        <span className="badge badge-success badge-md text-white text-xs whitespace-nowrap">{st.label}</span>
-                      )}
-                    </td>
                   </tr>
                 );
               })}
@@ -421,7 +446,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
               <span className="badge badge-error align-middle">Overdue</span>{" "}
               is any Next Due date before today.{" "}
               <span className="badge badge-warning align-middle">Due Soon</span>{" "}
-              is Next Due within 7 days.
+              is Next Due within 14 days.
             </div>
           </div>
         </div>

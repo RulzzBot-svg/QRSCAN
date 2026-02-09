@@ -296,7 +296,7 @@ def admin_get_all_ahus():
     try:
         ahus = (
             db.session.query(AHU)
-            .options(joinedload(AHU.hospital), selectinload(AHU.filters))
+                .options(joinedload(AHU.hospital), joinedload(AHU.building), selectinload(AHU.filters))
             .order_by(AHU.hospital_id.asc(), AHU.excel_order.asc(), AHU.id.asc())
             .all()
         )
@@ -342,6 +342,8 @@ def admin_get_all_ahus():
                 "days_overdue": status_data["days_overdue"],
 
                 "filters_count": len(active_filters),
+                "building_id": a.building_id,
+                "building": (a.building.name if a.building and getattr(a.building, 'name', None) else None),
             })
 
         return jsonify(payload), 200

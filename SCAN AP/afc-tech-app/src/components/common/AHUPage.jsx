@@ -34,6 +34,12 @@ function AHUPage() {
       (a.location || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const labelFor = (id) => {
+    if (!id) return "";
+    const idx = id.indexOf('-');
+    return idx >= 0 ? id.slice(idx + 1) : id;
+  };
+
   const formatDate = (iso) => {
     if (!iso) return "TBD";
     return new Date(iso).toLocaleDateString("en-US");
@@ -110,7 +116,7 @@ function AHUPage() {
                   <div className="flex justify-between items-start">
                     <div>
                         <h2 className="card-title text-lg text-primary">
-                          {ahu.id}
+                            {labelFor(ahu.id)}
                         </h2>
                         <p className="text-sm text-base-content/70">
                           📍 {ahu.location || "Unknown location"}
