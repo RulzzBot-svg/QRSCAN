@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {loginTech} from "../../api/tech"
 
@@ -9,6 +9,23 @@ export default function Login() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirectMessage, setRedirectMessage] = useState("");
+
+  useEffect(() => {
+    try {
+      const post = sessionStorage.getItem("post_login_path");
+      if (post) {
+        setRedirectMessage("Please sign in to view the scanned AHU.");
+      }
+    } catch (e) {}
+  }, []);
+
+  const dismissRedirectMessage = () => {
+    setRedirectMessage("");
+    try {
+      sessionStorage.removeItem("post_login_path");
+    } catch (e) {}
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +45,17 @@ export default function Login() {
       );
 
       // Navigate to technician app
-      navigate("/Home");
+      // If a post-login redirect was set (e.g., scanned QR), go there
+      const post = sessionStorage.getItem("post_login_path");
+      if (post) {
+        try {
+          sessionStorage.removeItem("post_login_path");
+        } catch {}
+        // full nav to support deep routes
+        window.location.assign(post);
+      } else {
+        navigate("/Home");
+      }
 
     } catch (err) {
       setError(
@@ -49,6 +76,13 @@ export default function Login() {
         <h1 className="text-2xl font-bold text-primary text-center mb-6">
           Technician Login
         </h1>
+
+        {redirectMessage && (
+          <div className="mb-4 rounded-lg bg-info/20 border border-info p-3 text-sm text-info flex justify-between items-center">
+            <div>{redirectMessage}</div>
+            <button className="btn btn-ghost btn-sm" onClick={dismissRedirectMessage}>Dismiss</button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
 

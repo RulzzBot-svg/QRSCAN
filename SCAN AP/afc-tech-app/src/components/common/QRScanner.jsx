@@ -64,13 +64,25 @@ export default function QRScanner() {
             await scanner.stop();
           } catch {}
 
-          try {
+            try {
             if (!ahuId) {
               setError("Invalid QR code");
               setStatus("Scan error");
               setScanned(false);
               return;
             }
+
+              // If not logged in, save intended path and send user to login
+              const tech = localStorage.getItem("tech");
+              if (!tech) {
+                const target = `/FilterInfo/${encodeURIComponent(ahuId)}`;
+                try {
+                  sessionStorage.setItem("post_login_path", target);
+                } catch {}
+                // navigate to login (full reload is fine)
+                window.location.assign(`/login`);
+                return;
+              }
 
             // ✅ OFFLINE: require the AHU to exist in cache
             if (!navigator.onLine) {
