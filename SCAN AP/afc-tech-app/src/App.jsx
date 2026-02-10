@@ -12,7 +12,8 @@ export default function App() {
   console.log("API BASE URL:", import.meta.env.VITE_API_BASE_URL);
 
   if (!tech) {
-    return navigate("/")
+    navigate("/");
+    return null;
   }
 
   return (
@@ -146,8 +147,10 @@ export default function App() {
           </div>
 
           <div className="flex justify-between text-xs text-base-content/60">
-            <span>Last sync</span>
-            <span className="font-semibold text-success">Online</span>
+            <span>Connection</span>
+            <span className={`font-semibold ${navigator.onLine ? 'text-success' : 'text-error'}`}>
+              {navigator.onLine ? 'Online' : 'Offline'}
+            </span>
           </div>
         </section>
       </main>

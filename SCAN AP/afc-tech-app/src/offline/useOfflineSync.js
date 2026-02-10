@@ -28,8 +28,16 @@ export function useOfflineSync(){
     useEffect(()=>{
         runSync();
 
-        const online = ()=>runSync();
-        window.addEventListener("online",ononline);
+        const online = () => runSync();
+        const offline = () => {
+            /* no-op for now, could update UI via shared state */
+        };
+        window.addEventListener("online", online);
+        window.addEventListener("offline", offline);
+        return () => {
+            window.removeEventListener("online", online);
+            window.removeEventListener("offline", offline);
+        };
     }, []);
     return{...status, runSync};
 }

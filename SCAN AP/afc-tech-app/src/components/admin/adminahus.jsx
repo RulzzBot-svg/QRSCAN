@@ -220,7 +220,6 @@ function AdminAHUs() {
                     <th>Hospital</th>
                     <th>Building</th>
                     <th>Location</th>
-                    <th>Group</th>
                     <th>Label</th>
                     <th>Overdue</th>
                     <th>Due Soon</th>
@@ -240,7 +239,6 @@ function AdminAHUs() {
                           <td className="truncate max-w-xs">{a.hospital}</td>
                           <td className="truncate max-w-xs">{a.building || '-'}</td>
                           <td className="truncate max-w-xs">{a.location || '-'}</td>
-                          <td className="truncate max-w-xs">{a.excel_block || a.group || a.display_name || '-'}</td>
                           <td>{a.name || (String(a.id).split('-').slice(1).join('-') || a.id)}</td>
                           <td>{a.overdue_count > 0 ? <span className="badge badge-error badge-sm">{a.overdue_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
                           <td>{a.due_soon_count > 0 ? <span className="badge badge-warning badge-sm">{a.due_soon_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>

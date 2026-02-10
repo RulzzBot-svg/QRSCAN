@@ -31,40 +31,67 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
+      if (!navigator.onLine) {
+        // Attempt offline login using stored offline cred
+        const stored = localStorage.getItem("offline_tech");
+        if (!stored) throw new Error("No offline credentials available");
+        const offline = JSON.parse(stored);
+        const pinHash = await digestPin(pin);
+        if (offline.username === username && offline.pinHash === pinHash) {
+          // restore tech session
+          localStorage.setItem("tech", JSON.stringify({ id: offline.id, name: offline.name }));
+          navigate("/Home");
+          return;
+        }
+        throw new Error("Offline login failed");
+      }
+
       const res = await loginTech(username, pin);
 
       // Save tech session
       localStorage.setItem(
         "tech",
-        JSON.stringify({
-          id: res.data.id,
-          name: res.data.name
-        })
+        JSON.stringify({ id: res.data.id, name: res.data.name })
       );
 
+      // Save offline credential (hashed PIN) so user can login when offline
+      try {
+        const pinHash = await digestPin(pin);
+        localStorage.setItem(
+          "offline_tech",
+          JSON.stringify({ username, pinHash, id: res.data.id, name: res.data.name })
+        );
+      } catch (e) {
+        console.warn("Failed to store offline credential:", e);
+      }
+
       // Navigate to technician app
-      // If a post-login redirect was set (e.g., scanned QR), go there
       const post = sessionStorage.getItem("post_login_path");
       if (post) {
         try {
           sessionStorage.removeItem("post_login_path");
         } catch {}
-        // full nav to support deep routes
         window.location.assign(post);
       } else {
         navigate("/Home");
       }
 
     } catch (err) {
-      setError(
-        err.response?.data?.error || "Login failed"
-      );
+      setError(err.response?.data?.error || err.message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
+
+  // helper: hash PIN using SHA-256 and return hex
+  async function digestPin(pin) {
+    const enc = new TextEncoder();
+    const data = enc.encode(pin);
+    const hash = await window.crypto.subtle.digest('SHA-256', data);
+    const arr = Array.from(new Uint8Array(hash));
+    return arr.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
 
   return (
     <div
