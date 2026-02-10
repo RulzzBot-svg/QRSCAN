@@ -373,44 +373,62 @@ def seed_from_excel(path, selected_sheet=None):
 
         filter_order_map = {}
 
-        last_display_name = None
-        last_row_had_ahu = False
+        # Build row blocks separated by fully-blank separator rows.
+        rows = [r for _, r in df.iterrows()]
+        blocks = []
+        current_block = []
 
-        for _, r in df.iterrows():
-            raw_ahu_no = clean_str(r.get(col_ahu))
-            location = clean_str(r.get(col_loc)) if col_loc else None
-            building = clean_str(r.get(col_building)) if col_building else None
-            floor_area = clean_str(r.get(col_floor_area)) if col_floor_area else None
-
-            # Determine whether this row contains any filter-related data
-            has_filter_data = False
-            for c in (col_stage, col_size, col_qty, col_part_num, col_filter_type, col_freq, col_repl):
+        def row_has_data(r):
+            # Check relevant columns for any non-placeholder data
+            for c in (col_ahu, col_stage, col_size, col_qty, col_part_num, col_filter_type, col_freq, col_repl, col_loc, col_building):
                 if c:
-                    val = clean_str(r.get(c))
-                    if val and not is_placeholder(val):
-                        has_filter_data = True
-                        break
+                    v = clean_str(r.get(c))
+                    if v and not is_placeholder(v):
+                        return True
+            return False
 
-            # Decide display name
-            if not is_placeholder(raw_ahu_no):
-                display_name = raw_ahu_no
-                last_display_name = display_name
-                last_row_had_ahu = True
+        for r in rows:
+            if row_has_data(r):
+                current_block.append(r)
             else:
-                if has_filter_data:
-                    if last_row_had_ahu and last_display_name:
-                        display_name = last_display_name
-                    else:
-                        display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
-                        last_display_name = display_name
-                        last_row_had_ahu = True
-                else:
-                    display_name = None
-                    last_display_name = None
-                    last_row_had_ahu = False
+                if current_block:
+                    blocks.append(current_block)
+                    current_block = []
 
+        if current_block:
+            blocks.append(current_block)
+
+        # Process each block as a single AHU (rows within a block belong to same AHU)
+        for block in blocks:
+            # pick display_name: prefer first explicit AHU NO. else use location or unnamed
+            display_name = None
+            building = None
+            floor_area = None
+            location = None
+
+            for r in block:
+                raw_ahu_no = clean_str(r.get(col_ahu))
+                if not is_placeholder(raw_ahu_no):
+                    display_name = raw_ahu_no
+                    break
+
+            # fallback: use first row's location/building if no AHU number provided
+            first = block[0]
             if display_name is None:
-                continue
+                location = clean_str(first.get(col_loc)) if col_loc else None
+                display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
+
+            # building/floor area from first row where present
+            for r in block:
+                b = clean_str(r.get(col_building)) if col_building else None
+                if b:
+                    building = b
+                    break
+            for r in block:
+                fa = clean_str(r.get(col_floor_area)) if col_floor_area else None
+                if fa:
+                    floor_area = fa
+                    break
 
             ahu_key = normalize_ahu_key(display_name, building=building)
 
@@ -422,7 +440,6 @@ def seed_from_excel(path, selected_sheet=None):
                 building_id = building_obj.id if building_obj else None
 
             if ahu_key not in ahu_key_to_id:
-                # create a new AHU row; DB will assign a numeric id
                 display_label = make_sequential_ahu_id(next_seq)
                 a = AHU(
                     hospital_id=hospital.id,
@@ -433,27 +450,23 @@ def seed_from_excel(path, selected_sheet=None):
                     excel_order=next_seq,
                 )
                 db.session.add(a)
-                db.session.flush()  # assign id
+                db.session.flush()
                 ahu_id = a.id
                 ahu_key_to_id[ahu_key] = ahu_id
                 excel_order = next_seq
                 next_seq += 1
             else:
                 ahu_id = ahu_key_to_id[ahu_key]
-                # try to fetch existing excel_order if present
                 existing_ahu = db.session.get(AHU, ahu_id)
                 excel_order = getattr(existing_ahu, "excel_order", None) if existing_ahu else None
-            notes_parts = [
-                f"Excel AHU: {raw_ahu_no or '(blank)'}",
-                f"Excel Display: {display_name}",
-            ]
+
+            notes_parts = [f"Excel AHU block", f"Excel Display: {display_name}"]
             if building:
                 notes_parts.append(f"Building: {building}")
             if floor_area:
                 notes_parts.append(f"Floor/Area: {floor_area}")
             notes = " | ".join(notes_parts)
 
-            # Ensure AHU object exists and update notes/excel_order if needed
             ahu_obj = db.session.get(AHU, ahu_id)
             if ahu_obj:
                 ahu_obj.notes = notes or ahu_obj.notes
@@ -461,44 +474,45 @@ def seed_from_excel(path, selected_sheet=None):
                     ahu_obj.excel_order = int(excel_order)
             stats["ahus"].add(ahu_id)
 
-            # filters
-            phase = clean_str(r.get(col_stage))
-            size = clean_str(r.get(col_size))
-            qty = r.get(col_qty)
-
-            freq_raw = r.get(col_freq)
-            freq_days = parse_frequency_to_days(freq_raw)
-
-            part_number = clean_str(r.get(col_part_num)) if col_part_num else None
-            if not part_number:
-                part_number = clean_str(r.get(col_filter_type)) if col_filter_type else None
-
-            last_service_date = to_date(r.get(col_repl)) if col_repl else None
-
-            is_active = True
-            if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
-                is_active = False
-
-            if not size:
-                stats["filters_skipped"] += 1
-                continue
-
+            # Now process filters rows inside this block
             filter_order_map.setdefault(ahu_id, 1)
-            filter_excel_order = filter_order_map[ahu_id]
-            filter_order_map[ahu_id] += 1
+            for r in block:
+                phase = clean_str(r.get(col_stage))
+                size = clean_str(r.get(col_size))
+                qty = r.get(col_qty)
 
-            upsert_filter(
-                ahu_id=ahu_id,
-                phase=phase,
-                part_number=part_number,
-                size=size,
-                quantity=qty,
-                frequency_days=freq_days,
-                last_service_date=last_service_date,
-                is_active=is_active,
-                excel_order=filter_excel_order,
-            )
-            stats["filters_upserted"] += 1
+                freq_raw = r.get(col_freq)
+                freq_days = parse_frequency_to_days(freq_raw)
+
+                part_number = clean_str(r.get(col_part_num)) if col_part_num else None
+                if not part_number:
+                    part_number = clean_str(r.get(col_filter_type)) if col_filter_type else None
+
+                last_service_date = to_date(r.get(col_repl)) if col_repl else None
+
+                is_active = True
+                if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
+                    is_active = False
+
+                if not size:
+                    stats["filters_skipped"] += 1
+                    continue
+
+                filter_excel_order = filter_order_map[ahu_id]
+                filter_order_map[ahu_id] += 1
+
+                upsert_filter(
+                    ahu_id=ahu_id,
+                    phase=phase,
+                    part_number=part_number,
+                    size=size,
+                    quantity=qty,
+                    frequency_days=freq_days,
+                    last_service_date=last_service_date,
+                    is_active=is_active,
+                    excel_order=filter_excel_order,
+                )
+                stats["filters_upserted"] += 1
 
     db.session.commit()
 
