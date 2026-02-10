@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getHospitals } from "../../api/hospitals";
-import { saveHospitalBundle } from "../../offline/offlineBundle";
+import { saveHospitalBundle, isHospitalDownloaded } from "../../offline/offlineBundle";
 import LogoutButton from "./logoutbutton";
 import { API } from "../../api/api";
 
@@ -9,7 +9,8 @@ async function downloadHospital(hospitalId) {
 
   const res = await API.get(`/hospitals/${hospitalId}/offline-bundle`);
   await saveHospitalBundle(res.data);
-  alert("Hospital donwload for offline use.");
+  alert("Hospital download for offline use.");
+  return true;
 }
 
 
@@ -29,6 +30,8 @@ function HospitalCards() {
 
   // Per-hospital computed counts: { [hospitalId]: { filters_count, overdue_count, due_soon_count, ok_count } }
   const [countsMap, setCountsMap] = useState({});
+  // map of hospitalId -> downloaded boolean
+  const [offlineMap, setOfflineMap] = useState({});
 
   // Search bar state
   const [search, setSearch] = useState("");
@@ -90,6 +93,19 @@ function HospitalCards() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, visible]);
 
+  // Check which hospitals are available offline in IndexedDB
+  useEffect(() => {
+    const ids = filtered.slice(0, visible).map((h) => h.id);
+    ids.forEach(async (hid) => {
+      try {
+        const downloaded = await isHospitalDownloaded(hid);
+        setOfflineMap((m) => ({ ...m, [hid]: !!downloaded }));
+      } catch (e) {
+        console.warn('isHospitalDownloaded failed', hid, e);
+      }
+    });
+  }, [filtered, visible]);
+
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200 p-4">
 
@@ -145,10 +161,13 @@ function HospitalCards() {
                   </div>
 
                   {/* Right: badge (no shrinking) */}
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col items-end gap-1">
                     <span className={`badge badge-sm ${hospital.active ? "badge-success" : "badge-ghost"}`}>
                       {hospital.active ? "Active" : "Inactive"}
                     </span>
+                    {offlineMap[hospital.id] && (
+                      <span className="badge badge-sm badge-info">Offline ready</span>
+                    )}
                   </div>
                 </div>
 
@@ -174,7 +193,19 @@ function HospitalCards() {
                 >
                   Load AHUs
                 </button>
-                <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); downloadHospital(hospital.id); }}>
+                <button
+                  className="btn btn-sm"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      const ok = await downloadHospital(hospital.id);
+                      if (ok) setOfflineMap((m) => ({ ...m, [hospital.id]: true }));
+                    } catch (err) {
+                      console.error('Download failed', err);
+                      alert('Failed to download hospital for offline');
+                    }
+                  }}
+                >
                   Download Hospital for offline
                 </button>
                 <button

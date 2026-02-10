@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAHUsForHospital } from "../../api/hospitals";
 import { API } from "../../api/api";
+import { dbPromise } from "../../offline/db";
 
 function AHUPage() {
   const { hospitalId } = useParams();
@@ -15,16 +16,27 @@ function AHUPage() {
   useEffect(() => {
     setLoading(true);
     // Use admin endpoint which includes filter counts and status per AHU
-    API.get("/admin/ahus")
-      .then((res) => {
+    (async () => {
+      try {
+        const res = await API.get("/admin/ahus");
         const list = Array.isArray(res.data) ? res.data : [];
         const filteredList = list.filter((a) => String(a.hospital_id) === String(hospitalId));
         setAhus(filteredList);
-      })
-      .catch((err) => {
-        console.error("Error loading AHUs via admin endpoint", err);
-      })
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.warn("Online admin endpoint failed, falling back to local cache", err);
+        try {
+          const db = await dbPromise;
+          const all = await db.getAll("ahuCache");
+          const localList = (all || []).filter((a) => String(a.hospital_id) === String(hospitalId));
+          setAhus(localList);
+        } catch (e) {
+          console.error("Failed to load AHUs from local cache", e);
+          setAhus([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [hospitalId]);
 
   // Filter by ID (coerce to string) or location
