@@ -27,17 +27,20 @@ function AHUPage() {
       .finally(() => setLoading(false));
   }, [hospitalId]);
 
-  // Filter by ID or location
-  const filtered = ahus.filter(
-    (a) =>
-      a.id.toLowerCase().includes(search.toLowerCase()) ||
-      (a.location || "").toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter by ID (coerce to string) or location
+  const filtered = ahus.filter((a) => {
+    const idStr = String(a.id || "");
+    const loc = String(a.location || "");
+    return idStr.toLowerCase().includes(search.toLowerCase()) || loc.toLowerCase().includes(search.toLowerCase());
+  });
 
-  const labelFor = (id) => {
-    if (!id) return "";
-    const idx = id.indexOf('-');
-    return idx >= 0 ? id.slice(idx + 1) : id;
+  // Prefer the human-friendly name when available; otherwise format id
+  const labelFor = (ahu) => {
+    if (!ahu) return "";
+    if (ahu.name) return ahu.name;
+    const idStr = String(ahu.id || "");
+    const idx = idStr.indexOf("-");
+    return idx >= 0 ? idStr.slice(idx + 1) : idStr;
   };
 
   const formatDate = (iso) => {
@@ -116,7 +119,7 @@ function AHUPage() {
                   <div className="flex justify-between items-start">
                     <div>
                         <h2 className="card-title text-lg text-primary">
-                            {labelFor(ahu.id)}
+                          {labelFor(ahu)}
                         </h2>
                         <p className="text-sm text-base-content/70">
                           📍 {ahu.location || "Unknown location"}
