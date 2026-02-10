@@ -1,5 +1,5 @@
 // AdminAHUs.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Fragment } from "react";
 import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
@@ -54,6 +54,8 @@ function AdminAHUs() {
   });
   const [newAhuLoading, setNewAhuLoading] = useState(false);
   const [showSignoff, setShowSignoff] = useState(false);
+  const [viewMode, setViewMode] = useState("spreadsheet"); // 'spreadsheet' | 'nested'
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -120,18 +122,18 @@ function AdminAHUs() {
     return groups;
   }, [ahus]);
 
-  // Expand all hospitals by default after first load (you set them to false originally; keeping your behavior)
+  // Expand all hospitals by default after first load
   useEffect(() => {
     if (loading) return;
 
     setOpenHospitals((prev) => {
       if (Object.keys(prev).length) return prev;
       const next = {};
-      for (const g of grouped) next[g.hospitalKey] = false; // default collapsed like your original
+      for (const g of grouped) next[g.hospitalKey] = false; // default collapsed
       return next;
     });
 
-    // Also initialize building open map so buildings start collapsed (or you can set true if you want open)
+    // Also initialize building open map so buildings start collapsed
     setOpenBuildings((prev) => {
       if (Object.keys(prev).length) return prev;
       const next = {};
@@ -204,9 +206,7 @@ function AdminAHUs() {
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold text-primary">AHU Maintenance Overview</h1>
-            <div className="text-sm opacity-70 mt-1">
-              Hospital → Building → AHU → Filters (accordion dropdowns).
-            </div>
+            <div className="text-sm opacity-70 mt-1">Hospital → Building → AHU → Filters (accordion dropdowns).</div>
           </div>
 
           {expandedAhuId && (
@@ -225,23 +225,15 @@ function AdminAHUs() {
             <span className="loading loading-spinner loading-lg"></span>
           </div>
         ) : (
-          <>
+          <div>
             {/* Add New AHU Form */}
             <div className="mb-4">
               {!showNewAhuForm ? (
                 <div className="flex gap-2">
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setShowNewAhuForm(true)}
-                    type="button"
-                  >
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowNewAhuForm(true)} type="button">
                     + Add New AHU
                   </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setShowSignoff(true)}
-                    type="button"
-                  >
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowSignoff(true)} type="button">
                     Supervisor Sign-off
                   </button>
                 </div>
@@ -254,9 +246,7 @@ function AdminAHUs() {
                       <select
                         className="select select-bordered w-full"
                         value={newAhuFormData.hospital_id}
-                        onChange={(e) =>
-                          setNewAhuFormData({ ...newAhuFormData, hospital_id: e.target.value })
-                        }
+                        onChange={(e) => setNewAhuFormData({ ...newAhuFormData, hospital_id: e.target.value })}
                       >
                         <option value="">Select a hospital</option>
                         {hospitals.map((h) => (
@@ -274,30 +264,15 @@ function AdminAHUs() {
                         className="input input-bordered w-full"
                         placeholder="e.g., AHU-1, Main Floor Unit"
                         value={newAhuFormData.ahu_name}
-                        onChange={(e) =>
-                          setNewAhuFormData({ ...newAhuFormData, ahu_name: e.target.value })
-                        }
+                        onChange={(e) => setNewAhuFormData({ ...newAhuFormData, ahu_name: e.target.value })}
                       />
                     </div>
 
                     <div className="flex gap-2">
-                      <button
-                        className="btn btn-primary btn-sm flex-1"
-                        onClick={handleCreateAhu}
-                        disabled={newAhuLoading}
-                        type="button"
-                      >
-                        {newAhuLoading ? (
-                          <span className="loading loading-spinner loading-xs"></span>
-                        ) : (
-                          "Create"
-                        )}
+                      <button className="btn btn-primary btn-sm flex-1" onClick={handleCreateAhu} disabled={newAhuLoading} type="button">
+                        {newAhuLoading ? <span className="loading loading-spinner loading-xs"></span> : "Create"}
                       </button>
-                      <button
-                        className="btn btn-outline btn-sm flex-1"
-                        onClick={() => setShowNewAhuForm(false)}
-                        type="button"
-                      >
+                      <button className="btn btn-outline btn-sm flex-1" onClick={() => setShowNewAhuForm(false)} type="button">
                         Cancel
                       </button>
                     </div>
@@ -310,252 +285,226 @@ function AdminAHUs() {
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="w-full lg:w-full min-w-0">
                 <div className="bg-base-100 border border-base-300 rounded-lg shadow">
-                  <div className="p-4 border-b border-base-300 flex items-center justify-between">
-                    <div className="font-semibold">Hospitals / AHUs</div>
-                    <div className="text-xs opacity-70">{ahus.length} total AHUs</div>
+                  <div className="p-4 border-b border-base-300 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold">AHUs</div>
+                      <div className="text-xs opacity-70">{ahus.length} total AHUs</div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="input-group">
+                        <input placeholder="Search hospital, building, location or label..." value={query} onChange={(e) => setQuery(e.target.value)} className="input input-sm input-bordered" />
+                      </div>
+
+                      <div className="btn-group">
+                        <button className={`btn btn-sm ${viewMode === "spreadsheet" ? "btn-primary" : "btn-outline"}`} onClick={() => setViewMode("spreadsheet")} type="button">
+                          Spreadsheet
+                        </button>
+                        <button className={`btn btn-sm ${viewMode === "nested" ? "btn-primary" : "btn-outline"}`} onClick={() => setViewMode("nested")} type="button">
+                          Nested
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="divide-y divide-base-300 lg:max-h-[calc(100vh-160px)] lg:overflow-y-auto">
-                    {grouped.map((group) => {
-                      const isHospitalOpen = !!openHospitals[group.hospitalKey];
+                  {/* Spreadsheet view */}
+                  {viewMode === "spreadsheet" ? (
+                    <div className="p-2 lg:max-h-[calc(100vh-180px)] lg:overflow-auto">
+                      <table className="table table-compact w-full">
+                        <thead>
+                          <tr>
+                            <th></th>
+                            <th>Hospital</th>
+                            <th>Building</th>
+                            <th>Location</th>
+                            <th>Label</th>
+                            <th>Overdue</th>
+                            <th>Due Soon</th>
+                            <th>Last</th>
+                            <th>Next</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ahus
+                            .filter((a) => {
+                              if (!query) return true;
+                              const q = query.toLowerCase();
+                              return (
+                                String(a.id || "").toLowerCase().includes(q) ||
+                                String(a.name || "").toLowerCase().includes(q) ||
+                                String(a.location || "").toLowerCase().includes(q) ||
+                                String(a.hospital || "").toLowerCase().includes(q)
+                              );
+                            })
+                            .map((a) => {
+                              const isSelected = String(expandedAhuId) === String(a.id);
+                              return (
+                                <Fragment key={`frag-${a.id}`}>
+                                  <tr key={`row-${a.id}`} className={isSelected ? "bg-primary/10" : ""}>
+                                    <td>
+                                      <button className="btn btn-ghost btn-xs" onClick={() => setExpandedAhuId(expandedAhuId === a.id ? null : a.id)} type="button">
+                                        {isSelected ? "-" : "+"}
+                                      </button>
+                                    </td>
+                                    <td className="truncate max-w-xs">{a.hospital}</td>
+                                    <td className="truncate max-w-xs">{a.building || "-"}</td>
+                                    <td className="truncate max-w-xs">{a.location || "-"}</td>
+                                    <td>{a.name || labelFor(a.id)}</td>
+                                    <td>{a.overdue_count > 0 ? <span className="badge badge-error badge-sm">{a.overdue_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
+                                    <td>{a.due_soon_count > 0 ? <span className="badge badge-warning badge-sm">{a.due_soon_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
+                                    <td className="text-xs">{a.last_serviced ? <span className="badge badge-sm badge-info">{new Date(a.last_serviced).toLocaleDateString()}</span> : <span className="text-muted">—</span>}</td>
+                                    <td className="text-xs">{a.next_due_date ? <span className="badge badge-sm badge-outline">{new Date(a.next_due_date).toLocaleDateString()}</span> : <span className="text-muted">—</span>}</td>
+                                    <td>
+                                      <div className="flex gap-2">
+                                        <button className="btn btn-xs btn-outline" onClick={() => window.open(`/FilterInfo/${a.id}`, "_blank")} type="button">
+                                          Open
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
 
-                      const hospitalOverdue = group.items.reduce(
-                        (acc, a) => acc + (a.overdue_count || 0),
-                        0
-                      );
-                      const hospitalDueSoon = group.items.reduce(
-                        (acc, a) => acc + (a.due_soon_count || 0),
-                        0
-                      );
-
-                      const hospitalOk = group.items.reduce((acc, a) => {
-                        const okCount =
-                          (a.filters_count ?? 0) -
-                          (a.overdue_count ?? 0) -
-                          (a.due_soon_count ?? 0);
-                        return acc + Math.max(0, okCount);
-                      }, 0);
-
-                      const hospitalFilter = group.items.reduce(
-                        (acc, a) => acc + (a.filters_count || 0),
-                        0
-                      );
-
-                      return (
-                        <div key={group.hospitalKey} className="p-4">
-                          {/* Hospital header (level 1) */}
-                          <button
-                            className="w-full text-left"
-                            onClick={() => toggleOpenHospital(group.hospitalKey)}
-                            type="button"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-3">
-                                  <div className="font-bold text-lg truncate">
-                                    {group.hospitalName}
-                                  </div>
-
-                                  <div className="flex items-center gap-2">
-                                    {hospitalOk > 0 ? (
-                                      <span className="badge badge-sm badge-success">
-                                        {hospitalOk} OK
-                                      </span>
-                                    ) : (
-                                      <span className="badge badge-sm badge-ghost">0 OK</span>
-                                    )}
-
-                                    {hospitalOverdue > 0 ? (
-                                      <span className="badge badge-sm badge-error">
-                                        {hospitalOverdue} overdue
-                                      </span>
-                                    ) : (
-                                      <span className="badge badge-sm badge-ghost">0 overdue</span>
-                                    )}
-
-                                    {hospitalDueSoon > 0 ? (
-                                      <span className="badge badge-sm badge-warning">
-                                        {hospitalDueSoon} due soon
-                                      </span>
-                                    ) : (
-                                      <span className="badge badge-sm badge-ghost">0 due soon</span>
-                                    )}
-
-                                    <span className="badge badge-sm badge-ghost">
-                                      {group.items.length} AHUs
-                                    </span>
-
-                                    <span className="badge badge-sm badge-ghost">
-                                      {hospitalFilter} filters
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="text-xs opacity-70 mt-1">
-                                  Click to {isHospitalOpen ? "collapse" : "expand"} hospital
-                                </div>
-                              </div>
-
-                              <span className="btn btn-xs btn-outline shrink-0">
-                                {isHospitalOpen ? "Hide" : "View"}
-                              </span>
-                            </div>
-                          </button>
-
-                          {/* Buildings (level 2) */}
-                          {isHospitalOpen && (
-                            <div className="mt-3 space-y-3">
-                              {group.buildings.map((b) => {
-                                const isBuildingOpen =
-                                  !!openBuildings[group.hospitalKey]?.[b.buildingName];
-
-                                return (
-                                  <div
-                                    key={`${group.hospitalKey}__${b.buildingName}`}
-                                    className="border border-base-300 rounded-md overflow-hidden"
-                                  >
-                                    {/* Building toggle: NOW CLICKABLE */}
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        toggleOpenBuilding(group.hospitalKey, b.buildingName)
-                                      }
-                                      className={[
-                                        "w-full text-left p-2",
-                                        "bg-base-200",
-                                        "flex items-center justify-between gap-3",
-                                        "hover:bg-base-200/80",
-                                      ].join(" ")}
-                                    >
-                                      <div className="min-w-0">
-                                        <div className="font-medium truncate">{b.buildingName}</div>
-                                        <div className="text-xs opacity-70">
-                                          Click to {isBuildingOpen ? "collapse" : "expand"} building
+                                  {isSelected && (
+                                    <tr key={`exp-${a.id}`} className="bg-base-100">
+                                      <td colSpan={10} className="p-0">
+                                        <div className="p-3 border-t">
+                                          <AdminFilterEditorInline ahuId={a.id} isOpen={true} />
                                         </div>
-                                      </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </Fragment>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-base-300 lg:max-h-[calc(100vh-160px)] lg:overflow-y-auto">
+                      {grouped.map((group) => {
+                        const isHospitalOpen = !!openHospitals[group.hospitalKey];
 
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <div className="text-xs opacity-70">{b.items.length} AHUs</div>
-                                        <span className="btn btn-xs btn-outline">
-                                          {isBuildingOpen ? "Hide" : "View"}
-                                        </span>
-                                      </div>
-                                    </button>
+                        const hospitalOverdue = group.items.reduce((acc, a) => acc + (a.overdue_count || 0), 0);
+                        const hospitalDueSoon = group.items.reduce((acc, a) => acc + (a.due_soon_count || 0), 0);
 
-                                    {/* AHUs inside building (level 3) */}
-                                    {isBuildingOpen && (
-                                      <div className="divide-y divide-base-300">
-                                        {b.items.map((a) => {
-                                          const isSelected =
-                                            String(expandedAhuId) === String(a.id);
+                        const hospitalOk = group.items.reduce((acc, a) => {
+                          const okCount = (a.filters_count ?? 0) - (a.overdue_count ?? 0) - (a.due_soon_count ?? 0);
+                          return acc + Math.max(0, okCount);
+                        }, 0);
 
-                                          const okCount =
-                                            (a.filters_count ?? 0) -
-                                            (a.overdue_count ?? 0) -
-                                            (a.due_soon_count ?? 0);
+                        return (
+                          <div key={group.hospitalKey} className="p-4">
+                            <button className="w-full text-left" onClick={() => toggleOpenHospital(group.hospitalKey)} type="button">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-3">
+                                    <div className="font-bold text-lg truncate">{group.hospitalName}</div>
 
+                                    <div className="flex items-center gap-2">
+                                      {hospitalOk > 0 ? <span className="badge badge-sm badge-success">{hospitalOk} OK</span> : <span className="badge badge-sm badge-ghost">0 OK</span>}
+                                      {hospitalOverdue > 0 ? <span className="badge badge-sm badge-error">{hospitalOverdue} overdue</span> : <span className="badge badge-sm badge-ghost">0 overdue</span>}
+                                      {hospitalDueSoon > 0 ? <span className="badge badge-sm badge-warning">{hospitalDueSoon} due soon</span> : <span className="badge badge-sm badge-ghost">0 due soon</span>}
+
+                                      <span className="badge badge-sm badge-ghost">{group.items.length} AHUs</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-xs opacity-70 mt-1">Click to {isHospitalOpen ? "collapse" : "expand"} hospital</div>
+                                </div>
+
+                                <span className="btn btn-xs btn-outline shrink-0">{isHospitalOpen ? "Hide" : "View"}</span>
+                              </div>
+                            </button>
+
+                            {isHospitalOpen && (
+                              <div className="mt-3">
+                                <div className="overflow-auto">
+                                  <table className="table table-compact w-full">
+                                    <thead>
+                                      <tr>
+                                        <th></th>
+                                        <th>ID</th>
+                                        <th>Label</th>
+                                        <th>Building</th>
+                                        <th>Location</th>
+                                        <th>Filters</th>
+                                        <th>Overdue</th>
+                                        <th>Due Soon</th>
+                                        <th>Last</th>
+                                        <th>Next</th>
+                                        <th>Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {group.items
+                                        .filter((a) => {
+                                          if (!query) return true;
+                                          const q = query.toLowerCase();
                                           return (
-                                            <div key={a.id} className="p-0">
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  setExpandedAhuId(
-                                                    expandedAhuId === a.id ? null : a.id
-                                                  )
-                                                }
-                                                className={[
-                                                  "w-full text-left px-3 py-2",
-                                                  "flex items-center justify-between gap-3",
-                                                  "hover:bg-base-200/60",
-                                                  isSelected
-                                                    ? "bg-primary/10 ring-1 ring-primary/30"
-                                                    : "",
-                                                ].join(" ")}
-                                              >
-                                                <div className="min-w-0">
-                                                  <div className="flex items-center gap-2 flex-wrap">
-                                                    <div className="font-semibold truncate">
-                                                      {labelFor(a.id)}
+                                            String(a.id || "").toLowerCase().includes(q) ||
+                                            String(a.name || "").toLowerCase().includes(q) ||
+                                            String(a.location || "").toLowerCase().includes(q)
+                                          );
+                                        })
+                                        .map((a) => {
+                                          const isSelected = String(expandedAhuId) === String(a.id);
+                                          return (
+                                            <Fragment key={`frag-h-${a.id}`}>
+                                              <tr key={`row-h-${a.id}`} className={isSelected ? "bg-primary/10" : ""}>
+                                                <td>
+                                                  <button className="btn btn-ghost btn-xs" onClick={() => setExpandedAhuId(expandedAhuId === a.id ? null : a.id)} type="button">
+                                                    {isSelected ? "-" : "+"}
+                                                  </button>
+                                                </td>
+                                                <td className="font-mono">{a.id}</td>
+                                                <td>{a.name || labelFor(a.id)}</td>
+                                                <td className="truncate max-w-xs">{a.building || "-"}</td>
+                                                <td className="truncate max-w-xs">{a.location || "-"}</td>
+                                                <td>{a.filters_count ?? 0}</td>
+                                                <td>{a.overdue_count > 0 ? <span className="badge badge-error badge-sm">{a.overdue_count} overdue</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
+                                                <td>{a.due_soon_count > 0 ? <span className="badge badge-warning badge-sm">{a.due_soon_count} due soon</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
+                                                <td className="text-xs">{a.last_serviced ? <span className="badge badge-sm badge-info">{new Date(a.last_serviced).toLocaleDateString()}</span> : <span className="text-muted">—</span>}</td>
+                                                <td className="text-xs">{a.next_due_date ? <span className="badge badge-sm badge-outline">{new Date(a.next_due_date).toLocaleDateString()}</span> : <span className="text-muted">—</span>}</td>
+                                                <td>
+                                                  <div className="flex gap-2">
+                                                    <button className="btn btn-xs btn-outline" onClick={() => window.open(`/ahu/${a.id}`, "_blank")} type="button">
+                                                      Open
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+
+                                              {isSelected && (
+                                                <tr key={`exp-h-${a.id}`} className="bg-base-100">
+                                                  <td colSpan={11} className="p-0">
+                                                    <div className="p-3 border-t">
+                                                      <AdminFilterEditorInline ahuId={a.id} isOpen={true} />
                                                     </div>
-
-                                                    {okCount > 0 ? (
-                                                      <span className="badge badge-success badge-sm">
-                                                        {okCount} OK
-                                                      </span>
-                                                    ) : null}
-
-                                                    {a.overdue_count > 0 ? (
-                                                      <span className="badge badge-error badge-sm">
-                                                        {a.overdue_count} overdue
-                                                      </span>
-                                                    ) : null}
-
-                                                    {a.due_soon_count > 0 ? (
-                                                      <span className="badge badge-warning badge-sm">
-                                                        {a.due_soon_count} due soon
-                                                      </span>
-                                                    ) : null}
-
-                                                    <span className="badge badge-ghost badge-sm">
-                                                      {a.filters_count ?? 0} filters
-                                                    </span>
-                                                  </div>
-
-                                                  <div className="text-xs opacity-70 truncate mt-0.5">
-                                                    {a.location ? `${a.location} • ` : ""}
-                                                    Last:{" "}
-                                                    {a.last_serviced
-                                                      ? new Date(a.last_serviced).toLocaleDateString()
-                                                      : "Never"}
-                                                    {" • "}
-                                                    Next:{" "}
-                                                    {a.next_due_date
-                                                      ? new Date(a.next_due_date).toLocaleDateString()
-                                                      : "—"}
-                                                  </div>
-                                                </div>
-
-                                                <div className="shrink-0 text-xs opacity-70">
-                                                  {isSelected ? "Selected" : "Open"}
-                                                </div>
-                                              </button>
-
-                                              {/* Filters inline (level 4) */}
-                                              {String(expandedAhuId) === String(a.id) && (
-                                                <div className="p-3 bg-base-100 border-t border-base-200">
-                                                  <AdminFilterEditorInline ahuId={a.id} isOpen={true} />
-                                                </div>
+                                                  </td>
+                                                </tr>
                                               )}
-                                            </div>
+                                            </Fragment>
                                           );
                                         })}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
 
-                    {ahus.length === 0 && (
-                      <div className="p-6 text-center opacity-70">No AHUs found.</div>
-                    )}
-                  </div>
+                      {ahus.length === 0 && <div className="p-6 text-center opacity-70">No AHUs found.</div>}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </>
-        )}
 
-        <SupervisorSignoff
-          open={showSignoff}
-          onClose={() => setShowSignoff(false)}
-          hospitals={hospitals}
-          ahus={ahus}
-        />
+            <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} ahus={ahus} />
+          </div>
+        )}
       </main>
     </div>
   );
