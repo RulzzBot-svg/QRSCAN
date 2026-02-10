@@ -67,6 +67,17 @@ function AdminSidebar() {
             <span className="is-drawer-close:hidden">Jobs</span>
           </NavLink>
         </li>
+
+        <li>
+          <NavLink
+            to="/admin/signoffs"
+            className={`${linkClass} is-drawer-close:tooltip is-drawer-close:tooltip-right`}
+            data-tip="Signed Off Forms"
+          >
+            📝
+            <span className="is-drawer-close:hidden">Signed Off</span>
+          </NavLink>
+        </li>
       </ul>
 
       {/* Footer */}

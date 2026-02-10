@@ -14,6 +14,7 @@ import AdminDashboard from "./components/admin/admin";
 import Hospitals from "./components/admin/hospitals";
 import AdminAHUs from "./components/admin/adminahus";
 import AdminJobs from "./components/admin/adminjobs";
+import AdminSignoffs from "./components/admin/AdminSignoffs";
 import AdminLayout from "./components/admin/AdminLayout";
 import Login from "./components/common/login";
 import JobSignature from "./components/common/jobSignatures";
@@ -45,6 +46,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="hospitals" element={<Hospitals />} />
           <Route path="ahus" element={<AdminAHUs />} />
           <Route path="jobs" element={<AdminJobs />} />
+          <Route path="signoffs" element={<AdminSignoffs />} />
         </Route>
 
         {import.meta.env.DEV ? (

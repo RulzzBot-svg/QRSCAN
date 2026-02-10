@@ -190,7 +190,7 @@ function AdminAHUs() {
         </aside>
 
         {/* Right: spreadsheet and toolbar */}
-        <section className="flex-1">
+        <section className="flex-1 min-w-[40rem]">
           <div className="bg-base-100 border border-base-300 rounded-lg">
             <div className="p-3 flex items-center justify-between gap-3 border-b">
               <div className="flex items-center gap-3">
@@ -214,7 +214,7 @@ function AdminAHUs() {
 
             {/* Table */}
             <div className="p-2 overflow-auto lg:max-h-[calc(100vh-200px)]">
-              <table className="table table-compact w-full">
+              <table className="table table-compact table-fixed w-full">
                 <thead>
                   <tr>
                     <th><input type="checkbox" checked={selectAll} onChange={toggleSelectAll} /></th>
