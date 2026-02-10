@@ -5,7 +5,7 @@ import { saveHospitalBundle } from "../../offline/offlineBundle";
 import LogoutButton from "./logoutbutton";
 import { API } from "../../api/api";
 
-async function downloadHospital (hospitalId){
+async function downloadHospital(hospitalId) {
 
   const res = await API.get(`/hospitals/${hospitalId}/offline-bundle`);
   await saveHospitalBundle(res.data);
@@ -126,59 +126,66 @@ function HospitalCards() {
         {filtered.slice(0, visible).map((hospital) => {
           const c = countsMap[hospital.id] || { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 };
           return (
-          <div
-            key={hospital.id}
-            onClick={() => navigate(`/AHU/${hospital.id}`)}
-            className="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:bg-base-100 transition-all cursor-pointer"
-          >
-            <div className="card-body p-5 ">
+            <div
+              key={hospital.id}
+              onClick={() => navigate(`/AHU/${hospital.id}`)}
+              className="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:bg-base-100 transition-all cursor-pointer"
+            >
+              <div className="card-body p-5 ">
 
-              <div className="flex items-start gap-3">
-                <div className="min-w-0">
-                  <h2 className="card-title text-lg text-primary truncate">{hospital.name}</h2>
-                  <p className="text-xs text-base-content/60 truncate">{hospital.city}</p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  {/* Left: title/city */}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-lg font-semibold text-primary whitespace-nowrap overflow-hidden text-ellipsis">
+                      {hospital.name}
+                    </div>
+                    <div className="text-xs text-base-content/60 whitespace-nowrap overflow-hidden text-ellipsis">
+                      {hospital.city}
+                    </div>
+                  </div>
+
+                  {/* Right: badge (no shrinking) */}
+                  <div className="shrink-0">
+                    <span className={`badge badge-sm ${hospital.active ? "badge-success" : "badge-ghost"}`}>
+                      {hospital.active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="ml-auto flex items-center gap-2">
-                  <span className={`badge badge-sm ${hospital.active ? "badge-success" : "badge-ghost"}`}>
-                    {hospital.active ? "Active" : "Inactive"}
-                  </span>
-                </div>
-              </div>
 
-              {/* AHU Count + Badges */}
-              <div className="flex items-center justify-start gap-4 mb-3 mt-2">
-                
+                {/* AHU Count + Badges */}
+                <div className="flex flex-wrap items-center gap-4 mb-3 mt-2">
+
                   {/* Blue badge for OK count as requested, preserve error/warning colours */}
-                  {c.ahu_count > 0 ? <span className="badge badge-ghost">{c.ahu_count} AHUs </span> : null}
+                  {c.ahu_count > 0 ? <span className="text-xs badge badge-ghost">{c.ahu_count} AHUs </span> : null}
                   {c.ahus_ok > 0 ? <span className="badge badge-info">{c.ahus_ok} OK</span> : null}
                   {c.ahus_overdue > 0 ? <span className="badge badge-error">{c.ahus_overdue} overdue</span> : null}
                   {c.ahus_due_soon > 0 ? <span className="badge badge-warning">{c.ahus_due_soon} due soon</span> : null}
-                
+
+                </div>
+
+                {/* Divider */}
+                <div className="divider my-1"></div>
+
+                {/* Buttons */}
+                <button
+                  className="btn btn-primary btn-sm w-full mb-2 "
+                  onClick={(e) => {e.stopPropagation(); navigate(`/AHU/${hospital.id}`)}}
+                >
+                  Load AHUs
+                </button>
+                <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); downloadHospital(hospital.id); }}>
+                  Download Hospital for offline
+                </button>
+                <button
+                  className="btn btn-success btn-sm w-full mt-2"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/tech/signoff?h=${hospital.id}`); }}
+                >
+                  Tech Sign-off
+                </button>
+
               </div>
-
-              {/* Divider */}
-              <div className="divider my-1"></div>
-
-              {/* Buttons */}
-              <button
-                className="btn btn-primary btn-sm w-full mb-2 "
-                onClick={() => navigate(`/AHU/${hospital.id}`)}
-              >
-                Load AHUs
-              </button>
-              <button className="btn btn-sm" onClick={()=>downloadHospital(hospital.id)}>
-                Download Hospital for offline
-              </button>
-              <button
-                className="btn btn-success btn-sm w-full mt-2"
-                onClick={(e) => { e.stopPropagation(); navigate(`/tech/signoff?h=${hospital.id}`); }}
-              >
-                Tech Sign-off
-              </button>
-              
             </div>
-          </div>
           )
         })}
       </div>
