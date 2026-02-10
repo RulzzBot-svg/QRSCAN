@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getHospitals } from "../../api/hospitals";
 import { saveHospitalBundle, isHospitalDownloaded } from "../../offline/offlineBundle";
+import { dbPromise } from "../../offline/db";
+import { parseIsoToDate } from "../../utils/dates";
 import LogoutButton from "./logoutbutton";
 import { API } from "../../api/api";
 
@@ -41,7 +43,7 @@ function HospitalCards() {
     h.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Load counts for hospitals in view (avoids firing for all at once)
+  // Load counts for hospitals in view from local IndexedDB only (avoid network prefetch)
   useEffect(() => {
     const idsToLoad = filtered.slice(0, visible).map((h) => h.id).filter((id) => !(id in countsMap));
     if (idsToLoad.length === 0) return;
@@ -50,26 +52,35 @@ function HospitalCards() {
 
     idsToLoad.forEach(async (hospitalId) => {
       try {
-        const res = await API.get(`/hospitals/${hospitalId}/offline-bundle`);
-        const payload = res.data;
+        // If hospital bundle is downloaded, compute counts from local DB
+        const downloaded = await isHospitalDownloaded(hospitalId);
+        if (!downloaded) {
+          // Avoid fetching remote bundle here to prevent many concurrent requests.
+          setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 } }));
+          return;
+        }
 
-        // Compute AHU-level counts (Air Handlers): how many AHUs are overdue / due soon / ok
+        const db = await dbPromise;
+        const idx = await db.get('hospitalAhuIndex', hospitalId);
+        const ahuIds = idx?.ahu_ids || [];
+
         let ahu_count = 0;
         let ahus_overdue = 0;
         let ahus_due_soon = 0;
         let ahus_ok = 0;
 
-        for (const a of (payload.ahus || [])) {
+        for (const aid of ahuIds) {
+          const a = await db.get('ahuCache', aid);
+          if (!a) continue;
           ahu_count += 1;
 
-          // determine AHU status from its filters
           let has_overdue = false;
           let has_due_soon = false;
           let has_filters = false;
 
           for (const f of (a.filters || [])) {
             has_filters = true;
-            const last = f.last_service_date ? new Date(f.last_service_date) : null;
+            const last = f.last_service_date ? parseIsoToDate(f.last_service_date) : null;
             const freq = f.frequency_days || null;
             if (last && freq) {
               const nextDue = new Date(last.getTime() + freq * 24 * 60 * 60 * 1000);
@@ -86,12 +97,12 @@ function HospitalCards() {
 
         setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count, ahus_overdue, ahus_due_soon, ahus_ok } }));
       } catch (err) {
-        console.error('Failed to load hospital bundle', hospitalId, err);
+        console.error('Failed to compute local hospital counts', hospitalId, err);
         setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 } }));
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, visible]);
+  }, [filtered, visible, offlineMap]);
 
   // Check which hospitals are available offline in IndexedDB
   useEffect(() => {
