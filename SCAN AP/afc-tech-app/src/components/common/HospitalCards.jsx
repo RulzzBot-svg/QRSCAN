@@ -123,7 +123,9 @@ function HospitalCards() {
 
       {/* Grid of Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {filtered.slice(0, visible).map((hospital) => (
+        {filtered.slice(0, visible).map((hospital) => {
+          const c = countsMap[hospital.id] || { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 };
+          return (
           <div
             key={hospital.id}
             onClick={() => navigate(`/AHU/${hospital.id}`)}
@@ -141,29 +143,18 @@ function HospitalCards() {
                   <span className={`badge badge-sm ${hospital.active ? "badge-success" : "badge-ghost"}`}>
                     {hospital.active ? "Active" : "Inactive"}
                   </span>
-
-                  {(() => {
-                    const c = countsMap[hospital.id] || { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 };
-                    return (
-                      <>
-                        {c.ahus_ok > 0 ? <span className="badge badge-sm badge-success">{c.ahus_ok} OK</span> : null}
-                        {c.ahus_overdue > 0 ? <span className="badge badge-sm badge-error">{c.ahus_overdue} overdue</span> : null}
-                        {c.ahus_due_soon > 0 ? <span className="badge badge-sm badge-warning">{c.ahus_due_soon} due soon</span> : null}
-                        <span className="badge badge-sm badge-ghost">{c.ahu_count} Air Handlers</span>
-                      </>
-                    );
-                  })()}
                 </div>
               </div>
 
-              {/* STAT COMPONENT */}
-              <div className="stats shadow w-full mb-3 mt-1">
-                <div className="stat">
-                  <div className="stat-title text-xs">AHUs</div>
-                  <div className="stat-value text-primary text-xl">
-                    {hospital.ahu_count}
-                  </div>
-                </div>
+              {/* AHU Count + Badges */}
+              <div className="flex items-center justify-start gap-4 mb-3 mt-2">
+                
+                  {/* Blue badge for OK count as requested, preserve error/warning colours */}
+                  {c.ahu_count > 0 ? <span className="badge badge-ghost">{c.ahu_count} AHUs </span> : null}
+                  {c.ahus_ok > 0 ? <span className="badge badge-info">{c.ahus_ok} OK</span> : null}
+                  {c.ahus_overdue > 0 ? <span className="badge badge-error">{c.ahus_overdue} overdue</span> : null}
+                  {c.ahus_due_soon > 0 ? <span className="badge badge-warning">{c.ahus_due_soon} due soon</span> : null}
+                
               </div>
 
               {/* Divider */}
@@ -188,7 +179,8 @@ function HospitalCards() {
               
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Show More Button */}
