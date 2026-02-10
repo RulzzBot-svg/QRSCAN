@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, Fragment } from "react";
 import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
+import { formatDate, formatDateTime } from "../../utils/dates";
 
 const naturalAhuSort = (a, b) => {
   const A = String(a ?? "");
@@ -242,8 +243,8 @@ function AdminAHUs() {
                           <td>{a.name || (String(a.id).split('-').slice(1).join('-') || a.id)}</td>
                           <td>{a.overdue_count > 0 ? <span className="badge badge-error badge-sm">{a.overdue_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
                           <td>{a.due_soon_count > 0 ? <span className="badge badge-warning badge-sm">{a.due_soon_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
-                          <td className="text-xs">{a.last_serviced ? <span className="badge badge-sm badge-info">{new Date(a.last_serviced).toLocaleDateString()}</span> : <span className="text-muted">—</span>}</td>
-                          <td className="text-xs">{a.next_due_date ? <span className="badge badge-sm badge-outline">{new Date(a.next_due_date).toLocaleDateString()}</span> : <span className="text-muted">—</span>}</td>
+                          <td className="text-xs">{a.last_serviced ? <span className="badge badge-sm badge-info">{formatDate(a.last_serviced)}</span> : <span className="text-muted">—</span>}</td>
+                          <td className="text-xs">{a.next_due_date ? <span className="badge badge-sm badge-outline">{formatDate(a.next_due_date)}</span> : <span className="text-muted">—</span>}</td>
                           <td>
                             <div className="flex gap-2">
                               <button className="btn btn-xs" onClick={() => setExpandedAhuId(isOpen ? null : a.id)}>{isOpen ? 'Close' : 'View'}</button>

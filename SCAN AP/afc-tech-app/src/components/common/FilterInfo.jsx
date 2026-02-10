@@ -6,6 +6,7 @@ import { submitJob } from "../../api/jobs";
 
 import { queueJob } from "../../offline/jobQueue";
 import { cacheAHU, getCachedAHU } from "../../offline/ahuCache";
+import { parseIsoToDate, formatDate } from "../../utils/dates";
 
 function FilterInfo() {
   const navigate = useNavigate();
@@ -244,13 +245,15 @@ function FilterInfo() {
                     Last Serviced Date
                   </p>
                   {filterRows.some((f) => f.last_service_date)
-                    ? new Date(
-                        Math.max(
-                          ...filterRows
-                            .filter((f) => f.last_service_date)
-                            .map((f) => new Date(f.last_service_date))
+                    ? formatDate(
+                        new Date(
+                          Math.max(
+                            ...filterRows
+                              .filter((f) => f.last_service_date)
+                              .map((f) => parseIsoToDate(f.last_service_date).getTime())
+                          )
                         )
-                      ).toLocaleDateString()
+                      )
                     : "Never"}
                 </div>
 
@@ -311,7 +314,7 @@ function FilterInfo() {
                   <td className="px-4 py-3">
                     <span className="badge badge-success">
                       {row.last_service_date
-                        ? new Date(row.last_service_date).toLocaleDateString()
+                        ? formatDate(row.last_service_date)
                         : "Never"}
                     </span>
                   </td>

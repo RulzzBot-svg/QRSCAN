@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getAHUsForHospital } from "../../api/hospitals";
 import { API } from "../../api/api";
 import { dbPromise } from "../../offline/db";
+import { formatDate } from "../../utils/dates";
 
 function AHUPage() {
   const { hospitalId } = useParams();
@@ -55,9 +56,9 @@ function AHUPage() {
     return idx >= 0 ? idStr.slice(idx + 1) : idStr;
   };
 
-  const formatDate = (iso) => {
+  const formatDateLocal = (iso) => {
     if (!iso) return "TBD";
-    return new Date(iso).toLocaleDateString("en-US");
+    return formatDate(iso, 'en-US');
   };
 
   const statusBadge = (status) => {

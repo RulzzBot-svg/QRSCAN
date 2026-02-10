@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminSidebar from "./AdminSidebar";
 import { API } from "../../api/api";
+import { formatDateTime } from "../../utils/dates";
 
 
 function AdminJobs() {
@@ -40,7 +41,7 @@ function AdminJobs() {
                   <td>{j.id}</td>
                   <td className="font-medium">{j.ahu_id}</td>
                   <td>{j.technician}</td>
-                  <td>{new Date(j.completed_at).toLocaleString()}</td>
+                  <td>{formatDateTime(j.completed_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -60,7 +61,7 @@ function AdminJobs() {
                 <div><strong>Technician:</strong> {selectedJob.technician}</div>
                 <div>
                   <strong>Completed:</strong>{" "}
-                  {new Date(selectedJob.completed_at).toLocaleString()}
+                  {formatDateTime(selectedJob.completed_at)}
                 </div>
               </div>
 
@@ -72,30 +73,16 @@ function AdminJobs() {
                 {selectedJob.filters.map((f, idx) => (
                   <div
                     key={idx}
-                    className={`p-3 rounded border ${
-                      f.is_completed
-                        ? "border-success bg-success/5"
-                        : f.note && f.note.toLowerCase().includes("inspected")
-                        ? "border-info bg-info/5"
-                        : "border-base-300"
-                    }`}
+                    className={`p-3 rounded border ${f.is_completed ? "border-success bg-success/5" : "border-info bg-info/5"}`}
                   >
                     <div className="font-medium">
                       {f.phase} — {f.part_number} ({f.size})
                     </div>
 
                     <div className="text-sm mt-1">
-                      Status:{" "}
-                      <span
-                        className={`badge badge-sm ${
-                          f.is_completed
-                            ? "badge-success"
-                            : f.note && f.note.toLowerCase().includes("inspected")
-                            ? "badge-info"
-                            : "badge-ghost"
-                        }`}
-                      >
-                        {f.is_completed ? "Replaced" : f.note && f.note.toLowerCase().includes("inspected") ? "Inspected" : "Not Done"}
+                      Status: {" "}
+                      <span className={`badge badge-sm ${f.is_completed ? "badge-success" : "badge-info"}`}>
+                        {f.is_completed ? "Replaced" : "Inspected"}
                       </span>
                     </div>
 
