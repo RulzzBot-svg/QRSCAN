@@ -1,9 +1,8 @@
 // Redesigned Admin AHU UI: two-pane layout
-import { useEffect, useMemo, useState, Fragment } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
-import { formatDate, formatDateTime } from "../../utils/dates";
 
 const naturalAhuSort = (a, b) => {
   const A = String(a ?? "");
@@ -31,10 +30,7 @@ function AdminAHUs() {
 
   // UI state
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState("spreadsheet");
-  const [expandedAhuId, setExpandedAhuId] = useState(null);
   const [selected, setSelected] = useState({}); // { [ahuId]: true }
-  const [selectAll, setSelectAll] = useState(false);
   const [selectedHospitalKey, setSelectedHospitalKey] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
@@ -98,16 +94,6 @@ function AdminAHUs() {
 
   // multi-select
   const toggleSelect = (id) => setSelected((s) => ({ ...s, [id]: !s[id] }));
-  const toggleSelectAll = () => {
-    if (!selectAll) {
-      const next = {};
-      for (const a of filtered) next[a.id] = true;
-      setSelected(next);
-    } else {
-      setSelected({});
-    }
-    setSelectAll(!selectAll);
-  };
 
   const handleBulkAction = (action) => {
     const ids = Object.keys(selected).filter((k) => selected[k]);
@@ -150,14 +136,14 @@ function AdminAHUs() {
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200 p-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-2xl font-bold">Admin — AHUs</h1>
-          <div className="text-sm opacity-70">Two-pane: hospitals on the left, spreadsheet on the right.</div>
+          <h1 className="text-xl font-bold">Admin — AHUs & Filters</h1>
+          <div className="text-xs opacity-70">Compact view with always-visible filters</div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn btn-sm" onClick={() => setShowImport(true)} type="button">Import Preview</button>
-          <button className="btn btn-sm btn-secondary" onClick={() => setShowSignoff(true)} type="button">Supervisor Sign-off</button>
+          <button className="btn btn-xs" onClick={() => setShowImport(true)} type="button">Import</button>
+          <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">Sign-off</button>
         </div>
       </div>
 
@@ -189,77 +175,58 @@ function AdminAHUs() {
           </div>
         </aside>
 
-        {/* Right: spreadsheet and toolbar */}
+        {/* Right: compact AHU list with always-visible filters */}
         <section className="flex-1 min-w-[40rem]">
           <div className="bg-base-100 border border-base-300 rounded-lg">
-            <div className="p-3 flex items-center justify-between gap-3 border-b">
-              <div className="flex items-center gap-3">
-                <div className="font-semibold">AHUs</div>
-                <div className="text-sm opacity-70">{ahus.length} total</div>
+            <div className="p-2 flex items-center justify-between gap-2 border-b">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-semibold">AHUs</div>
+                <div className="text-xs opacity-70">{filtered.length} shown</div>
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="input-group">
-                  <input placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} className="input input-sm input-bordered" />
-                </div>
-                <div className="btn-group">
-                  <button className={`btn btn-sm ${viewMode === "spreadsheet" ? "btn-primary" : "btn-outline"}`} onClick={() => setViewMode("spreadsheet")}>Spreadsheet</button>
-                  <button className={`btn btn-sm ${viewMode === "nested" ? "btn-primary" : "btn-outline"}`} onClick={() => setViewMode("nested")}>Nested</button>
-                </div>
-                <div className="divider-vertical" />
-                <button className="btn btn-sm" onClick={() => handleBulkAction('Export CSV')}>Export CSV</button>
-                <button className="btn btn-sm btn-warning" onClick={() => handleBulkAction('Regenerate QR')}>QR (bulk)</button>
+                <input placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} className="input input-xs input-bordered" />
+                <button className="btn btn-xs" onClick={() => handleBulkAction('Export CSV')}>Export</button>
+                <button className="btn btn-xs btn-warning" onClick={() => handleBulkAction('QR')}>QR</button>
               </div>
             </div>
 
-            {/* Table */}
-            <div className="p-2 overflow-auto lg:max-h-[calc(100vh-200px)]">
-              <table className="table table-compact table-fixed w-full">
-                <thead>
-                  <tr>
-                    <th><input type="checkbox" checked={selectAll} onChange={toggleSelectAll} /></th>
-                    <th>Hospital</th>
-                    <th>Building</th>
-                    <th>Location</th>
-                    <th>Label</th>
-                    <th>Overdue</th>
-                    <th>Due Soon</th>
-                    <th>Last</th>
-                    <th>Next</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((a) => {
-                    const sel = !!selected[a.id];
-                    const isOpen = String(expandedAhuId) === String(a.id);
-                    return (
-                      <Fragment key={`r-${a.id}`}>
-                        <tr className={sel ? 'bg-primary/10' : ''}>
-                          <td><input type="checkbox" checked={sel} onChange={() => toggleSelect(a.id)} /></td>
-                          <td className="truncate max-w-xs">{a.hospital}</td>
-                          <td className="truncate max-w-xs">{a.building || '-'}</td>
-                          <td className="truncate max-w-xs">{a.location || '-'}</td>
-                          <td>{a.name || (String(a.id).split('-').slice(1).join('-') || a.id)}</td>
-                          <td>{a.overdue_count > 0 ? <span className="badge badge-error badge-sm">{a.overdue_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
-                          <td>{a.due_soon_count > 0 ? <span className="badge badge-warning badge-sm">{a.due_soon_count}</span> : <span className="badge badge-ghost badge-sm">0</span>}</td>
-                          <td className="text-xs">{a.last_serviced ? <span className="badge badge-sm badge-info">{formatDate(a.last_serviced)}</span> : <span className="text-muted">—</span>}</td>
-                          <td className="text-xs">{a.next_due_date ? <span className="badge badge-sm badge-outline">{formatDate(a.next_due_date)}</span> : <span className="text-muted">—</span>}</td>
-                          <td>
-                            <div className="flex gap-2">
-                              <button className="btn btn-xs" onClick={() => setExpandedAhuId(isOpen ? null : a.id)}>{isOpen ? 'Close' : 'View'}</button>
-                              <button className="btn btn-xs btn-outline" onClick={() => window.open(`/ahu/${a.id}`, '_blank')}>Open</button>
-                            </div>
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr><td colSpan={11} className="p-0"><div className="p-3 border-t"><AdminFilterEditorInline ahuId={a.id} isOpen={true} /></div></td></tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Compact card list */}
+            <div className="p-2 overflow-auto lg:max-h-[calc(100vh-200px)] space-y-2">
+              {filtered.map((a) => {
+                return (
+                  <div key={a.id} className="border border-base-300 rounded-lg overflow-hidden">
+                    {/* Compact AHU header - only Location and Label */}
+                    <div className="bg-base-200 px-3 py-1.5 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <input 
+                          type="checkbox" 
+                          checked={!!selected[a.id]} 
+                          onChange={() => toggleSelect(a.id)} 
+                          className="checkbox checkbox-xs"
+                        />
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="text-xs font-semibold truncate">
+                            {a.location || 'No location'}
+                          </div>
+                          <div className="text-xs opacity-70 truncate">
+                            {a.name || (String(a.id).split('-').slice(1).join('-') || a.id)}
+                          </div>
+                        </div>
+                      </div>
+                      <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/ahu/${a.id}`, '_blank')}>Open</button>
+                    </div>
+                    
+                    {/* Always visible filters */}
+                    <div className="p-2">
+                      <AdminFilterEditorInline ahuId={a.id} isOpen={true} />
+                    </div>
+                  </div>
+                );
+              })}
+              {filtered.length === 0 && (
+                <div className="text-center py-8 opacity-70">No AHUs found</div>
+              )}
             </div>
           </div>
         </section>
