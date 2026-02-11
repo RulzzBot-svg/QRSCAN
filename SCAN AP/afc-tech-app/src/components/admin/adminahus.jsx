@@ -207,10 +207,10 @@ function AdminAHUs() {
                         />
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="text-xs font-semibold truncate">
-                            {a.location || 'No location'}
+                            {a.name || (String(a.id).split('-').slice(1).join('-') || a.id)}
                           </div>
                           <div className="text-xs opacity-70 truncate">
-                            {a.name || (String(a.id).split('-').slice(1).join('-') || a.id)}
+                            {a.location || ''}
                           </div>
                         </div>
                       </div>
