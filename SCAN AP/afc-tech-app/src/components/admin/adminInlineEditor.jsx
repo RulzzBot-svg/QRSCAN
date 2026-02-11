@@ -566,18 +566,15 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 );
               })}
 
-              {filteredFilters.length === 0 && (() => {
-                const emptyMessage = filters.length === 0 
-                  ? "No filters for this AHU." 
-                  : "No filters match the selected criteria.";
-                return (
-                  <tr>
-                    <td colSpan={10} className="text-center py-3 opacity-70 text-xs">
-                      {emptyMessage}
-                    </td>
-                  </tr>
-                );
-              })()}
+              {filteredFilters.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="text-center py-3 opacity-70 text-xs">
+                    {filters.length === 0 
+                      ? "No filters for this AHU." 
+                      : "No filters match the selected criteria."}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
 
