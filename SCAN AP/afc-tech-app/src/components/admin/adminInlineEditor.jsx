@@ -262,16 +262,17 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
           <table className="table table-xs w-full">
             <thead>
               <tr className="text-xs">
+                <th Classname="px-1"></th>
                 <th className="px-1">Phase</th>
                 <th className="px-1">Part #</th>
-                <th className="px-1">Size</th>
-                <th className="px-1">Qty</th>
-                <th className="px-1">Freq</th>
+                <th className="px-1">Size (inches)</th>
+                <th className="px-1">Quantity</th>
+                <th className="px-1">Frequency</th>
                 <th className="px-1">Last</th>
                 <th className="px-1">Next</th>
                 <th className="px-1">Status</th>
-                <th className="px-1"></th>
-                <th className="px-1"></th>
+                <th className="px-1">Save</th>
+                <th className="px-1">Remove</th>
               </tr>
             </thead>
 
@@ -298,7 +299,10 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 }
 
                 return (
+                  //this cell is just for the "new" badge, it has to later become a checkbox that selects this specific filter
+                  //for pulling packing slips and connecting it later, so leaving it as a separate cell for now
                   <tr key={f.id} className={rowClass} style={rowStyle}>
+                    <td> o </td>
                     <td className="px-1 py-0.5">
                       <input
                         className="input input-xs input-bordered w-10"
