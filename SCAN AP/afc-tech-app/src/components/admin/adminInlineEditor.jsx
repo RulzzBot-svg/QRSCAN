@@ -41,8 +41,6 @@ const computeNextDueDate = (f) => {
   return next;
 };
 
-const formatDate = (d) => (d ? d.toLocaleDateString() : "—");
-
 const getRowStatus = (f) => {
   // Inactive always stays muted
   if (f?._inactive) {
@@ -243,37 +241,37 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
   if (!isOpen) return null;
 
   return (
-    <div className="bg-base-100 border border-base-300 rounded-lg p-4">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="text-sm opacity-80">
-          Active Filters: <span className="font-semibold">{activeCount}</span>
-          <span className="ml-2 opacity-60">/ Total: {filters.length}</span>
+    <div className="bg-base-50">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <div className="text-xs opacity-70">
+          <span className="font-semibold">{activeCount}</span> active
+          <span className="ml-2 opacity-50">/ {filters.length} total</span>
         </div>
 
-        <button type="button" className="btn btn-xs btn-outline" onClick={addFilter}>
-          + Add Filter
+        <button type="button" className="btn btn-xs btn-ghost" onClick={addFilter}>
+          + Add
         </button>
       </div>
 
       {loading ? (
-        <div className="py-6 text-center">
-          <span className="loading loading-spinner loading-md"></span>
+        <div className="py-4 text-center">
+          <span className="loading loading-spinner loading-sm"></span>
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="table table-sm w-full">
+          <table className="table table-xs w-full">
             <thead>
-              <tr>
-                <th>Phase</th>
-                <th>Part</th>
-                <th>Size</th>
-                <th>Qty</th>
-                <th>Frequency</th>
-                <th>Last Serviced</th>
-                <th>Next Due</th>
-                <th>Status</th>
-                <th>Save</th>
-                <th>Actions</th>
+              <tr className="text-xs">
+                <th className="px-1">Phase</th>
+                <th className="px-1">Part #</th>
+                <th className="px-1">Size</th>
+                <th className="px-1">Qty</th>
+                <th className="px-1">Freq</th>
+                <th className="px-1">Last</th>
+                <th className="px-1">Next</th>
+                <th className="px-1">Status</th>
+                <th className="px-1"></th>
+                <th className="px-1"></th>
               </tr>
             </thead>
 
@@ -301,32 +299,32 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
                 return (
                   <tr key={f.id} className={rowClass} style={rowStyle}>
-                    <td>
+                    <td className="px-1 py-0.5">
                       <input
-                        className="input input-xs input-bordered w-12"
+                        className="input input-xs input-bordered w-10"
                         value={f.phase}
                         onChange={(e) => updateFilter(f.id, "phase", e.target.value)}
                         disabled={f._inactive}
                       />
                     </td>
 
-                    <td>
+                    <td className="px-1 py-0.5">
                       <input
-                        className="input input-xs input-bordered w-44"
+                        className="input input-xs input-bordered w-32"
                         value={f.part_number}
                         onChange={(e) => updateFilter(f.id, "part_number", e.target.value)}
                         disabled={f._inactive}
                       />
                     </td>
 
-                    <td>
-                      <div className="flex gap-1">
+                    <td className="px-1 py-0.5">
+                      <div className="flex gap-0.5">
                         {["h", "w", "d"].map((dim) => (
                           <input
                             key={dim}
                             type="number"
                             placeholder={dim.toUpperCase()}
-                            className="input input-xs input-bordered w-12"
+                            className="input input-xs input-bordered w-10"
                             value={f.sizeParts?.[dim] || ""}
                             disabled={f._inactive}
                             onChange={(e) => updateFilter(f.id, `size.${dim}`, e.target.value)}
@@ -335,53 +333,53 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                       </div>
                     </td>
 
-                    <td>
+                    <td className="px-1 py-0.5">
                       <input
                         type="number"
-                        className="input input-xs input-bordered w-12"
+                        className="input input-xs input-bordered w-10"
                         value={f.quantity}
                         disabled={f._inactive}
                         onChange={(e) => updateFilter(f.id, "quantity", e.target.value)}
                       />
                     </td>
 
-                    <td>
+                    <td className="px-1 py-0.5">
                       <select
-                        className="select select-xs select-bordered"
+                        className="select select-xs select-bordered w-20 text-xs"
                         value={f.frequency_days}
                         disabled={f._inactive}
                         onChange={(e) => updateFilter(f.id, "frequency_days", e.target.value)}
                       >
                         {FREQUENCY_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
-                            {opt.label}
+                            {opt.value}d
                           </option>
                         ))}
                       </select>
                     </td>
 
-                    <td className="text-xs">
+                    <td className="px-1 py-0.5 text-xs">
                       {f.last_service_date
-                        ? new Date(f.last_service_date).toLocaleDateString()
-                        : "Never"}
+                        ? new Date(f.last_service_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+                        : "—"}
                     </td>
 
-                    <td className="text-xs">{formatDate(nextDue)}</td>
+                    <td className="px-1 py-0.5 text-xs">{nextDue ? nextDue.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : "—"}</td>
 
-                    <td>
+                    <td className="px-1 py-0.5">
                       {f._inactive ? (
-                        <span className="badge badge-ghost badge-md text-xs whitespace-nowrap">Inactive</span>
+                        <span className="badge badge-ghost badge-xs">Inactive</span>
                       ) : st.key === "overdue" ? (
-                        <span className="badge badge-error badge-md text-xs whitespace-nowrap">{st.label}</span>
+                        <span className="badge badge-error badge-xs">{st.label}</span>
                       ) : st.key === "dueSoon" ? (
-                        <span className="badge badge-warning badge-md text-xs whitespace-nowrap">{st.label}</span>
+                        <span className="badge badge-warning badge-xs">{st.label}</span>
                       ) : st.key === "pending" ? (
-                        <span className="badge badge-ghost badge-md text-xs whitespace-nowrap">Pending</span>
+                        <span className="badge badge-ghost badge-xs">Pending</span>
                       ) : (
-                        <span className="badge badge-success badge-md text-white text-xs whitespace-nowrap">{st.label}</span>
+                        <span className="badge badge-success badge-xs">{st.label}</span>
                       )}
                     </td>
-                    <td>
+                    <td className="px-1 py-0.5">
                       <button
                         type="button"
                         className="btn btn-xs btn-primary"
@@ -393,7 +391,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                             else await saveFilter(f);
                           } catch (err) {
                             console.error(err);
-                            showToast("Save failed. Check server logs.", "info");
+                            showToast("Save failed.", "info");
                           }
                         }}
                       >
@@ -401,7 +399,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                       </button>
                     </td>
 
-                    <td>
+                    <td className="px-1 py-0.5">
                       {!f._inactive ? (
                         <button
                           type="button"
@@ -411,7 +409,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                             setConfirmAction({ mode: "deactivate", filter: f });
                           }}
                         >
-                          Deactivate
+                          Off
                         </button>
                       ) : (
                         <button
@@ -422,7 +420,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                             setConfirmAction({ mode: "reactivate", filter: f });
                           }}
                         >
-                          Reactivate
+                          On
                         </button>
                       )}
                     </td>
@@ -433,21 +431,17 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
               {filters.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center py-6 opacity-70">
-                    No filters found for this AHU.
+                  <td colSpan={10} className="text-center py-3 opacity-70 text-xs">
+                    No filters for this AHU.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
 
-          <div className="mt-3 text-xs opacity-70">
-            <div className="mt-1">
-              <span className="badge badge-error align-middle">Overdue</span>{" "}
-              is any Next Due date before today.{" "}
-              <span className="badge badge-warning align-middle">Due Soon</span>{" "}
-              is Next Due within 14 days.
-            </div>
+          <div className="mt-1 text-xs opacity-60">
+            <span className="badge badge-error badge-xs align-middle">Overdue</span> = past due,{" "}
+            <span className="badge badge-warning badge-xs align-middle">Due Soon</span> = within 14 days
           </div>
         </div>
       )}
@@ -455,7 +449,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
       {toast && (
         <div className="toast toast-center toast-middle z-9999">
           <div className={`alert ${toast.type === "success" ? "alert-success" : "alert-info"}`}>
-            <span>{toast.message}</span>
+            <span className="text-xs">{toast.message}</span>
           </div>
         </div>
       )}
