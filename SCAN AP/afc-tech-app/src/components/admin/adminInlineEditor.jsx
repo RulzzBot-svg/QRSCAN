@@ -302,7 +302,13 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                   //this cell is just for the "new" badge, it has to later become a checkbox that selects this specific filter
                   //for pulling packing slips and connecting it later, so leaving it as a separate cell for now
                   <tr key={f.id} className={rowClass} style={rowStyle}>
-                    <td> o </td>
+                    <td className="px-1 py-0.5">
+                      <input 
+                        type="checkbox" 
+                        className="checkbox checkbox-xs"
+                        disabled={f._inactive}
+                      />
+                    </td>
                     <td className="px-1 py-0.5">
                       <input
                         className="input input-xs input-bordered w-10"
@@ -364,11 +370,11 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
                     <td className="px-1 py-0.5 text-xs">
                       {f.last_service_date
-                        ? new Date(f.last_service_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+                        ? new Date(f.last_service_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
                         : "—"}
                     </td>
 
-                    <td className="px-1 py-0.5 text-xs">{nextDue ? nextDue.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : "—"}</td>
+                    <td className="px-1 py-0.5 text-xs">{nextDue ? nextDue.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : "—"}</td>
 
                     <td className="px-1 py-0.5">
                       {f._inactive ? (
