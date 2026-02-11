@@ -8,7 +8,10 @@ const FREQUENCY_OPTIONS = [
   { label: "90 Days", value: 90 },
   { label: "180 Days", value: 180 },
   { label: "365 Days", value: 365 },
+  { label: "18 Months", value: 540 },
 ];
+//not optimal mixing days and month but what can you do huh
+
 
 const parseSize = (size) => {
   if (!size) return { h: "", w: "", d: "" };
@@ -419,7 +422,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                             setConfirmAction({ mode: "deactivate", filter: f });
                           }}
                         >
-                          Off
+                          Deactivate
                         </button>
                       ) : (
                         <button
@@ -430,7 +433,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                             setConfirmAction({ mode: "reactivate", filter: f });
                           }}
                         >
-                          On
+                          Reactivate
                         </button>
                       )}
                     </td>
@@ -451,7 +454,8 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
           <div className="mt-1 text-xs opacity-60">
             <span className="badge badge-error badge-xs align-middle">Overdue</span> = past due,{" "}
-            <span className="badge badge-warning badge-xs align-middle">Due Soon</span> = within 14 days
+            <span className="badge badge-warning badge-xs align-middle">Due Soon</span> = within 14 days,{" "}
+            <span className="badge badge-info badge-xs align-middle">540 Days</span> = 18 Months
           </div>
         </div>
       )}
