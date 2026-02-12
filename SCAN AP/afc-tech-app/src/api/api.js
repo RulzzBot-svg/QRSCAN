@@ -16,3 +16,24 @@ export const API = axios.create({
 
     baseURL: `${BASE}/api`,
 });
+
+// Add request interceptor to include tech ID in headers for admin routes
+API.interceptors.request.use(
+    (config) => {
+        // Only add tech ID header for admin routes
+        if (config.url && config.url.includes('/admin')) {
+            try {
+                const tech = JSON.parse(localStorage.getItem("tech"));
+                if (tech && tech.id) {
+                    config.headers['X-Tech-ID'] = tech.id;
+                }
+            } catch (e) {
+                console.error("Error adding tech ID to request:", e);
+            }
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);

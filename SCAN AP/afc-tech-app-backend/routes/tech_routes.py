@@ -33,7 +33,8 @@ def login_technicians():
     return jsonify({
         "id":tech.id,
         "name":tech.name,
-        "active":tech.active
+        "active":tech.active,
+        "role": getattr(tech, "role", "technician")  # Include role, default to technician for backward compatibility
     }),200
 
 

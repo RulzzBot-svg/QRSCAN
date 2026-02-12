@@ -3,6 +3,7 @@ from models import Job, JobFilter, Filter, AHU, Technician
 from db import db
 from datetime import datetime
 from sqlalchemy.orm import joinedload
+from middleware.auth import require_admin
 
 job_bp = Blueprint("jobs", __name__)
 
@@ -124,6 +125,7 @@ def get_job(job_id):
 # -----------------------------
 
 @job_bp.route("/admin/jobs", methods=["GET"])
+@require_admin
 def admin_get_all_jobs():
     jobs = (
         Job.query

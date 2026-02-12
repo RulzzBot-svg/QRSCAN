@@ -49,10 +49,14 @@ export default function Login() {
 
       const res = await loginTech(username, pin);
 
-      // Save tech session
+      // Save tech session with role
       localStorage.setItem(
         "tech",
-        JSON.stringify({ id: res.data.id, name: res.data.name })
+        JSON.stringify({ 
+          id: res.data.id, 
+          name: res.data.name,
+          role: res.data.role || "technician"  // Store role, default to technician
+        })
       );
 
       // Save offline credential (hashed PIN) so user can login when offline
