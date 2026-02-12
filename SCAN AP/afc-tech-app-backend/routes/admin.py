@@ -5,10 +5,39 @@ from db import db
 from sqlalchemy.orm import joinedload
 import re
 from datetime import datetime
+from functools import wraps
 
 admin_bp = Blueprint("admin", __name__)
 
+
+def require_admin(f):
+    """Decorator to require admin role for a route."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Get tech_id from request headers or query params
+        tech_id = request.headers.get("X-Tech-ID") or request.args.get("tech_id")
+        
+        if not tech_id:
+            return jsonify({"error": "Authentication required"}), 401
+        
+        try:
+            tech = db.session.get(Technician, int(tech_id))
+            if not tech:
+                return jsonify({"error": "Invalid technician"}), 401
+            
+            # Check if technician has admin role
+            if getattr(tech, "role", "technician") != "admin":
+                return jsonify({"error": "Admin access required"}), 403
+                
+        except Exception as e:
+            return jsonify({"error": "Authentication failed"}), 401
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 @admin_bp.route("/supervisor-signoff", methods=["POST"])
+@require_admin
 def create_supervisor_signoff():
     """Create a new supervisor signoff record."""
     try:
@@ -53,6 +82,7 @@ def create_supervisor_signoff():
 
 
 @admin_bp.route("/supervisor-signoff", methods=["GET"])
+@require_admin
 def get_supervisor_signoffs():
     """Get supervisor signoff records, optionally filtered by hospital_id and/or date."""
     try:
@@ -86,6 +116,7 @@ def get_supervisor_signoffs():
         return jsonify({"error": str(e)}), 500
 
 @admin_bp.route("/hospitals", methods=["GET"])
+@require_admin
 def get_hospitals():
     """Get all hospitals for dropdown selections."""
     try:
@@ -104,6 +135,7 @@ def get_hospitals():
         return jsonify({"error": str(e)}), 500
 
 @admin_bp.route("/overview", methods=["GET"])
+@require_admin
 def admin_overview():
     hospitals = Hospital.query.all()
 
@@ -125,6 +157,7 @@ def admin_overview():
 
 
 @admin_bp.route("/jobs", methods=["GET"])
+@require_admin
 def get_all_jobs():
     print("DEBUG: get_all_jobs called with is_inspected support - VERSION 2")  # Debug log
     # Updated to include is_inspected
@@ -162,6 +195,7 @@ def get_all_jobs():
 
 
 @admin_bp.route("/ahu", methods=["POST"])
+@require_admin
 def create_ahu():
     """Create a new AHU manually with sequential AHU-### ids."""
     try:

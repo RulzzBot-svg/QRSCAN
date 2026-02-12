@@ -94,6 +94,7 @@ class Technician(db.Model):
     name = Column(String(150), nullable=False)
     pin = Column(String(20), nullable=False)
     active = Column(Boolean, default=True)
+    role = Column(String(20), default="technician", nullable=False)  # 'technician' or 'admin'
 
     jobs = relationship("Job", back_populates="technician", cascade="all, delete-orphan")
 

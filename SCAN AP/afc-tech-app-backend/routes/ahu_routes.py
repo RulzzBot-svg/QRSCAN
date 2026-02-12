@@ -1,12 +1,39 @@
 from flask import Blueprint, jsonify, request
-from models import AHU, Filter
+from models import AHU, Filter, Technician
 from db import db
 import traceback
+from functools import wraps
 
 from sqlalchemy.orm import joinedload, selectinload
 from utility.status import compute_filter_status
 
 ahu_bp = Blueprint("ahu", __name__)
+
+
+def require_admin(f):
+    """Decorator to require admin role for a route."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Get tech_id from request headers or query params
+        tech_id = request.headers.get("X-Tech-ID") or request.args.get("tech_id")
+        
+        if not tech_id:
+            return jsonify({"error": "Authentication required"}), 401
+        
+        try:
+            tech = db.session.get(Technician, int(tech_id))
+            if not tech:
+                return jsonify({"error": "Invalid technician"}), 401
+            
+            # Check if technician has admin role
+            if getattr(tech, "role", "technician") != "admin":
+                return jsonify({"error": "Admin access required"}), 403
+                
+        except Exception as e:
+            return jsonify({"error": "Authentication failed"}), 401
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 # ---------------------------------------------------
@@ -164,6 +191,7 @@ def debug_ahu_ids():
 # Admin: Get filters for an AHU (ACTIVE only)
 # ---------------------------------------------------
 @ahu_bp.route("/admin/ahus/<string:ahu_id>/filters", methods=["GET"])
+@require_admin
 def get_filters_for_admin(ahu_id):
     try:
         # Accept either numeric id or legacy label
@@ -212,6 +240,7 @@ def get_filters_for_admin(ahu_id):
 # Admin: Add filter
 # ---------------------------------------------------
 @ahu_bp.route("/admin/ahus/<string:ahu_id>/filters", methods=["POST"])
+@require_admin
 def add_filter(ahu_id):
     try:
         data = request.json or {}
@@ -250,6 +279,7 @@ def add_filter(ahu_id):
 # Admin: Deactivate (soft delete)
 # ---------------------------------------------------
 @ahu_bp.route("/admin/filters/<int:filter_id>/deactivate", methods=["PATCH"])
+@require_admin
 def deactivate_filter(filter_id):
     try:
         f = db.session.get(Filter, filter_id)
@@ -270,6 +300,7 @@ def deactivate_filter(filter_id):
 # Admin: Update filter
 # ---------------------------------------------------
 @ahu_bp.route("/admin/filters/<int:filter_id>", methods=["PUT"])
+@require_admin
 def update_filter(filter_id):
     try:
         f = db.session.get(Filter, filter_id)
@@ -297,6 +328,7 @@ def update_filter(filter_id):
 # Admin: Hard delete (keep if you still want it)
 # ---------------------------------------------------
 @ahu_bp.route("/admin/filters/<int:filter_id>", methods=["DELETE"])
+@require_admin
 def delete_filter(filter_id):
     try:
         f = db.session.get(Filter, filter_id)
@@ -316,6 +348,7 @@ def delete_filter(filter_id):
 # Admin: Get all AHUs
 # ---------------------------------------------------
 @ahu_bp.route("/admin/ahus", methods=["GET"])
+@require_admin
 def admin_get_all_ahus():
     try:
         ahus = (
@@ -378,6 +411,7 @@ def admin_get_all_ahus():
 
 
 @ahu_bp.route("/admin/filters/<int:filter_id>/reactivate", methods=["PATCH"])
+@require_admin
 def reactivate_filter(filter_id):
     f = db.session.get(Filter, filter_id)
     if not f:

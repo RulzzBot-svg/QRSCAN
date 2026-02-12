@@ -1,7 +1,34 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import AdminSidebar from "./AdminSidebar";
 
 export default function AdminLayout() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if user is logged in
+    const techStr = localStorage.getItem("tech");
+    if (!techStr) {
+      navigate("/");
+      return;
+    }
+
+    // Check if user has admin role
+    try {
+      const tech = JSON.parse(techStr);
+      if (tech.role !== "admin") {
+        // Redirect non-admin users to home
+        alert("Access denied. Admin privileges required.");
+        navigate("/Home");
+        return;
+      }
+    } catch (e) {
+      console.error("Error parsing tech data:", e);
+      navigate("/");
+      return;
+    }
+  }, [navigate]);
+
   return (
     <div data-theme="corporate" className="drawer lg:drawer-open min-h-screen">
       {/* Toggle */}

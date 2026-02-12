@@ -16,6 +16,9 @@ export default function App() {
     return null;
   }
 
+  // Check if user has admin role
+  const isAdmin = tech.role === "admin";
+
   return (
 
     <div data-theme="corporate" className="min-h-screen flex flex-col bg-base-200">
@@ -91,31 +94,33 @@ export default function App() {
           </div>
         </section>
 
-        {/* Admin Dashboard */}
-        <div className="card bg-base-100 border border-base-300 shadow-sm">
-          <div className="card-body p-4">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="card-title text-base">
-                Admin Dashboard
-              </h2>
-              <span className="rounded-2xl badge badge-info badge-soft badge-outline text-xs">
-                Admin
-              </span>
+        {/* Admin Dashboard - Only show for admin users */}
+        {isAdmin && (
+          <div className="card bg-base-100 border border-base-300 shadow-sm">
+            <div className="card-body p-4">
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="card-title text-base">
+                  Admin Dashboard
+                </h2>
+                <span className="rounded-2xl badge badge-info badge-soft badge-outline text-xs">
+                  Admin
+                </span>
+              </div>
+
+              <p className="text-sm text-base-content/70 mb-3 leading-snug">
+                View system-wide status, upcoming changeouts, and overall
+                compliance across all hospitals and AHUs.
+              </p>
+
+              <button
+                className="btn btn-outline btn-info w-full"
+                onClick={() => navigate("/admin")}
+              >
+                📊 Open Admin Dashboard
+              </button>
             </div>
-
-            <p className="text-sm text-base-content/70 mb-3 leading-snug">
-              View system-wide status, upcoming changeouts, and overall
-              compliance across all hospitals and AHUs.
-            </p>
-
-            <button
-              className="btn btn-outline btn-info w-full"
-              onClick={() => navigate("/admin")}
-            >
-              📊 Open Admin Dashboard
-            </button>
           </div>
-        </div>
+        )}
 
         <div className="card bg-base-100 border border-base-300 shadow-sm">
           <div className="card-body p-4">
