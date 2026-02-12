@@ -1,3 +1,4 @@
+// AdminAHUs.jsx
 // Redesigned Admin AHU UI: two-pane layout
 import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
@@ -36,6 +37,14 @@ function AdminAHUs() {
   const [importPreview, setImportPreview] = useState([]);
   const [showSignoff, setShowSignoff] = useState(false);
 
+  // NEW: Global (page-level) filter bar state (independent of tables)
+  const [globalFilters, setGlobalFilters] = useState({
+    frequency: "all", // all | 30 | 60 | 90 | 180 | 365
+    status: "all", // all | ok | due_soon | overdue | pending | inactive
+    nextFrom: "", // yyyy-mm-dd
+    nextTo: "", // yyyy-mm-dd
+  });
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -55,7 +64,7 @@ function AdminAHUs() {
     load();
   }, []);
 
-  // Group by hospital then building
+  // Group by hospital then building (LEFT PANEL — unchanged)
   const grouped = useMemo(() => {
     const map = new Map();
     for (const a of ahus) {
@@ -72,11 +81,15 @@ function AdminAHUs() {
         if (!bmap.has(b)) bmap.set(b, []);
         bmap.get(b).push(a);
       }
-      g.buildings = Array.from(bmap.entries()).map(([name, items]) => ({ buildingName: name, items: items.sort((p, q) => naturalAhuSort(p.id, q.id)) }));
+      g.buildings = Array.from(bmap.entries()).map(([name, items]) => ({
+        buildingName: name,
+        items: items.sort((p, q) => naturalAhuSort(p.id, q.id)),
+      }));
     }
     return groups;
   }, [ahus]);
 
+  // NOTE: This is your existing "Search ALL AHUs..." behavior (searches through all AHUs)
   const filtered = useMemo(() => {
     const q = (query || "").toLowerCase();
     return ahus.filter((a) => {
@@ -98,7 +111,6 @@ function AdminAHUs() {
   const handleBulkAction = (action) => {
     const ids = Object.keys(selected).filter((k) => selected[k]);
     if (!ids.length) return alert("No rows selected");
-    // stub - perform client-side UI action or call API
     alert(`${action} on ${ids.length} AHU(s)`);
   };
 
@@ -109,7 +121,10 @@ function AdminAHUs() {
     let cur = [];
     for (const line of lines) {
       if (line.trim() === "") {
-        if (cur.length) { blocks.push(cur); cur = []; }
+        if (cur.length) {
+          blocks.push(cur);
+          cur = [];
+        }
       } else cur.push(line);
     }
     if (cur.length) blocks.push(cur);
@@ -124,6 +139,10 @@ function AdminAHUs() {
       setImportPreview(blocks);
     };
     r.readAsText(file);
+  };
+
+  const clearGlobalFilters = () => {
+    setGlobalFilters({ frequency: "all", status: "all", nextFrom: "", nextTo: "" });
   };
 
   if (loading) {
@@ -142,16 +161,25 @@ function AdminAHUs() {
           <div className="text-xs opacity-70">Compact view with always-visible filters</div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn btn-xs" onClick={() => setShowImport(true)} type="button">Import</button>
-          <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">Sign-off</button>
+          <button className="btn btn-xs" onClick={() => setShowImport(true)} type="button">
+            Import
+          </button>
+          <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">
+            Sign-off
+          </button>
         </div>
       </div>
 
       <div className="flex gap-4">
-        {/* Left: Hospital tree */}
-          <aside className="w-72 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto">
+        {/* Left: Hospital tree (UNCHANGED) */}
+        <aside className="w-72 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto">
           <div className="font-medium mb-2">Hospitals</div>
-          <input className="input input-sm input-bordered w-full mb-3" placeholder="Filter hospitals..." onChange={(e) => setQuery(e.target.value)} value={query} />
+          <input
+            className="input input-sm input-bordered w-full mb-3"
+            placeholder="Filter hospitals..."
+            onChange={(e) => setQuery(e.target.value)}
+            value={query}
+          />
           <div className="space-y-2">
             {grouped.map((g) => {
               const total = g.items.length;
@@ -160,7 +188,9 @@ function AdminAHUs() {
                 <div
                   key={g.hospitalKey}
                   onClick={() => setSelectedHospitalKey(selectedHospitalKey === g.hospitalKey ? null : g.hospitalKey)}
-                  className={`p-2 rounded hover:bg-base-200 cursor-pointer ${selectedHospitalKey === g.hospitalKey ? 'bg-primary/10' : ''}`}
+                  className={`p-2 rounded hover:bg-base-200 cursor-pointer ${
+                    selectedHospitalKey === g.hospitalKey ? "bg-primary/10" : ""
+                  }`}
                 >
                   <div className="flex justify-between items-center">
                     <div className="truncate font-semibold">{g.hospitalName}</div>
@@ -178,6 +208,7 @@ function AdminAHUs() {
         {/* Right: compact AHU list with always-visible filters */}
         <section className="flex-1 min-w-[40rem]">
           <div className="bg-base-100 border border-base-300 rounded-lg">
+            {/* Top toolbar (kept) */}
             <div className="p-2 flex items-center justify-between gap-2 border-b">
               <div className="flex items-center gap-2">
                 <div className="text-sm font-semibold">AHUs</div>
@@ -185,54 +216,127 @@ function AdminAHUs() {
               </div>
 
               <div className="flex items-center gap-2">
-                <input placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} className="input input-xs input-bordered" />
-                <button className="btn btn-xs" onClick={() => handleBulkAction('Export CSV')}>Export</button>
-                <button className="btn btn-xs btn-warning" onClick={() => handleBulkAction('QR')}>QR</button>
+                <input
+                  placeholder="Search ALL AHUs..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="input input-xs input-bordered w-72"
+                />
+                <button className="btn btn-xs" onClick={() => handleBulkAction("Export CSV")} type="button">
+                  Export
+                </button>
+                <button className="btn btn-xs btn-warning" onClick={() => handleBulkAction("QR")} type="button">
+                  QR
+                </button>
+                <button className="btn btn-xs btn-ghost" onClick={() => setSelected({})} type="button">
+                  Clear selection
+                </button>
+              </div>
+            </div>
+
+            {/* ✅ NEW: GLOBAL FILTER BAR (independent of the tables) */}
+            <div className="px-3 py-2 border-b bg-base-100">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-semibold">Frequency:</div>
+                  <select
+                    className="select select-xs select-bordered"
+                    value={globalFilters.frequency}
+                    onChange={(e) => setGlobalFilters((f) => ({ ...f, frequency: e.target.value }))}
+                  >
+                    <option value="all">All</option>
+                    <option value="30">30d</option>
+                    <option value="60">60d</option>
+                    <option value="90">90d</option>
+                    <option value="180">180d</option>
+                    <option value="365">365d</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-semibold">Status:</div>
+                  <select
+                    className="select select-xs select-bordered"
+                    value={globalFilters.status}
+                    onChange={(e) => setGlobalFilters((f) => ({ ...f, status: e.target.value }))}
+                  >
+                    <option value="all">All</option>
+                    <option value="ok">OK</option>
+                    <option value="due_soon">Due Soon</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="pending">Pending</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-semibold">Next Date From:</div>
+                  <input
+                    type="date"
+                    className="input input-xs input-bordered"
+                    value={globalFilters.nextFrom}
+                    onChange={(e) => setGlobalFilters((f) => ({ ...f, nextFrom: e.target.value }))}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-semibold">To:</div>
+                  <input
+                    type="date"
+                    className="input input-xs input-bordered"
+                    value={globalFilters.nextTo}
+                    onChange={(e) => setGlobalFilters((f) => ({ ...f, nextTo: e.target.value }))}
+                  />
+                </div>
+
+                <button className="btn btn-xs btn-ghost ml-auto" onClick={clearGlobalFilters} type="button">
+                  Clear filters
+                </button>
               </div>
             </div>
 
             {/* Compact card list */}
-            <div className="p-2 overflow-auto lg:max-h-[calc(100vh-200px)] space-y-2">
+            <div className="p-2 overflow-auto lg:max-h-[calc(100vh-240px)] space-y-2">
               {filtered.map((a) => {
                 return (
                   <div key={a.id} className="border border-base-300 rounded-lg overflow-hidden">
-                    {/* Compact AHU header - only Location and Label */}
+                    {/* Compact AHU header */}
                     <div className="bg-base-200 px-3 py-1.5 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <input 
-                          type="checkbox" 
-                          checked={!!selected[a.id]} 
-                          onChange={() => toggleSelect(a.id)} 
+                        <input
+                          type="checkbox"
+                          checked={!!selected[a.id]}
+                          onChange={() => toggleSelect(a.id)}
                           className="checkbox checkbox-xs"
                         />
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="text-xs font-semibold truncate">
-                            {a.name || (String(a.id).split('-').slice(1).join('-') || a.id)}
+                            {a.name || String(a.id).split("-").slice(1).join("-") || a.id}
                           </div>
-                          <div className="text-xs opacity-70 truncate">
-                            {a.location || ''}
-                          </div>
+                          <div className="text-xs opacity-70 truncate">{a.location || ""}</div>
                         </div>
                       </div>
-                      <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/ahu/${a.id}`, '_blank')}>Open</button>
+                      <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/ahu/${a.id}`, "_blank")} type="button">
+                        Open
+                      </button>
                     </div>
-                    
-                    {/* Always visible filters */}
+
+                    {/* Always visible filters table */}
                     <div className="p-2">
-                      <AdminFilterEditorInline ahuId={a.id} isOpen={true} />
+                      {/* Pass the global filters down (AdminFilterEditorInline can ignore or use it) */}
+                      <AdminFilterEditorInline ahuId={a.id} isOpen={true} globalFilters={globalFilters} />
                     </div>
                   </div>
                 );
               })}
-              {filtered.length === 0 && (
-                <div className="text-center py-8 opacity-70">No AHUs found</div>
-              )}
+
+              {filtered.length === 0 && <div className="text-center py-8 opacity-70">No AHUs found</div>}
             </div>
           </div>
         </section>
       </div>
 
-      {/* Import preview modal (simple CSV grouping preview) */}
+      {/* Import preview modal */}
       {showImport && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40">
           <div className="bg-base-100 border p-4 rounded-lg w-3/4 max-h-[80vh] overflow-auto">
@@ -241,9 +345,16 @@ function AdminAHUs() {
               <div className="flex gap-2">
                 <label className="btn btn-sm btn-ghost">
                   Choose CSV
-                  <input type="file" accept="text/csv,text/plain" className="hidden" onChange={(e) => e.target.files?.[0] && handleImportFile(e.target.files[0])} />
+                  <input
+                    type="file"
+                    accept="text/csv,text/plain"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleImportFile(e.target.files[0])}
+                  />
                 </label>
-                <button className="btn btn-sm" onClick={() => { setShowImport(false); setImportPreview([]); }}>Close</button>
+                <button className="btn btn-sm" onClick={() => { setShowImport(false); setImportPreview([]); }} type="button">
+                  Close
+                </button>
               </div>
             </div>
 
@@ -253,8 +364,12 @@ function AdminAHUs() {
               <div className="space-y-2">
                 {importPreview.map((b) => (
                   <div key={b.id} className="p-2 border rounded">
-                    <div className="font-medium">{b.group} — {b.rows.length} rows</div>
-                    <div className="text-xs mt-1 overflow-auto"><pre className="whitespace-pre-wrap">{b.rows.join('\n')}</pre></div>
+                    <div className="font-medium">
+                      {b.group} — {b.rows.length} rows
+                    </div>
+                    <div className="text-xs mt-1 overflow-auto">
+                      <pre className="whitespace-pre-wrap">{b.rows.join("\n")}</pre>
+                    </div>
                   </div>
                 ))}
               </div>

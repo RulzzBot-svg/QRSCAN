@@ -97,12 +97,6 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
 
   const [toast, setToast] = useState(null);
 
-  // Filter states
-  const [filterFrequency, setFilterFrequency] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterNextDateFrom, setFilterNextDateFrom] = useState("");
-  const [filterNextDateTo, setFilterNextDateTo] = useState("");
-
   const showToast = (message, type = "info") => {
     setToast({ message, type });
     window.clearTimeout(showToast._t);
@@ -247,52 +241,6 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
     [filters]
   );
 
-  // Apply filters to the filter rows
-  const filteredFilters = useMemo(() => {
-    return filters.filter((f) => {
-      // Filter by frequency
-      if (filterFrequency && String(f.frequency_days) !== filterFrequency) {
-        return false;
-      }
-
-      // Filter by status
-      if (filterStatus) {
-        const status = getRowStatus(f);
-        if (status.key !== filterStatus) {
-          return false;
-        }
-      }
-
-      // Filter by next date range (inclusive on both ends)
-      if (filterNextDateFrom || filterNextDateTo) {
-        const nextDue = computeNextDueDate(f);
-        if (!nextDue) {
-          // If no next due date, exclude from date range filters
-          return false;
-        }
-
-        const nextDueTime = startOfDay(nextDue).getTime();
-
-        if (filterNextDateFrom) {
-          const fromTime = startOfDay(new Date(filterNextDateFrom)).getTime();
-          if (nextDueTime < fromTime) {
-            return false;
-          }
-        }
-
-        if (filterNextDateTo) {
-          const toTime = startOfDay(new Date(filterNextDateTo)).getTime();
-          // Use > to make the range inclusive on both ends
-          if (nextDueTime > toTime) {
-            return false;
-          }
-        }
-      }
-
-      return true;
-    });
-  }, [filters, filterFrequency, filterStatus, filterNextDateFrom, filterNextDateTo]);
-
   if (!isOpen) return null;
 
   return (
@@ -301,86 +249,11 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
         <div className="text-xs opacity-70">
           <span className="font-semibold">{activeCount}</span> active
           <span className="ml-2 opacity-50">/ {filters.length} total</span>
-          {(filterFrequency || filterStatus || filterNextDateFrom || filterNextDateTo) && (
-            <span className="ml-2 text-primary">
-              • {filteredFilters.length} filtered
-            </span>
-          )}
         </div>
 
         <button type="button" className="btn btn-xs btn-ghost" onClick={addFilter}>
           + Add
         </button>
-      </div>
-
-      {/* Filter Controls */}
-      <div className="flex flex-wrap gap-2 mb-2 p-2 bg-base-100 rounded border border-base-300">
-        <div className="flex items-center gap-1">
-          <label className="text-xs font-medium">Frequency:</label>
-          <select
-            className="select select-xs select-bordered"
-            value={filterFrequency}
-            onChange={(e) => setFilterFrequency(e.target.value)}
-          >
-            <option value="">All</option>
-            {FREQUENCY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.value}d
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <label className="text-xs font-medium">Status:</label>
-          <select
-            className="select select-xs select-bordered"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">All</option>
-            <option value="overdue">Overdue</option>
-            <option value="dueSoon">Due Soon</option>
-            <option value="ok">OK</option>
-            <option value="pending">Pending</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <label className="text-xs font-medium">Next Date From:</label>
-          <input
-            type="date"
-            className="input input-xs input-bordered"
-            value={filterNextDateFrom}
-            onChange={(e) => setFilterNextDateFrom(e.target.value)}
-          />
-        </div>
-
-        <div className="flex items-center gap-1">
-          <label className="text-xs font-medium">To:</label>
-          <input
-            type="date"
-            className="input input-xs input-bordered"
-            value={filterNextDateTo}
-            onChange={(e) => setFilterNextDateTo(e.target.value)}
-          />
-        </div>
-
-        {(filterFrequency || filterStatus || filterNextDateFrom || filterNextDateTo) && (
-          <button
-            type="button"
-            className="btn btn-xs btn-ghost"
-            onClick={() => {
-              setFilterFrequency("");
-              setFilterStatus("");
-              setFilterNextDateFrom("");
-              setFilterNextDateTo("");
-            }}
-          >
-            Clear Filters
-          </button>
-        )}
       </div>
 
       {loading ? (
@@ -407,7 +280,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
             </thead>
 
             <tbody>
-              {filteredFilters.map((f) => {
+              {filters.map((f) => {
                 const st = getRowStatus(f);
                 const nextDue = computeNextDueDate(f);
 
@@ -569,12 +442,10 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 );
               })}
 
-              {filteredFilters.length === 0 && (
+              {filters.length === 0 && (
                 <tr>
                   <td colSpan={10} className="text-center py-3 opacity-70 text-xs">
-                    {filters.length === 0 
-                      ? "No filters for this AHU." 
-                      : "No filters match the selected criteria."}
+                    No filters for this AHU.
                   </td>
                 </tr>
               )}
