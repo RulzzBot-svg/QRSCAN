@@ -87,7 +87,7 @@ const getFrequencyColor = (freqDays) => {
   return map[m] || null;
 };
 
-function AdminFilterEditorInline({ ahuId, isOpen }) {
+function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
   const [filters, setFilters] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -241,14 +241,63 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
     [filters]
   );
 
+  // Apply global filters to the filters list
+  const filteredFilters = useMemo(() => {
+    if (!globalFilters) return filters;
+
+    return filters.filter((f) => {
+      // Filter by frequency
+      if (globalFilters.frequency !== "all") {
+        const selectedFreq = Number(globalFilters.frequency);
+        if (f.frequency_days !== selectedFreq) return false;
+      }
+
+      // Filter by status
+      if (globalFilters.status !== "all") {
+        const status = getRowStatus(f);
+        const statusMap = {
+          ok: "ok",
+          due_soon: "dueSoon",
+          overdue: "overdue",
+          pending: "pending",
+          inactive: "inactive",
+        };
+        if (status.key !== statusMap[globalFilters.status]) return false;
+      }
+
+      // Filter by next date range
+      if (globalFilters.nextFrom || globalFilters.nextTo) {
+        const nextDue = computeNextDueDate(f);
+        if (!nextDue) {
+          // If no next due date, exclude unless we're filtering for pending
+          if (globalFilters.status !== "pending") return false;
+        } else {
+          const nextDueStr = nextDue.toISOString().split("T")[0];
+          if (globalFilters.nextFrom && nextDueStr < globalFilters.nextFrom) return false;
+          if (globalFilters.nextTo && nextDueStr > globalFilters.nextTo) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [filters, globalFilters]);
+
+  const filteredActiveCount = useMemo(
+    () => filteredFilters.filter((f) => !f._inactive).length,
+    [filteredFilters]
+  );
+
   if (!isOpen) return null;
 
   return (
     <div className="bg-base-50">
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="text-xs opacity-70">
-          <span className="font-semibold">{activeCount}</span> active
-          <span className="ml-2 opacity-50">/ {filters.length} total</span>
+          <span className="font-semibold">{filteredActiveCount}</span> active
+          <span className="ml-2 opacity-50">/ {filteredFilters.length} shown</span>
+          {filteredFilters.length !== filters.length && (
+            <span className="ml-2 text-warning">({filters.length} total)</span>
+          )}
         </div>
 
         <button type="button" className="btn btn-xs btn-ghost" onClick={addFilter}>
@@ -280,7 +329,7 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
             </thead>
 
             <tbody>
-              {filters.map((f) => {
+              {filteredFilters.map((f) => {
                 const st = getRowStatus(f);
                 const nextDue = computeNextDueDate(f);
 
@@ -442,10 +491,18 @@ function AdminFilterEditorInline({ ahuId, isOpen }) {
                 );
               })}
 
-              {filters.length === 0 && (
+              {filteredFilters.length === 0 && filters.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center py-3 opacity-70 text-xs">
+                  <td colSpan={11} className="text-center py-3 opacity-70 text-xs">
                     No filters for this AHU.
+                  </td>
+                </tr>
+              )}
+              
+              {filteredFilters.length === 0 && filters.length > 0 && (
+                <tr>
+                  <td colSpan={11} className="text-center py-3 opacity-70 text-xs">
+                    No filters match the current filters. Clear filters to see all {filters.length} filter(s).
                   </td>
                 </tr>
               )}
