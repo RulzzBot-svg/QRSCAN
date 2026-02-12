@@ -5,35 +5,9 @@ from db import db
 from sqlalchemy.orm import joinedload
 import re
 from datetime import datetime
-from functools import wraps
+from middleware.auth import require_admin
 
 admin_bp = Blueprint("admin", __name__)
-
-
-def require_admin(f):
-    """Decorator to require admin role for a route."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Get tech_id from request headers or query params
-        tech_id = request.headers.get("X-Tech-ID") or request.args.get("tech_id")
-        
-        if not tech_id:
-            return jsonify({"error": "Authentication required"}), 401
-        
-        try:
-            tech = db.session.get(Technician, int(tech_id))
-            if not tech:
-                return jsonify({"error": "Invalid technician"}), 401
-            
-            # Check if technician has admin role
-            if getattr(tech, "role", "technician") != "admin":
-                return jsonify({"error": "Admin access required"}), 403
-                
-        except Exception as e:
-            return jsonify({"error": "Authentication failed"}), 401
-        
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 @admin_bp.route("/supervisor-signoff", methods=["POST"])
