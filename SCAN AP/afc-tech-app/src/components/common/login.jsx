@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {loginTech} from "../../api/tech"
+import { loginTech } from "../../api/tech"
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,14 +17,14 @@ export default function Login() {
       if (post) {
         setRedirectMessage("Please sign in to view the scanned AHU.");
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const dismissRedirectMessage = () => {
     setRedirectMessage("");
     try {
       sessionStorage.removeItem("post_login_path");
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleSubmit = async (e) => {
@@ -52,8 +52,8 @@ export default function Login() {
       // Save tech session with role
       localStorage.setItem(
         "tech",
-        JSON.stringify({ 
-          id: res.data.id, 
+        JSON.stringify({
+          id: res.data.id,
           name: res.data.name,
           role: res.data.role || "technician"  // Store role, default to technician
         })
@@ -75,7 +75,7 @@ export default function Login() {
       if (post) {
         try {
           sessionStorage.removeItem("post_login_path");
-        } catch {}
+        } catch { }
         window.location.assign(post);
       } else {
         navigate("/Home");
@@ -90,12 +90,18 @@ export default function Login() {
 
   // helper: hash PIN using SHA-256 and return hex
   async function digestPin(pin) {
+    const subtle = window?.crypto?.subtle;
+    if (!subtle) {
+      throw new Error("WebCrypto unavailable (crypto.subtle missing). Use HTTPS/localhost or disable offline PIN storage.");
+    }
     const enc = new TextEncoder();
     const data = enc.encode(pin);
-    const hash = await window.crypto.subtle.digest('SHA-256', data);
-    const arr = Array.from(new Uint8Array(hash));
-    return arr.map(b => b.toString(16).padStart(2, '0')).join('');
+    const hash = await subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hash))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
   }
+
 
   return (
     <div
