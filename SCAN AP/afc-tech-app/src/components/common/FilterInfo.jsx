@@ -31,7 +31,7 @@ function FilterInfo() {
       setTech(JSON.parse(storedTech));
     } else {
       // If no tech logged in, redirect to login
-      navigate("/login");
+      navigate("/");
     }
   }, [navigate]);
 

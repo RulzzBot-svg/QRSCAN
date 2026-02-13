@@ -33,6 +33,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/Home" element={<App />} />
         <Route path="/hospitals" element={<HospitalCards />} />
         <Route path="/AHU" element={<AHU />} />
@@ -40,7 +41,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/FilterInfo/:ahuId" element={<FilterInfo />} />
         <Route path="/job-completed" element={<jobCompleted />} />
         <Route path="/scan" element={<QRScanner />} />
-        <Route path="/jobs/:jobId/signature" element={<JobSignature/>}/>
+        <Route path="/jobs/:jobId/signature" element={<JobSignature />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="hospitals" element={<Hospitals />} />
