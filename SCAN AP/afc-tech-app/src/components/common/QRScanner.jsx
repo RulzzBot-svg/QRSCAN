@@ -80,7 +80,7 @@ export default function QRScanner() {
                   sessionStorage.setItem("post_login_path", target);
                 } catch {}
                 // navigate to login (full reload is fine)
-                window.location.assign(`/login`);
+                window.location.assign(`/`);
                 return;
               }
 
