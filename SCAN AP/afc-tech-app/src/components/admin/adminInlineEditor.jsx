@@ -365,7 +365,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         type="checkbox"
                         className="checkbox checkbox-xs"
                         disabled={f._inactive}
-                        checked={isSelected}
+                        checked={selectedFilters.has(f.id)}
                         onChange={() => toggleFilterSelection(f.id)}
                       />
                     </td>
