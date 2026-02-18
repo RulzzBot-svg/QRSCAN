@@ -188,7 +188,7 @@ function AdminAHUs() {
       // Format: [13 tabs] qty||part||[5 tabs] qty||part||[5 tabs] qty||part ...
       // Build each item piece
       const itemParts = allSelectedFilters.map((f) => {
-        return `${f.quantity}||${f.part_number}||||||||||`; // qty||part||5tabs
+        return `${f.quantity}||${f.part_number}||||||||||||`; // qty||part||5tabs
       });
       
       // ONE line: 13 leading tabs + all items joined directly
