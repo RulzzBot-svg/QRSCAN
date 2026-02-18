@@ -184,33 +184,33 @@ function AdminAHUs() {
 
     try {
       // Format data for QB SpecialPaste.exe
-      // QB columns: [13 empty cols] | Qty | Item Number | Description | Unit Price | Class | Extension | Tax
-      // || represents TAB between columns
-      // We provide: 13 empty tabs + quantity + tab + part_number (QB autofills the rest)
-      const lines = allSelectedFilters.map((f) => {
-        // 13 tabs to skip columns, then qty||item_number
-        return `||||||||||||||||||||||||||${f.quantity}||${f.part_number}`;
+      // QB format: ALL items on ONE line, horizontally
+      // Structure: [13 tabs] qty||part# [5 tabs] qty||part# [5 tabs] qty||part# ...
+      const itemParts = allSelectedFilters.map((f) => {
+        return `${f.quantity}||${f.part_number}||||||||||`; // qty||part#||5 tabs
       });
-      const data = lines.join("\n");
+      
+      // Join all items on ONE line with 13 leading tabs
+      const data = `||||||||||||||||||||||||||${itemParts.join("")}`;
 
       // Copy to clipboard
       try {
         await navigator.clipboard.writeText(data);
         
         // Show detailed instructions for QB auto-paste
-        const preview = lines.slice(0, 5).join("\n") + (lines.length > 5 ? `\n... (${lines.length - 5} more)` : "");
+        const preview = data.slice(0, 200) + (data.length > 200 ? "..." : "");
         
         alert(
-          `✓ ${lines.length} filter${lines.length > 1 ? 's' : ''} copied to clipboard!\n\n` +
-          "Preview (13 tabs → Qty → Item #):\n" +
+          `✓ ${allSelectedFilters.length} filter${allSelectedFilters.length > 1 ? 's' : ''} copied to clipboard!\n\n` +
+          "Preview (all on ONE line):\n" +
           preview +
           "\n\n━━━ QUICKBOOKS AUTO-PASTE ━━━\n" +
           "1. Open QuickBooks packing slip\n" +
           "2. Click in the FIRST cell (top-left)\n" +
           "3. Press Ctrl+Shift+V to auto-paste\n" +
-          "4. Press Ctrl+Q to stop if needed\n\n" +
-          "Note: Data skips 13 columns, then enters Qty & Item #\n" +
-          "QB will auto-fill Description, Price, etc.!"
+          "4. Items will fill across horizontally\n" +
+          "5. Press Ctrl+Q to stop if needed\n\n" +
+          "Format: [13 tabs] qty||part# [5 tabs] qty||part# ..."
         );
         
         // Clear selections after success
