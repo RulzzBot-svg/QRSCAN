@@ -192,7 +192,7 @@ function AdminAHUs() {
       });
       
       // ONE line: 13 leading tabs + all items joined directly
-      const data = `||||||||||||||||||||||||||${itemParts.join("")}`;
+      const data = `${itemParts.join("")}`;
 
       // Copy to clipboard
       try {
