@@ -38,6 +38,7 @@ function AdminAHUs() {
   const [showSignoff, setShowSignoff] = useState(false);
   const [qbMacroLoading, setQbMacroLoading] = useState(false);
   const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({}); // { [ahuId]: Set<filterId> }
+  const [listenerAvailable, setListenerAvailable] = useState(false); // Local QB listener status
 
   // NEW: Global (page-level) filter bar state (independent of tables)
   const [globalFilters, setGlobalFilters] = useState({
@@ -46,6 +47,26 @@ function AdminAHUs() {
     nextFrom: "", // yyyy-mm-dd
     nextTo: "", // yyyy-mm-dd
   });
+
+  // Check if local QB listener is available
+  useEffect(() => {
+    const checkListener = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/health', { 
+          method: 'GET',
+          mode: 'cors'
+        });
+        if (res.ok) {
+          setListenerAvailable(true);
+          console.log("✓ QB Auto-Paste Listener detected on localhost:5000");
+        }
+      } catch (e) {
+        setListenerAvailable(false);
+        console.log("QB Auto-Paste Listener not found - will use manual clipboard copy");
+      }
+    };
+    checkListener();
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -190,36 +211,70 @@ function AdminAHUs() {
       });
       const data = lines.join("\n");
 
-      // Copy to clipboard
-      try {
-        await navigator.clipboard.writeText(data);
-      } catch (clipboardErr) {
-        console.error("Clipboard copy failed:", clipboardErr);
-        alert("Failed to copy data to clipboard. Check browser permissions.");
-        setQbMacroLoading(false);
-        return;
+      // If local listener is available, use auto-paste
+      if (listenerAvailable) {
+        try {
+          const res = await fetch('http://localhost:5000/paste', {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              data: data,
+              delete_old: false
+            })
+          });
+
+          const result = await res.json();
+          
+          if (res.ok) {
+            alert(
+              "✓ Auto-paste initiated!\n\n" +
+              "Status: " + result.status + "\n\n" +
+              (result.steps ? result.steps.join('\n') : "") +
+              "\n\nMake sure QB window is in focus!"
+            );
+            setSelectedFiltersForQB({});
+          } else {
+            // Fallback to manual clipboard copy if listener call fails
+            console.error("Listener returned error:", result.error);
+            await manualClipboardCopy(data);
+          }
+        } catch (err) {
+          console.error("Listener call failed:", err);
+          // Fallback to manual clipboard copy
+          await manualClipboardCopy(data);
+        }
+      } else {
+        // No listener available - use manual clipboard copy
+        await manualClipboardCopy(data);
       }
-
-      // Show success with manual paste instructions
-      alert(
-        "✓ Filter data copied to clipboard!\n\n" +
-        "Packing slip format (part_number | size | quantity):\n\n" +
-        data.slice(0, 200) + (data.length > 200 ? "..." : "") +
-        "\n\nSteps:\n" +
-        "1. Open QuickBooks on your machine\n" +
-        "2. Navigate to the packing slip section\n" +
-        "3. Click where you want to paste the data\n" +
-        "4. Press Ctrl+Shift+V to auto-paste (if using SpecialPaste.exe)\n" +
-        "   OR Ctrl+V to paste normally"
-      );
-
-      // Clear selections after success
-      setSelectedFiltersForQB({});
     } catch (err) {
       console.error("Unexpected error in generatePackingSlip:", err);
       alert("Unexpected error. Check browser console for details.");
     } finally {
       setQbMacroLoading(false);
+    }
+  };
+
+  // Manual fallback: Copy to clipboard and show instructions
+  const manualClipboardCopy = async (data) => {
+    try {
+      await navigator.clipboard.writeText(data);
+      alert(
+        "✓ Filter data copied to clipboard!\n\n" +
+        "Packing slip format (part_number | size | quantity):\n\n" +
+        data.slice(0, 150) + (data.length > 150 ? "\n..." : "") +
+        "\n\nSteps:\n" +
+        "1. Open QuickBooks\n" +
+        "2. Navigate to packing slip section\n" +
+        "3. Click where you want to paste\n" +
+        "4. Press Ctrl+V to paste\n\n" +
+        "(Tip: Run 'python qb_listener.py' on your machine for auto-paste)"
+      );
+      setSelectedFiltersForQB({});
+    } catch (clipboardErr) {
+      console.error("Clipboard copy failed:", clipboardErr);
+      alert("Failed to copy to clipboard. Check browser permissions.");
     }
   };
 
@@ -249,16 +304,18 @@ function AdminAHUs() {
                 : 'btn-disabled'
             }`}
             onClick={generatePackingSlip}
-            disabled={qbMacroLoading || !Object.values(selectedFiltersForQB).some(set => set && set.size > 0)}
+            disabled={qbMacroLoading || !Object.values(selectedFiltersForQB).some(arr => arr && arr.length > 0)}
             type="button"
           >
             {qbMacroLoading ? (
               <>
                 <span className="loading loading-spinner loading-xs"></span>
-                Launching...
+                {listenerAvailable ? "Auto-pasting..." : "Copying..."}
               </>
+            ) : listenerAvailable ? (
+              "⚡ Auto-Paste to QB"
             ) : (
-              "📋 QB Packing Slip"
+              "📋 Copy to Clipboard"
             )}
           </button>
           <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">
