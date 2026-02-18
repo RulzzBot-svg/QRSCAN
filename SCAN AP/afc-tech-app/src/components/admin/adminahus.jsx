@@ -155,8 +155,8 @@ function AdminAHUs() {
   };
 
   const generatePackingSlip = async () => {
-    // Collect all selected filters across all AHUs
-    const allSelectedFilters = [];
+    // Collect all selected filters GROUPED BY AHU
+    const filtersByAhu = {};
     let hasAnyFilters = false;
 
     for (const [ahuId, filterObjects] of Object.entries(selectedFiltersForQB)) {
@@ -164,13 +164,10 @@ function AdminAHUs() {
         hasAnyFilters = true;
         const ahu = ahus.find((a) => a.id == ahuId);
         if (ahu) {
-          for (const filter of filterObjects) {
-            allSelectedFilters.push({
-              part_number: filter.part_number,
-              quantity: filter.quantity,
-              ahu_name: ahu.name,
-            });
-          }
+          filtersByAhu[ahuId] = {
+            ahu_name: ahu.name || ahu.id,
+            filters: filterObjects
+          };
         }
       }
     }
@@ -184,34 +181,43 @@ function AdminAHUs() {
 
     try {
       // Format data for QB SpecialPaste.exe
-      // ALL items on ONE continuous line (SpecialPaste doesn't handle newlines)
-      // Format: [13 tabs] qty||part||[5 tabs] qty||part||[5 tabs] qty||part ...
-      // Build each item piece
-      const itemParts = allSelectedFilters.map((f) => {
-        return `${f.quantity}||${f.part_number}||||||||||||`; // qty||part||5tabs
-      });
+      // QB columns after 13 initial tabs: [skip 2] | Description | [skip 6] | Qty | Part | [skip 6] | ...
+      // Pattern: |||| = 2 tabs, then description, then |||||||||||| = 6 tabs, then qty||part||||||||||
       
-      // ONE line: 13 leading tabs + all items joined directly
-      const data = `${itemParts.join("")}`;
+      const allParts = [];
+      
+      // For each AHU, add AHU name header, then items
+      for (const [ahuId, ahuData] of Object.entries(filtersByAhu)) {
+        // AHU header: |||| (2 tabs) + AHU name + |||||||||||||||||||||||| (13 tabs)
+        allParts.push(`||||${ahuData.ahu_name}||||||||||||||||||||||||||`);
+        
+        // Items: |||||||||||||||| (8 tabs to skip description) + qty || part |||||||||| (6 tabs)
+        ahuData.filters.forEach((f) => {
+          allParts.push(`||||||||||||||||${f.quantity}||${f.part_number}||||||||||||`);
+        });
+      }
+      
+      // ONE continuous line: all parts joined
+      const data = allParts.join("");
 
       // Copy to clipboard
       try {
         await navigator.clipboard.writeText(data);
         
-        // Show detailed instructions for QB auto-paste
-        const preview = data.slice(0, 150) + (data.length > 150 ? "..." : "");
+        const totalItems = Object.values(filtersByAhu).reduce((sum, a) => sum + a.filters.length, 0);
+        const preview = data.slice(0, 200) + (data.length > 200 ? "..." : "");
         
         alert(
-          `✓ ${allSelectedFilters.length} filter${allSelectedFilters.length > 1 ? 's' : ''} copied to clipboard!\n\n` +
-          "Preview (all on ONE line):\n" +
+          `✓ ${Object.keys(filtersByAhu).length} AHU(s), ${totalItems} filter(s) copied!\n\n` +
+          "Preview (one continuous line):\n" +
           preview +
           "\n\n━━━ QUICKBOOKS AUTO-PASTE ━━━\n" +
           "1. Open QuickBooks packing slip\n" +
           "2. Click in the FIRST cell (top-left)\n" +
           "3. Press Ctrl+Shift+V to auto-paste\n" +
-          "4. Items will fill across horizontally\n" +
-          "5. Press Ctrl+Q to stop if needed\n\n" +
-          "Format: [13 tabs] qty||part [5 tabs] qty||part ..."
+          "4. AHU names appear as section headers\n" +
+          "5. Items fill across horizontally\n" +
+          "6. Press Ctrl+Q to stop if needed"
         );
         
         // Clear selections after success
