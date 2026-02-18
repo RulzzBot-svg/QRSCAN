@@ -208,10 +208,10 @@ function AdminAHUs() {
 
           if (fdesc) {
             // qty || item || description ||||||||||  (then next item)
-            allParts.push(`${qty}||${part}||${fdesc}||||||||||||`);
+            allParts.push(`${qty}||${part}||${fdesc}||||||||||`);
           } else {
             // qty || item |||||||||| (no item-level description)
-            allParts.push(`${qty}||${part}||||||||||||`);
+            allParts.push(`${qty}||${part}||||||||||`);
           }
         });
       }
