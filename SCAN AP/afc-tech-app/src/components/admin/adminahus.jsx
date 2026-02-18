@@ -246,9 +246,9 @@ function AdminAHUs() {
           <button className="btn btn-xs" onClick={() => setShowImport(true)} type="button">
             Import
           </button>
-          <button 
+          <button
             className={`btn btn-xs ${
-              Object.values(selectedFiltersForQB).some(set => set && set.size > 0)
+              Object.values(selectedFiltersForQB).some(arr => arr && arr.length > 0)
                 ? 'btn-accent'
                 : 'btn-disabled'
             }`}
