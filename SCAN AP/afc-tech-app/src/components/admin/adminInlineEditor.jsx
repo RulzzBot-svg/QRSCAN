@@ -80,15 +80,13 @@ const getFrequencyColor = (freqDays) => {
   return map[m] || null;
 };
 
-function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
+function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange }) {
   const [filters, setFilters] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null);
   const [toast, setToast] = useState(null);
-  const [qbMacroLoading, setQbMacroLoading] = useState(false);
-  const [qbMacroError, setQbMacroError] = useState(null);
 
   const showToast = (message, type = "info") => {
     setToast({ message, type });
@@ -230,99 +228,12 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
       } else {
         newSet.add(filterId);
       }
+      // Report selection change to parent
+      if (onSelectionChange) {
+        onSelectionChange(newSet);
+      }
       return newSet;
     });
-  };
-
-  const formatForQBPackingSlip = () => {
-    const selected = filteredFilters.filter(
-      (f) => selectedFilters.has(f.id) && !f._inactive
-    );
-
-    if (selected.length === 0) return null;
-
-    // Format: part_number||size||quantity (|| = TAB separator for QB)
-    const lines = selected.map((f) => {
-      return `${f.part_number}||${f.size}||${f.quantity}`;
-    });
-
-    return lines.join("\n");
-  };
-
-  const generatePackingSlip = async () => {
-    // Validation
-    if (selectedFilters.size === 0) {
-      showToast("Select at least one filter to generate packing slip.", "warning");
-      return;
-    }
-
-    const data = formatForQBPackingSlip();
-    if (!data) {
-      showToast("No valid filters selected.", "warning");
-      return;
-    }
-
-    setQbMacroLoading(true);
-    setQbMacroError(null);
-
-    try {
-      // Step 1: Copy data to clipboard
-      try {
-        await navigator.clipboard.writeText(data);
-        showToast("✓ Data copied to clipboard", "info");
-      } catch (clipboardErr) {
-        console.error("Clipboard copy failed:", clipboardErr);
-        setQbMacroError("Failed to copy data to clipboard. Check browser permissions.");
-        showToast(
-          "Clipboard error: Check browser permissions.",
-          "error"
-        );
-        setQbMacroLoading(false);
-        return;
-      }
-
-      // Step 2: Launch QB macros
-      try {
-        const res = await API.post("/admin/launch-qb-macro", {
-          action: "generate_packing_slip",
-          delete_old: false, // User can optionally enable this
-        });
-
-        if (res.data.status === "started") {
-          showToast(
-            "✓ QB macros launched! Focus QB window → Ctrl+Shift+V to paste",
-            "success"
-          );
-          
-          // Display helpful instructions in a modal-like toast
-          setQbMacroError(null); // Clear any previous errors
-          console.log("QB Workflow Steps:", res.data.steps);
-          
-          // Clear selections after successful launch
-          setSelectedFilters(new Set());
-        }
-      } catch (apiErr) {
-        console.error("API error calling QB macro:", apiErr);
-
-        // Parse API error response for user-friendly messages
-        const errorMsg =
-          apiErr.response?.data?.error ||
-          apiErr.response?.data?.detail ||
-          "Failed to launch QB macros";
-
-        const errorDetail = apiErr.response?.data?.tip ||
-          "Ensure QuickBooks is open and macros are in the backend directory";
-
-        setQbMacroError(`${errorMsg}: ${errorDetail}`);
-        showToast(errorMsg, "error");
-      }
-    } catch (err) {
-      console.error("Unexpected error in generatePackingSlip:", err);
-      setQbMacroError("Unexpected error occurred. Check browser console.");
-      showToast("Unexpected error. Check console for details.", "error");
-    } finally {
-      setQbMacroLoading(false);
-    }
   };
 
   const activeCount = useMemo(
@@ -385,11 +296,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
           {filteredFilters.length !== filters.length && (
             <span className="ml-2 text-warning">({filters.length} total)</span>
           )}
-          {selectedFilters.size > 0 && (
-            <span className="ml-2 text-info font-semibold">
-              [{selectedFilters.size} selected]
-            </span>
-          )}
         </div>
 
         <div className="flex gap-1">
@@ -400,57 +306,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
           >
             + Add
           </button>
-          
-          <button
-            type="button"
-            className={`btn btn-xs ${
-              selectedFilters.size === 0
-                ? "btn-disabled"
-                : "btn-accent"
-            }`}
-            onClick={generatePackingSlip}
-            disabled={selectedFilters.size === 0 || qbMacroLoading}
-          >
-            {qbMacroLoading ? (
-              <>
-                <span className="loading loading-spinner loading-xs"></span>
-                Launching...
-              </>
-            ) : (
-              "📋 QB Packing Slip"
-            )}
-          </button>
         </div>
       </div>
-
-      {/* QB Macro Error Display */}
-      {qbMacroError && (
-        <div className="alert alert-error mb-2 text-xs">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="stroke-current shrink-0 h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M10 14l-2-2m0 0l-2-2m2 2l2-2m-2 2l-2 2"
-            />
-          </svg>
-          <div>
-            <h3 className="font-bold text-xs">QB Macro Error</h3>
-            <div className="text-xs">{qbMacroError}</div>
-            <button
-              className="btn btn-xs btn-ghost"
-              onClick={() => setQbMacroError(null)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="py-4 text-center">
@@ -479,19 +336,16 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
               {filteredFilters.map((f) => {
                 const st = getRowStatus(f);
                 const nextDue = computeNextDueDate(f);
-                const isSelected = selectedFilters.has(f.id);
 
                 const rowClass = f._inactive
                   ? "opacity-40 italic"
-                  : isSelected
-                    ? "bg-info/15 border-l-4 border-l-info font-semibold"
-                    : st.key === "overdue"
-                      ? "bg-error/15 border-l-4 border-l-error"
-                      : st.key === "dueSoon"
-                        ? "bg-warning/10 border-l-4 border-l-warning"
-                        : f._isNew
-                          ? "bg-primary/5"
-                          : "";
+                  : st.key === "overdue"
+                    ? "bg-error/15 border-l-4 border-l-error"
+                    : st.key === "dueSoon"
+                      ? "bg-warning/10 border-l-4 border-l-warning"
+                      : f._isNew
+                        ? "bg-primary/5"
+                        : "";
 
                 const freqColor = getFrequencyColor(f.frequency_days);
                 const rowStyle = {};
@@ -499,7 +353,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                   !f._inactive &&
                   st.key !== "overdue" &&
                   st.key !== "dueSoon" &&
-                  !isSelected &&
                   freqColor
                 ) {
                   rowStyle.backgroundColor = freqColor;

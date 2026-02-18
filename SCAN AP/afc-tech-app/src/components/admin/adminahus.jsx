@@ -36,6 +36,8 @@ function AdminAHUs() {
   const [showImport, setShowImport] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
   const [showSignoff, setShowSignoff] = useState(false);
+  const [qbMacroLoading, setQbMacroLoading] = useState(false);
+  const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({}); // { [ahuId]: Set<filterId> }
 
   // NEW: Global (page-level) filter bar state (independent of tables)
   const [globalFilters, setGlobalFilters] = useState({
@@ -145,6 +147,96 @@ function AdminAHUs() {
     setGlobalFilters({ frequency: "all", status: "all", nextFrom: "", nextTo: "" });
   };
 
+  const handleFilterSelection = (ahuId, selectedFilterIds) => {
+    setSelectedFiltersForQB((prev) => ({
+      ...prev,
+      [ahuId]: selectedFilterIds,
+    }));
+  };
+
+  const generatePackingSlip = async () => {
+    // Collect all selected filters across all AHUs
+    const allSelectedFilters = [];
+    let hasAnyFilters = false;
+
+    for (const [ahuId, filterIds] of Object.entries(selectedFiltersForQB)) {
+      if (filterIds && filterIds.size > 0) {
+        hasAnyFilters = true;
+        // Find the AHU's filters
+        const ahu = ahus.find((a) => a.id == ahuId);
+        if (ahu && Array.isArray(ahu.filters)) {
+          for (const filterId of filterIds) {
+            const filter = ahu.filters.find((f) => f.id == filterId);
+            if (filter) {
+              allSelectedFilters.push({
+                part_number: filter.part_number,
+                size: filter.size,
+                quantity: filter.quantity,
+                ahu_name: ahu.name,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    if (!hasAnyFilters) {
+      alert("Please select at least one filter to generate packing slip");
+      return;
+    }
+
+    setQbMacroLoading(true);
+
+    try {
+      // Format data for QB: part_number||size||quantity (|| = TAB)
+      const lines = allSelectedFilters.map((f) => {
+        return `${f.part_number}||${f.size}||${f.quantity}`;
+      });
+      const data = lines.join("\n");
+
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(data);
+      } catch (clipboardErr) {
+        console.error("Clipboard copy failed:", clipboardErr);
+        alert("Failed to copy data to clipboard. Check browser permissions.");
+        setQbMacroLoading(false);
+        return;
+      }
+
+      // Launch QB macros
+      try {
+        const res = await API.post("/admin/launch-qb-macro", {
+          action: "generate_packing_slip",
+          delete_old: false,
+        });
+
+        if (res.data.status === "started") {
+          alert(
+            "✓ QB macros launched!\n\nSteps:\n1. Focus QB window\n2. Press Ctrl+Shift+V to paste\n3. Press Ctrl+Q to stop if needed\n\nEstimated time: 5-10 seconds"
+          );
+          // Clear selections after success
+          setSelectedFiltersForQB({});
+        }
+      } catch (apiErr) {
+        console.error("API error calling QB macro:", apiErr);
+        const errorMsg =
+          apiErr.response?.data?.error ||
+          apiErr.response?.data?.detail ||
+          "Failed to launch QB macros";
+        const errorTip =
+          apiErr.response?.data?.tip ||
+          "Ensure QuickBooks is open and macros are in the backend directory";
+        alert(`Error: ${errorMsg}\n\nTip: ${errorTip}`);
+      }
+    } catch (err) {
+      console.error("Unexpected error in generatePackingSlip:", err);
+      alert("Unexpected error. Check browser console for details.");
+    } finally {
+      setQbMacroLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center">
@@ -163,6 +255,25 @@ function AdminAHUs() {
         <div className="flex items-center gap-2">
           <button className="btn btn-xs" onClick={() => setShowImport(true)} type="button">
             Import
+          </button>
+          <button 
+            className={`btn btn-xs ${
+              Object.values(selectedFiltersForQB).some(set => set && set.size > 0)
+                ? 'btn-accent'
+                : 'btn-disabled'
+            }`}
+            onClick={generatePackingSlip}
+            disabled={qbMacroLoading || !Object.values(selectedFiltersForQB).some(set => set && set.size > 0)}
+            type="button"
+          >
+            {qbMacroLoading ? (
+              <>
+                <span className="loading loading-spinner loading-xs"></span>
+                Launching...
+              </>
+            ) : (
+              "📋 QB Packing Slip"
+            )}
           </button>
           <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">
             Sign-off
@@ -324,7 +435,12 @@ function AdminAHUs() {
                     {/* Always visible filters table */}
                     <div className="p-2">
                       {/* Pass the global filters down (AdminFilterEditorInline can ignore or use it) */}
-                      <AdminFilterEditorInline ahuId={a.id} isOpen={true} globalFilters={globalFilters} />
+                      <AdminFilterEditorInline 
+                        ahuId={a.id} 
+                        isOpen={true} 
+                        globalFilters={globalFilters}
+                        onSelectionChange={(selectedIds) => handleFilterSelection(a.id, selectedIds)}
+                      />
                     </div>
                   </div>
                 );
