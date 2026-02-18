@@ -10,8 +10,6 @@ const FREQUENCY_OPTIONS = [
   { label: "365 Days", value: 365 },
   { label: "18 Months", value: 540 },
 ];
-//not optimal mixing days and month but what can you do huh
-
 
 const parseSize = (size) => {
   if (!size) return { h: "", w: "", d: "" };
@@ -24,9 +22,6 @@ const buildSize = ({ h, w, d }) => {
   return `${h}x${w}x${d}`;
 };
 
-// ------------------------------------------------------
-// Date/status helpers (frontend-only overdue highlighting)
-// ------------------------------------------------------
 const startOfDay = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -45,12 +40,10 @@ const computeNextDueDate = (f) => {
 };
 
 const getRowStatus = (f) => {
-  // Inactive always stays muted
   if (f?._inactive) {
     return { key: "inactive", label: "Inactive" };
   }
 
-  // Can't compute due date without last_service_date/frequency_days
   const nextDue = computeNextDueDate(f);
   if (!nextDue) {
     return { key: "pending", label: "Pending" };
@@ -79,9 +72,9 @@ const getFrequencyColor = (freqDays) => {
     120: "#E5A065",
     180: "#C5E0B3",
     365: "#FBE4D5",
-    540: "#F3F0D9", // 18 months approx
-    730: "#49BFBC", // 2 years
-    1095: "#FFD965", // 3 years
+    540: "#F3F0D9",
+    730: "#49BFBC",
+    1095: "#FFD965",
   };
 
   return map[m] || null;
@@ -91,48 +84,44 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
   const [filters, setFilters] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // { mode: "deactivate" | "reactivate", filter: FilterRow } | null
+  const [selectedFilters, setSelectedFilters] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null);
-
   const [toast, setToast] = useState(null);
+  const [qbMacroLoading, setQbMacroLoading] = useState(false);
+  const [qbMacroError, setQbMacroError] = useState(null);
 
   const showToast = (message, type = "info") => {
     setToast({ message, type });
     window.clearTimeout(showToast._t);
-    showToast._t = window.setTimeout(() => setToast(null), 1600);
+    showToast._t = window.setTimeout(() => setToast(null), 3000);
   };
 
-  // ✅ IMPORTANT FOR OPTION 3:
-  // When selecting a different AHU in the right panel, we must reset and reload.
   useEffect(() => {
     setFilters([]);
     setLoaded(false);
     setLoading(false);
     setConfirmAction(null);
+    setSelectedFilters(new Set());
   }, [ahuId]);
 
-  // Lazy-load only when opened
   useEffect(() => {
     if (!isOpen || loaded) return;
 
     const load = async () => {
       setLoading(true);
       try {
-        // NOTE: backend currently doesn't read include_inactive, but it still returns inactive rows
-        // because you aren't filtering by active_only=1. Leaving this as-is to avoid backend changes.
         const res = await API.get(`/admin/ahus/${ahuId}/filters?include_inactive=1`);
         setFilters(
           (Array.isArray(res.data) ? res.data : []).map((f) => ({
             ...f,
             sizeParts: parseSize(f.size),
-            _inactive: f.is_active === false, // derive UI from DB
+            _inactive: f.is_active === false,
           }))
         );
         setLoaded(true);
       } catch (e) {
-        console.error(e);
-        showToast("Failed to load filters.", "info");
+        console.error("Error loading filters:", e);
+        showToast("Failed to load filters.", "error");
       } finally {
         setLoading(false);
       }
@@ -189,8 +178,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
 
     await API.post(`/admin/ahus/${ahuId}/filters`, payload);
     showToast("Filter added.", "success");
-
-    // Force a reload so we get the real DB id
     setLoaded(false);
   };
 
@@ -216,7 +203,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
   const deactivateFilter = async (filter) => {
     if (!filter) return;
 
-    // unsaved row? just remove it
     if (String(filter.id).startsWith("new-")) {
       setFilters((prev) => prev.filter((x) => x.id !== filter.id));
       showToast("Unsaved filter removed.", "info");
@@ -236,23 +222,123 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
     showToast("Filter reactivated.", "success");
   };
 
+  const toggleFilterSelection = (filterId) => {
+    setSelectedFilters((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(filterId)) {
+        newSet.delete(filterId);
+      } else {
+        newSet.add(filterId);
+      }
+      return newSet;
+    });
+  };
+
+  const formatForQBPackingSlip = () => {
+    const selected = filteredFilters.filter(
+      (f) => selectedFilters.has(f.id) && !f._inactive
+    );
+
+    if (selected.length === 0) return null;
+
+    // Format: part_number||size||quantity (|| = TAB separator for QB)
+    const lines = selected.map((f) => {
+      return `${f.part_number}||${f.size}||${f.quantity}`;
+    });
+
+    return lines.join("\n");
+  };
+
+  const generatePackingSlip = async () => {
+    // Validation
+    if (selectedFilters.size === 0) {
+      showToast("Select at least one filter to generate packing slip.", "warning");
+      return;
+    }
+
+    const data = formatForQBPackingSlip();
+    if (!data) {
+      showToast("No valid filters selected.", "warning");
+      return;
+    }
+
+    setQbMacroLoading(true);
+    setQbMacroError(null);
+
+    try {
+      // Step 1: Copy data to clipboard
+      try {
+        await navigator.clipboard.writeText(data);
+        showToast("✓ Data copied to clipboard", "info");
+      } catch (clipboardErr) {
+        console.error("Clipboard copy failed:", clipboardErr);
+        setQbMacroError("Failed to copy data to clipboard. Check browser permissions.");
+        showToast(
+          "Clipboard error: Check browser permissions.",
+          "error"
+        );
+        setQbMacroLoading(false);
+        return;
+      }
+
+      // Step 2: Launch QB macros
+      try {
+        const res = await API.post("/admin/launch-qb-macro", {
+          action: "generate_packing_slip",
+          delete_old: false, // User can optionally enable this
+        });
+
+        if (res.data.status === "started") {
+          showToast(
+            "✓ QB macros launched! Focus QB window → Ctrl+Shift+V to paste",
+            "success"
+          );
+          
+          // Display helpful instructions in a modal-like toast
+          setQbMacroError(null); // Clear any previous errors
+          console.log("QB Workflow Steps:", res.data.steps);
+          
+          // Clear selections after successful launch
+          setSelectedFilters(new Set());
+        }
+      } catch (apiErr) {
+        console.error("API error calling QB macro:", apiErr);
+
+        // Parse API error response for user-friendly messages
+        const errorMsg =
+          apiErr.response?.data?.error ||
+          apiErr.response?.data?.detail ||
+          "Failed to launch QB macros";
+
+        const errorDetail = apiErr.response?.data?.tip ||
+          "Ensure QuickBooks is open and macros are in the backend directory";
+
+        setQbMacroError(`${errorMsg}: ${errorDetail}`);
+        showToast(errorMsg, "error");
+      }
+    } catch (err) {
+      console.error("Unexpected error in generatePackingSlip:", err);
+      setQbMacroError("Unexpected error occurred. Check browser console.");
+      showToast("Unexpected error. Check console for details.", "error");
+    } finally {
+      setQbMacroLoading(false);
+    }
+  };
+
   const activeCount = useMemo(
     () => filters.filter((f) => !f._inactive).length,
     [filters]
   );
 
-  // Apply global filters to the filters list
   const filteredFilters = useMemo(() => {
     if (!globalFilters) return filters;
 
     return filters.filter((f) => {
-      // Filter by frequency
       if (globalFilters.frequency !== "all") {
         const selectedFreq = Number(globalFilters.frequency);
         if (f.frequency_days !== selectedFreq) return false;
       }
 
-      // Filter by status
       if (globalFilters.status !== "all") {
         const status = getRowStatus(f);
         const statusMap = {
@@ -265,16 +351,16 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
         if (status.key !== statusMap[globalFilters.status]) return false;
       }
 
-      // Filter by next date range
       if (globalFilters.nextFrom || globalFilters.nextTo) {
         const nextDue = computeNextDueDate(f);
         if (!nextDue) {
-          // If no next due date, exclude unless we're filtering for pending
           if (globalFilters.status !== "pending") return false;
         } else {
           const nextDueStr = nextDue.toISOString().split("T")[0];
-          if (globalFilters.nextFrom && nextDueStr < globalFilters.nextFrom) return false;
-          if (globalFilters.nextTo && nextDueStr > globalFilters.nextTo) return false;
+          if (globalFilters.nextFrom && nextDueStr < globalFilters.nextFrom)
+            return false;
+          if (globalFilters.nextTo && nextDueStr > globalFilters.nextTo)
+            return false;
         }
       }
 
@@ -291,6 +377,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
 
   return (
     <div className="bg-base-50">
+      {/* Header with counts and action buttons */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="text-xs opacity-70">
           <span className="font-semibold">{filteredActiveCount}</span> active
@@ -298,12 +385,72 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
           {filteredFilters.length !== filters.length && (
             <span className="ml-2 text-warning">({filters.length} total)</span>
           )}
+          {selectedFilters.size > 0 && (
+            <span className="ml-2 text-info font-semibold">
+              [{selectedFilters.size} selected]
+            </span>
+          )}
         </div>
 
-        <button type="button" className="btn btn-xs btn-ghost" onClick={addFilter}>
-          + Add
-        </button>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className="btn btn-xs btn-ghost"
+            onClick={addFilter}
+          >
+            + Add
+          </button>
+          
+          <button
+            type="button"
+            className={`btn btn-xs ${
+              selectedFilters.size === 0
+                ? "btn-disabled"
+                : "btn-accent"
+            }`}
+            onClick={generatePackingSlip}
+            disabled={selectedFilters.size === 0 || qbMacroLoading}
+          >
+            {qbMacroLoading ? (
+              <>
+                <span className="loading loading-spinner loading-xs"></span>
+                Launching...
+              </>
+            ) : (
+              "📋 QB Packing Slip"
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* QB Macro Error Display */}
+      {qbMacroError && (
+        <div className="alert alert-error mb-2 text-xs">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="stroke-current shrink-0 h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M10 14l-2-2m0 0l-2-2m2 2l2-2m-2 2l-2 2"
+            />
+          </svg>
+          <div>
+            <h3 className="font-bold text-xs">QB Macro Error</h3>
+            <div className="text-xs">{qbMacroError}</div>
+            <button
+              className="btn btn-xs btn-ghost"
+              onClick={() => setQbMacroError(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="py-4 text-center">
@@ -314,7 +461,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
           <table className="table table-xs w-full">
             <thead>
               <tr className="text-xs">
-                <th Classname="px-1"></th>
+                <th className="px-1">✓</th>
                 <th className="px-1">Phase</th>
                 <th className="px-1">Part #</th>
                 <th className="px-1">Size (inches)</th>
@@ -332,40 +479,51 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
               {filteredFilters.map((f) => {
                 const st = getRowStatus(f);
                 const nextDue = computeNextDueDate(f);
+                const isSelected = selectedFilters.has(f.id);
 
                 const rowClass = f._inactive
                   ? "opacity-40 italic"
-                  : st.key === "overdue"
-                    ? "bg-error/15 border-l-4 border-l-error"
-                    : st.key === "dueSoon"
-                      ? "bg-warning/10 border-l-4 border-l-warning"
-                      : f._isNew
-                        ? "bg-primary/5"
-                        : "";
+                  : isSelected
+                    ? "bg-info/15 border-l-4 border-l-info font-semibold"
+                    : st.key === "overdue"
+                      ? "bg-error/15 border-l-4 border-l-error"
+                      : st.key === "dueSoon"
+                        ? "bg-warning/10 border-l-4 border-l-warning"
+                        : f._isNew
+                          ? "bg-primary/5"
+                          : "";
 
                 const freqColor = getFrequencyColor(f.frequency_days);
                 const rowStyle = {};
-                // Only apply frequency color when not overdue/dueSoon or inactive
-                if (!f._inactive && st.key !== "overdue" && st.key !== "dueSoon" && freqColor) {
+                if (
+                  !f._inactive &&
+                  st.key !== "overdue" &&
+                  st.key !== "dueSoon" &&
+                  !isSelected &&
+                  freqColor
+                ) {
                   rowStyle.backgroundColor = freqColor;
                 }
 
                 return (
-                  //this cell is just for the "new" badge, it has to later become a checkbox that selects this specific filter
-                  //for pulling packing slips and connecting it later, so leaving it as a separate cell for now
                   <tr key={f.id} className={rowClass} style={rowStyle}>
                     <td className="px-1 py-0.5">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         className="checkbox checkbox-xs"
                         disabled={f._inactive}
+                        checked={isSelected}
+                        onChange={() => toggleFilterSelection(f.id)}
                       />
                     </td>
+
                     <td className="px-1 py-0.5">
                       <input
                         className="input input-xs input-bordered w-10"
                         value={f.phase}
-                        onChange={(e) => updateFilter(f.id, "phase", e.target.value)}
+                        onChange={(e) =>
+                          updateFilter(f.id, "phase", e.target.value)
+                        }
                         disabled={f._inactive}
                       />
                     </td>
@@ -374,7 +532,9 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                       <input
                         className="input input-xs input-bordered w-32"
                         value={f.part_number}
-                        onChange={(e) => updateFilter(f.id, "part_number", e.target.value)}
+                        onChange={(e) =>
+                          updateFilter(f.id, "part_number", e.target.value)
+                        }
                         disabled={f._inactive}
                       />
                     </td>
@@ -389,7 +549,9 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                             className="input input-xs input-bordered w-10"
                             value={f.sizeParts?.[dim] || ""}
                             disabled={f._inactive}
-                            onChange={(e) => updateFilter(f.id, `size.${dim}`, e.target.value)}
+                            onChange={(e) =>
+                              updateFilter(f.id, `size.${dim}`, e.target.value)
+                            }
                           />
                         ))}
                       </div>
@@ -401,7 +563,9 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                         className="input input-xs input-bordered w-10"
                         value={f.quantity}
                         disabled={f._inactive}
-                        onChange={(e) => updateFilter(f.id, "quantity", e.target.value)}
+                        onChange={(e) =>
+                          updateFilter(f.id, "quantity", e.target.value)
+                        }
                       />
                     </td>
 
@@ -410,7 +574,9 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                         className="select select-xs select-bordered w-20 text-xs"
                         value={f.frequency_days}
                         disabled={f._inactive}
-                        onChange={(e) => updateFilter(f.id, "frequency_days", e.target.value)}
+                        onChange={(e) =>
+                          updateFilter(f.id, "frequency_days", e.target.value)
+                        }
                       >
                         {FREQUENCY_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -422,25 +588,47 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
 
                     <td className="px-1 py-0.5 text-xs">
                       {f.last_service_date
-                        ? new Date(f.last_service_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+                        ? new Date(f.last_service_date).toLocaleDateString(
+                            "en-US",
+                            { month: "2-digit", day: "2-digit", year: "numeric" }
+                          )
                         : "—"}
                     </td>
 
-                    <td className="px-1 py-0.5 text-xs">{nextDue ? nextDue.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : "—"}</td>
+                    <td className="px-1 py-0.5 text-xs">
+                      {nextDue
+                        ? nextDue.toLocaleDateString("en-US", {
+                            month: "2-digit",
+                            day: "2-digit",
+                            year: "numeric",
+                          })
+                        : "—"}
+                    </td>
 
                     <td className="px-1 py-0.5">
                       {f._inactive ? (
-                        <span className="badge badge-ghost badge-xs">Inactive</span>
+                        <span className="badge badge-ghost badge-xs">
+                          Inactive
+                        </span>
                       ) : st.key === "overdue" ? (
-                        <span className="badge badge-error badge-xs">{st.label}</span>
+                        <span className="badge badge-error badge-xs">
+                          {st.label}
+                        </span>
                       ) : st.key === "dueSoon" ? (
-                        <span className="badge badge-warning badge-xs">{st.label}</span>
+                        <span className="badge badge-warning badge-xs">
+                          {st.label}
+                        </span>
                       ) : st.key === "pending" ? (
-                        <span className="badge badge-ghost badge-xs">Pending</span>
+                        <span className="badge badge-ghost badge-xs">
+                          Pending
+                        </span>
                       ) : (
-                        <span className="badge badge-success badge-xs">{st.label}</span>
+                        <span className="badge badge-success badge-xs">
+                          {st.label}
+                        </span>
                       )}
                     </td>
+
                     <td className="px-1 py-0.5">
                       <button
                         type="button"
@@ -452,8 +640,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                             if (f._isNew) await saveNew(f);
                             else await saveFilter(f);
                           } catch (err) {
-                            console.error(err);
-                            showToast("Save failed.", "info");
+                            console.error("Filter save error:", err);
+                            showToast("Save failed.", "error");
                           }
                         }}
                       >
@@ -486,7 +674,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                         </button>
                       )}
                     </td>
-
                   </tr>
                 );
               })}
@@ -498,11 +685,12 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                   </td>
                 </tr>
               )}
-              
+
               {filteredFilters.length === 0 && filters.length > 0 && (
                 <tr>
                   <td colSpan={11} className="text-center py-3 opacity-70 text-xs">
-                    No filters match the current filters. Clear filters to see all {filters.length} filter(s).
+                    No filters match the current filters. Clear filters to see all{" "}
+                    {filters.length} filter(s).
                   </td>
                 </tr>
               )}
@@ -519,8 +707,18 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
 
       {toast && (
         <div className="toast toast-center toast-middle z-9999">
-          <div className={`alert ${toast.type === "success" ? "alert-success" : "alert-info"}`}>
-            <span className="text-xs">{toast.message}</span>
+          <div
+            className={`alert text-xs ${
+              toast.type === "success"
+                ? "alert-success"
+                : toast.type === "error"
+                  ? "alert-error"
+                  : toast.type === "warning"
+                    ? "alert-warning"
+                    : "alert-info"
+            }`}
+          >
+            <span>{toast.message}</span>
           </div>
         </div>
       )}
@@ -539,18 +737,22 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
             <p className="py-3">
               {confirmAction.mode === "deactivate" ? (
                 <>
-                  Deactivate <strong>{confirmAction.filter.part_number}</strong>? It will stay visible,
-                  but won’t count for future schedules.
+                  Deactivate <strong>{confirmAction.filter.part_number}</strong>? It
+                  will stay visible, but won't count for future schedules.
                 </>
               ) : (
                 <>
-                  Reactivate <strong>{confirmAction.filter.part_number}</strong>? It will count again for schedules.
+                  Reactivate <strong>{confirmAction.filter.part_number}</strong>? It
+                  will count again for schedules.
                 </>
               )}
             </p>
 
             <div className="modal-action">
-              <button className="btn btn-outline" onClick={() => setConfirmAction(null)}>
+              <button
+                className="btn btn-outline"
+                onClick={() => setConfirmAction(null)}
+              >
                 Cancel
               </button>
 
@@ -568,12 +770,17 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters }) {
                     if (mode === "deactivate") await deactivateFilter(filter);
                     else await reactivateFilter(filter);
                   } catch (err) {
-                    console.error(err);
-                    showToast(`${mode} failed. Check server logs.`, "info");
+                    console.error(`${mode} error:`, err);
+                    showToast(
+                      `${mode} failed. Check server logs.`,
+                      "error"
+                    );
                   }
                 }}
               >
-                {confirmAction.mode === "deactivate" ? "Yes, Deactivate" : "Yes, Reactivate"}
+                {confirmAction.mode === "deactivate"
+                  ? "Yes, Deactivate"
+                  : "Yes, Reactivate"}
               </button>
             </div>
           </div>

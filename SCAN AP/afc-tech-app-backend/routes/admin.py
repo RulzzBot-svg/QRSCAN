@@ -6,6 +6,15 @@ from sqlalchemy.orm import joinedload
 import re
 from datetime import datetime
 from middleware.auth import require_admin
+import subprocess
+import time
+import os
+from pathlib import Path
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -232,3 +241,115 @@ def create_ahu():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+@admin_bp.route("/launch-qb-macro", methods=["POST"])
+@require_admin
+def launch_qb_macro():
+    """
+    Launch QuickBooks automation macros for packing slip generation.
+    
+    Workflow:
+    1. Validates QB macros exist
+    2. Optionally deletes old packing slip section (qb_sections.au3)
+    3. Launches SpecialPaste.exe to auto-populate data
+    
+    Expected body:
+    {
+        "action": "generate_packing_slip",
+        "delete_old": true/false (optional, default false)
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        action = data.get("action")
+        delete_old = data.get("delete_old", False)
+        
+        if not action:
+            logger.warning("QB macro launched without action parameter")
+            return jsonify({
+                "error": "Missing 'action' parameter",
+                "valid_actions": ["generate_packing_slip"]
+            }), 400
+        
+        if action not in ["generate_packing_slip"]:
+            logger.warning(f"QB macro launched with invalid action: {action}")
+            return jsonify({
+                "error": f"Invalid action: {action}",
+                "valid_actions": ["generate_packing_slip"]
+            }), 400
+        
+        # Determine macro directory (same level as app.py)
+        macro_dir = Path(__file__).parent.parent
+        
+        # Verify QB window is active (user responsibility, but we warn if not)
+        # For now, we'll just proceed and let the macro handle it
+        
+        # STEP 1: Optional - Delete old packing slip section
+        if delete_old:
+            qb_delete_script = macro_dir / 'qb_sections.au3'
+            
+            if not qb_delete_script.exists():
+                logger.error(f"qb_sections.au3 not found at {qb_delete_script}")
+                return jsonify({
+                    "error": "qb_sections.au3 macro not found",
+                    "path": str(qb_delete_script),
+                    "tip": "Ensure qb_sections.au3 is in the backend directory"
+                }), 404
+            
+            try:
+                logger.info(f"Launching qb_sections.au3 from {qb_delete_script}")
+                subprocess.Popen(str(qb_delete_script))
+                time.sleep(2.5)  # Give user time to position cursor on Header line
+                logger.info("qb_sections.au3 launched successfully")
+            except Exception as e:
+                logger.error(f"Failed to launch qb_sections.au3: {str(e)}")
+                return jsonify({
+                    "error": "Failed to launch delete macro",
+                    "detail": str(e),
+                    "tip": "Check that QuickBooks is open and the macro directory is accessible"
+                }), 500
+        
+        # STEP 2: Launch SpecialPaste.exe for data injection
+        special_paste_exe = macro_dir / 'SpecialPaste.exe'
+        
+        if not special_paste_exe.exists():
+            logger.error(f"SpecialPaste.exe not found at {special_paste_exe}")
+            return jsonify({
+                "error": "SpecialPaste.exe not found",
+                "path": str(special_paste_exe),
+                "tip": "Ensure SpecialPaste.exe is in the backend directory"
+            }), 404
+        
+        try:
+            logger.info(f"Launching SpecialPaste.exe from {special_paste_exe}")
+            subprocess.Popen(str(special_paste_exe))
+            logger.info("SpecialPaste.exe launched successfully")
+            
+            return jsonify({
+                "status": "started",
+                "message": "QB macros launched successfully",
+                "steps": [
+                    "✓ Data copied to clipboard",
+                    "✓ SpecialPaste.exe started",
+                    "→ Click in QB window to activate it",
+                    "→ Press Ctrl+Shift+V to begin auto-paste",
+                    "→ Press Ctrl+Q to stop if needed"
+                ],
+                "estimated_time": "5-10 seconds"
+            }), 200
+        
+        except Exception as e:
+            logger.error(f"Failed to launch SpecialPaste.exe: {str(e)}")
+            return jsonify({
+                "error": "Failed to launch paste macro",
+                "detail": str(e),
+                "tip": "Check that QB is open and the macro directory is accessible"
+            }), 500
+    
+    except Exception as e:
+        logger.error(f"Unexpected error in launch_qb_macro: {str(e)}")
+        return jsonify({
+            "error": "Unexpected server error",
+            "detail": str(e)
+        }), 500
