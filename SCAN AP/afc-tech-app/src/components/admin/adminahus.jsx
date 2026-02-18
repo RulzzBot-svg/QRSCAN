@@ -147,10 +147,10 @@ function AdminAHUs() {
     setGlobalFilters({ frequency: "all", status: "all", nextFrom: "", nextTo: "" });
   };
 
-  const handleFilterSelection = (ahuId, selectedFilterIds) => {
+  const handleFilterSelection = (ahuId, selectedFilterObjects) => {
     setSelectedFiltersForQB((prev) => ({
       ...prev,
-      [ahuId]: selectedFilterIds,
+      [ahuId]: selectedFilterObjects || [],
     }));
   };
 
@@ -159,22 +159,18 @@ function AdminAHUs() {
     const allSelectedFilters = [];
     let hasAnyFilters = false;
 
-    for (const [ahuId, filterIds] of Object.entries(selectedFiltersForQB)) {
-      if (filterIds && filterIds.size > 0) {
+    for (const [ahuId, filterObjects] of Object.entries(selectedFiltersForQB)) {
+      if (filterObjects && Array.isArray(filterObjects) && filterObjects.length > 0) {
         hasAnyFilters = true;
-        // Find the AHU's filters
         const ahu = ahus.find((a) => a.id == ahuId);
-        if (ahu && Array.isArray(ahu.filters)) {
-          for (const filterId of filterIds) {
-            const filter = ahu.filters.find((f) => f.id == filterId);
-            if (filter) {
-              allSelectedFilters.push({
-                part_number: filter.part_number,
-                size: filter.size,
-                quantity: filter.quantity,
-                ahu_name: ahu.name,
-              });
-            }
+        if (ahu) {
+          for (const filter of filterObjects) {
+            allSelectedFilters.push({
+              part_number: filter.part_number,
+              size: filter.size,
+              quantity: filter.quantity,
+              ahu_name: ahu.name,
+            });
           }
         }
       }
@@ -204,31 +200,21 @@ function AdminAHUs() {
         return;
       }
 
-      // Launch QB macros
-      try {
-        const res = await API.post("/admin/launch-qb-macro", {
-          action: "generate_packing_slip",
-          delete_old: false,
-        });
+      // Show success with manual paste instructions
+      alert(
+        "✓ Filter data copied to clipboard!\n\n" +
+        "Packing slip format (part_number | size | quantity):\n\n" +
+        data.slice(0, 200) + (data.length > 200 ? "..." : "") +
+        "\n\nSteps:\n" +
+        "1. Open QuickBooks on your machine\n" +
+        "2. Navigate to the packing slip section\n" +
+        "3. Click where you want to paste the data\n" +
+        "4. Press Ctrl+Shift+V to auto-paste (if using SpecialPaste.exe)\n" +
+        "   OR Ctrl+V to paste normally"
+      );
 
-        if (res.data.status === "started") {
-          alert(
-            "✓ QB macros launched!\n\nSteps:\n1. Focus QB window\n2. Press Ctrl+Shift+V to paste\n3. Press Ctrl+Q to stop if needed\n\nEstimated time: 5-10 seconds"
-          );
-          // Clear selections after success
-          setSelectedFiltersForQB({});
-        }
-      } catch (apiErr) {
-        console.error("API error calling QB macro:", apiErr);
-        const errorMsg =
-          apiErr.response?.data?.error ||
-          apiErr.response?.data?.detail ||
-          "Failed to launch QB macros";
-        const errorTip =
-          apiErr.response?.data?.tip ||
-          "Ensure QuickBooks is open and macros are in the backend directory";
-        alert(`Error: ${errorMsg}\n\nTip: ${errorTip}`);
-      }
+      // Clear selections after success
+      setSelectedFiltersForQB({});
     } catch (err) {
       console.error("Unexpected error in generatePackingSlip:", err);
       alert("Unexpected error. Check browser console for details.");

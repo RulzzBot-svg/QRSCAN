@@ -220,7 +220,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     showToast("Filter reactivated.", "success");
   };
 
-  const toggleFilterSelection = (filterId) => {
+  const toggleFilterSelection = (filterId, filterData) => {
     setSelectedFilters((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(filterId)) {
@@ -228,9 +228,18 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       } else {
         newSet.add(filterId);
       }
-      // Report selection change to parent
+      // Report selection change to parent with full filter data
       if (onSelectionChange) {
-        onSelectionChange(newSet);
+        // Build array of selected filter objects
+        const selectedFilterObjs = filters
+          .filter(f => newSet.has(f.id))
+          .map(f => ({
+            id: f.id,
+            part_number: f.part_number,
+            size: f.size,
+            quantity: f.quantity
+          }));
+        onSelectionChange(selectedFilterObjs);
       }
       return newSet;
     });
@@ -366,7 +375,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         className="checkbox checkbox-xs"
                         disabled={f._inactive}
                         checked={selectedFilters.has(f.id)}
-                        onChange={() => toggleFilterSelection(f.id)}
+                        onChange={() => toggleFilterSelection(f.id, f)}
                       />
                     </td>
 

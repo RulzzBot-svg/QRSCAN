@@ -9,6 +9,7 @@ from middleware.auth import require_admin
 import subprocess
 import time
 import os
+import platform
 from pathlib import Path
 import logging
 
@@ -249,6 +250,9 @@ def launch_qb_macro():
     """
     Launch QuickBooks automation macros for packing slip generation.
     
+    NOTE: This endpoint only works on Windows systems with QuickBooks installed locally.
+    Cloud/hosted deployments on Linux cannot execute Windows executables.
+    
     Workflow:
     1. Validates QB macros exist
     2. Optionally deletes old packing slip section (qb_sections.au3)
@@ -261,6 +265,15 @@ def launch_qb_macro():
     }
     """
     try:
+        # Check if running on Windows
+        if platform.system() != "Windows":
+            logger.warning(f"QB macro launched on {platform.system()} - not supported")
+            return jsonify({
+                "error": "QB macros only work on Windows systems",
+                "current_system": platform.system(),
+                "tip": "QuickBooks automation requires a Windows machine with QuickBooks installed. This is a cloud server running Linux. Please run QB operations on your local Windows machine instead."
+            }), 400
+        
         data = request.get_json() or {}
         action = data.get("action")
         delete_old = data.get("delete_old", False)
