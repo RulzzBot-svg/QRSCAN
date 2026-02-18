@@ -37,8 +37,7 @@ function AdminAHUs() {
   const [importPreview, setImportPreview] = useState([]);
   const [showSignoff, setShowSignoff] = useState(false);
   const [qbMacroLoading, setQbMacroLoading] = useState(false);
-  const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({}); // { [ahuId]: Set<filterId> }
-  const [listenerAvailable, setListenerAvailable] = useState(false); // Local QB listener status
+  const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({}); // { [ahuId]: array of filter objects }
 
   // NEW: Global (page-level) filter bar state (independent of tables)
   const [globalFilters, setGlobalFilters] = useState({
@@ -47,26 +46,6 @@ function AdminAHUs() {
     nextFrom: "", // yyyy-mm-dd
     nextTo: "", // yyyy-mm-dd
   });
-
-  // Check if local QB listener is available
-  useEffect(() => {
-    const checkListener = async () => {
-      try {
-        const res = await fetch('http://localhost:5000/health', { 
-          method: 'GET',
-          mode: 'cors'
-        });
-        if (res.ok) {
-          setListenerAvailable(true);
-          console.log("✓ QB Auto-Paste Listener detected on localhost:5000");
-        }
-      } catch (e) {
-        setListenerAvailable(false);
-        console.log("QB Auto-Paste Listener not found - will use manual clipboard copy");
-      }
-    };
-    checkListener();
-  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -205,76 +184,46 @@ function AdminAHUs() {
     setQbMacroLoading(true);
 
     try {
-      // Format data for QB: part_number||size||quantity (|| = TAB)
+      // Format data for QB: part_number\tsize\tquantity (tab-separated)
       const lines = allSelectedFilters.map((f) => {
-        return `${f.part_number}||${f.size}||${f.quantity}`;
+        return `${f.part_number}\t${f.size}\t${f.quantity}`;
       });
       const data = lines.join("\n");
 
-      // If local listener is available, use auto-paste
-      if (listenerAvailable) {
-        try {
-          const res = await fetch('http://localhost:5000/paste', {
-            method: 'POST',
-            mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              data: data,
-              delete_old: false
-            })
-          });
-
-          const result = await res.json();
-          
-          if (res.ok) {
-            alert(
-              "✓ Auto-paste initiated!\n\n" +
-              "Status: " + result.status + "\n\n" +
-              (result.steps ? result.steps.join('\n') : "") +
-              "\n\nMake sure QB window is in focus!"
-            );
-            setSelectedFiltersForQB({});
-          } else {
-            // Fallback to manual clipboard copy if listener call fails
-            console.error("Listener returned error:", result.error);
-            await manualClipboardCopy(data);
-          }
-        } catch (err) {
-          console.error("Listener call failed:", err);
-          // Fallback to manual clipboard copy
-          await manualClipboardCopy(data);
-        }
-      } else {
-        // No listener available - use manual clipboard copy
-        await manualClipboardCopy(data);
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(data);
+        
+        // Show success with data preview
+        const preview = lines.slice(0, 5).join("\n") + (lines.length > 5 ? `\n... (${lines.length - 5} more)` : "");
+        
+        alert(
+          `✓ ${lines.length} filter${lines.length > 1 ? 's' : ''} copied to clipboard!\n\n` +
+          "Preview (Part # → Size → Qty):\n" +
+          preview +
+          "\n\nNext Steps:\n" +
+          "1. Open QuickBooks\n" +
+          "2. Go to your packing slip\n" +
+          "3. Click in the first cell\n" +
+          "4. Press Ctrl+V to paste\n\n" +
+          "Data is tab-separated for easy Excel/QB paste!"
+        );
+        
+        // Clear selections after success
+        setSelectedFiltersForQB({});
+      } catch (clipboardErr) {
+        console.error("Clipboard copy failed:", clipboardErr);
+        alert(
+          "Failed to copy to clipboard.\n\n" +
+          "This might be a browser permission issue.\n" +
+          "Try clicking somewhere on the page first, then try again."
+        );
       }
     } catch (err) {
       console.error("Unexpected error in generatePackingSlip:", err);
       alert("Unexpected error. Check browser console for details.");
     } finally {
       setQbMacroLoading(false);
-    }
-  };
-
-  // Manual fallback: Copy to clipboard and show instructions
-  const manualClipboardCopy = async (data) => {
-    try {
-      await navigator.clipboard.writeText(data);
-      alert(
-        "✓ Filter data copied to clipboard!\n\n" +
-        "Packing slip format (part_number | size | quantity):\n\n" +
-        data.slice(0, 150) + (data.length > 150 ? "\n..." : "") +
-        "\n\nSteps:\n" +
-        "1. Open QuickBooks\n" +
-        "2. Navigate to packing slip section\n" +
-        "3. Click where you want to paste\n" +
-        "4. Press Ctrl+V to paste\n\n" +
-        "(Tip: Run 'python qb_listener.py' on your machine for auto-paste)"
-      );
-      setSelectedFiltersForQB({});
-    } catch (clipboardErr) {
-      console.error("Clipboard copy failed:", clipboardErr);
-      alert("Failed to copy to clipboard. Check browser permissions.");
     }
   };
 
@@ -310,12 +259,10 @@ function AdminAHUs() {
             {qbMacroLoading ? (
               <>
                 <span className="loading loading-spinner loading-xs"></span>
-                {listenerAvailable ? "Auto-pasting..." : "Copying..."}
+                Copying...
               </>
-            ) : listenerAvailable ? (
-              "⚡ Auto-Paste to QB"
             ) : (
-              "📋 Copy to Clipboard"
+              "📋 Copy for QB"
             )}
           </button>
           <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">

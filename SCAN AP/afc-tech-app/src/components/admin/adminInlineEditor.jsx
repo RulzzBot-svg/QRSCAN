@@ -406,7 +406,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         {["h", "w", "d"].map((dim) => (
                           <input
                             key={dim}
-                            type="number"
+                            type="text"
                             placeholder={dim.toUpperCase()}
                             className="input input-xs input-bordered w-10"
                             value={f.sizeParts?.[dim] || ""}

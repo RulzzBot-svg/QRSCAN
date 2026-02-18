@@ -1,0 +1,11 @@
+2026-02-18 10:43:04,881 - INFO - ============================================================
+2026-02-18 10:43:04,882 - INFO - QB Auto-Paste Listener Service Starting
+2026-02-18 10:43:04,882 - INFO - ============================================================
+2026-02-18 10:43:04,882 - INFO - Script directory: C:\Users\AFC5admin\Documents\QRSCAN\QRSCAN\SCAN AP\afc-tech-app-backend
+2026-02-18 10:43:04,882 - INFO - SpecialPaste.exe: C:\Users\AFC5admin\Documents\QRSCAN\QRSCAN\SCAN AP\afc-tech-app-backend\SpecialPaste.exe (FOUND)
+2026-02-18 10:43:04,882 - INFO - qb_sections.au3: C:\Users\AFC5admin\Documents\QRSCAN\QRSCAN\SCAN AP\afc-tech-app-backend\qb_sections.au3 (FOUND)
+2026-02-18 10:43:04,882 - INFO - Listening on http://localhost:5000
+2026-02-18 10:43:04,882 - INFO - ============================================================
+2026-02-18 10:43:04,897 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://localhost:5000
+2026-02-18 10:43:04,898 - INFO - [33mPress CTRL+C to quit[0m
