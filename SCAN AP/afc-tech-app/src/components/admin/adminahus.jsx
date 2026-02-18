@@ -184,11 +184,12 @@ function AdminAHUs() {
 
     try {
       // Format data for QB SpecialPaste.exe
-      // QB columns: Qty | Item Number | Description | Unit Price | Class | Extension | Tax
+      // QB columns: [13 empty cols] | Qty | Item Number | Description | Unit Price | Class | Extension | Tax
       // || represents TAB between columns
-      // We provide: quantity||part_number (QB autofills the rest)
+      // We provide: 13 empty tabs + quantity + tab + part_number (QB autofills the rest)
       const lines = allSelectedFilters.map((f) => {
-        return `${f.quantity}||${f.part_number}`;
+        // 13 tabs to skip columns, then qty||item_number
+        return `||||||||||||||||||||||||||${f.quantity}||${f.part_number}`;
       });
       const data = lines.join("\n");
 
@@ -201,15 +202,15 @@ function AdminAHUs() {
         
         alert(
           `✓ ${lines.length} filter${lines.length > 1 ? 's' : ''} copied to clipboard!\n\n` +
-          "Preview (Qty → Item #):\n" +
+          "Preview (13 tabs → Qty → Item #):\n" +
           preview +
           "\n\n━━━ QUICKBOOKS AUTO-PASTE ━━━\n" +
           "1. Open QuickBooks packing slip\n" +
-          "2. Click in the FIRST cell (Qty column)\n" +
+          "2. Click in the FIRST cell (top-left)\n" +
           "3. Press Ctrl+Shift+V to auto-paste\n" +
           "4. Press Ctrl+Q to stop if needed\n\n" +
-          "Note: QB will auto-fill Description, Price, etc.!\n" +
-          "Format: quantity||item_number"
+          "Note: Data skips 13 columns, then enters Qty & Item #\n" +
+          "QB will auto-fill Description, Price, etc.!"
         );
         
         // Clear selections after success
