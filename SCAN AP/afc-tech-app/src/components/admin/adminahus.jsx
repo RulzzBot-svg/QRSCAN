@@ -167,7 +167,6 @@ function AdminAHUs() {
           for (const filter of filterObjects) {
             allSelectedFilters.push({
               part_number: filter.part_number,
-              size: filter.size,
               quantity: filter.quantity,
               ahu_name: ahu.name,
             });
@@ -184,9 +183,12 @@ function AdminAHUs() {
     setQbMacroLoading(true);
 
     try {
-      // Format data for QB: part_number\tsize\tquantity (tab-separated)
+      // Format data for QB SpecialPaste.exe
+      // QB columns: Qty | Item Number | Description | Unit Price | Class | Extension | Tax
+      // || represents TAB between columns
+      // We provide: quantity||part_number (QB autofills the rest)
       const lines = allSelectedFilters.map((f) => {
-        return `${f.part_number}\t${f.size}\t${f.quantity}`;
+        return `${f.quantity}||${f.part_number}`;
       });
       const data = lines.join("\n");
 
@@ -194,19 +196,20 @@ function AdminAHUs() {
       try {
         await navigator.clipboard.writeText(data);
         
-        // Show success with data preview
+        // Show detailed instructions for QB auto-paste
         const preview = lines.slice(0, 5).join("\n") + (lines.length > 5 ? `\n... (${lines.length - 5} more)` : "");
         
         alert(
           `✓ ${lines.length} filter${lines.length > 1 ? 's' : ''} copied to clipboard!\n\n` +
-          "Preview (Part # → Size → Qty):\n" +
+          "Preview (Qty → Item #):\n" +
           preview +
-          "\n\nNext Steps:\n" +
-          "1. Open QuickBooks\n" +
-          "2. Go to your packing slip\n" +
-          "3. Click in the first cell\n" +
-          "4. Press Ctrl+V to paste\n\n" +
-          "Data is tab-separated for easy Excel/QB paste!"
+          "\n\n━━━ QUICKBOOKS AUTO-PASTE ━━━\n" +
+          "1. Open QuickBooks packing slip\n" +
+          "2. Click in the FIRST cell (Qty column)\n" +
+          "3. Press Ctrl+Shift+V to auto-paste\n" +
+          "4. Press Ctrl+Q to stop if needed\n\n" +
+          "Note: QB will auto-fill Description, Price, etc.!\n" +
+          "Format: quantity||item_number"
         );
         
         // Clear selections after success
@@ -236,8 +239,8 @@ function AdminAHUs() {
   }
 
   return (
-    <div data-theme="corporate" className="min-h-screen bg-base-200 p-6">
-      <div className="flex items-center justify-between mb-3">
+    <div data-theme="corporate" className="min-h-screen bg-base-200">
+      <div className="flex items-center justify-between mb-3 px-4 pt-4">
         <div>
           <h1 className="text-xl font-bold">Admin — AHUs & Filters</h1>
           <div className="text-xs opacity-70">Compact view with always-visible filters</div>
@@ -271,9 +274,9 @@ function AdminAHUs() {
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 px-4 pb-4">
         {/* Left: Hospital tree (UNCHANGED) */}
-        <aside className="w-72 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto">
+        <aside className="w-64 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto max-h-[calc(100vh-8rem)] shrink-0">
           <div className="font-medium mb-2">Hospitals</div>
           <input
             className="input input-sm input-bordered w-full mb-3"
@@ -307,7 +310,7 @@ function AdminAHUs() {
         </aside>
 
         {/* Right: compact AHU list with always-visible filters */}
-        <section className="flex-1 min-w-[40rem]">
+        <section className="flex-1 w-full">
           <div className="bg-base-100 border border-base-300 rounded-lg">
             {/* Top toolbar (kept) */}
             <div className="p-2 flex items-center justify-between gap-2 border-b">
