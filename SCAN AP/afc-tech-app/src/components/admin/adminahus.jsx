@@ -184,19 +184,38 @@ function AdminAHUs() {
       // QB columns after 13 initial tabs: [skip 2] | Description | [skip 6] | Qty | Part | [skip 6] | ...
       // Pattern: |||| = 2 tabs, then description, then |||||||||||| = 6 tabs, then qty||part||||||||||
       
+      const sanitize = (s) => {
+        if (s == null) return "";
+        return String(s).replace(/\r?\n/g, " ").replace(/\|\|/g, " ").trim();
+      };
+
       const allParts = [];
-      
-      // For each AHU, add AHU name header, then items
+
+      // For each AHU, add AHU name (as a description-only header), then items
       for (const [ahuId, ahuData] of Object.entries(filtersByAhu)) {
-        // AHU header: |||| (2 tabs) + AHU name + |||||||||||||||||||||||| (13 tabs)
-        allParts.push(`||||${ahuData.ahu_name}||||||||||||||||||||||||||`);
-        
-        // Items: |||||||||||||||| (8 tabs to skip description) + qty || part |||||||||| (6 tabs)
+        const ahuName = sanitize(ahuData.ahu_name);
+
+        // Description-only header: put AHU name into the Description column
+        // Pattern: ||||<description>||  (user requested this format)
+        allParts.push(`||||${ahuName}||`);
+
+        // Items: if filter has its own description, include it after part number
+        // Otherwise provide qty||part and spacing to the next item
         ahuData.filters.forEach((f) => {
-          allParts.push(`||||||||||||||||${f.quantity}||${f.part_number}||||||||||||`);
+          const part = sanitize(f.part_number || "");
+          const qty = sanitize(f.quantity != null ? f.quantity : "1");
+          const fdesc = sanitize(f.description || "");
+
+          if (fdesc) {
+            // qty || item || description ||||||||||  (then next item)
+            allParts.push(`${qty}||${part}||${fdesc}||||||||||||`);
+          } else {
+            // qty || item |||||||||| (no item-level description)
+            allParts.push(`${qty}||${part}||||||||||||`);
+          }
         });
       }
-      
+
       // ONE continuous line: all parts joined
       const data = allParts.join("");
 
