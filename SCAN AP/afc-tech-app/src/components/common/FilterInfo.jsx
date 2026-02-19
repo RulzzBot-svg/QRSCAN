@@ -80,6 +80,7 @@ function FilterInfo() {
           setFilterRows(cached.filters || []);
         }
       } catch (err) {
+        console.error("Error loading AHU:", err);
         alert(
           navigator.onLine
             ? "AHU not found"
@@ -124,8 +125,6 @@ function FilterInfo() {
     setFinalResistance((prev) => ({ ...prev, [id]: value }));
   };
 
-  const completedCount = filterRows.filter((row) => checked[row.id]).length;
-  const inspectedCount = filterRows.filter((row) => inspected[row.id] && !checked[row.id]).length;
   const doneCount = filterRows.filter((row) => checked[row.id] || inspected[row.id]).length;
 
   const openModal = () => {
