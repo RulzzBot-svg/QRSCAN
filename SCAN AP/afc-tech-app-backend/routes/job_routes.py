@@ -70,7 +70,9 @@ def create_job():
                 filter_id=filter_id,
                 is_completed=f.get("is_completed", False),
                 is_inspected=f.get("is_inspected", False),
-                note=f.get("note", "")
+                note=f.get("note", ""),
+                initial_resistance=f.get("initial_resistance"),
+                final_resistance=f.get("final_resistance")
             )
             db.session.add(jf)
 
@@ -102,7 +104,9 @@ def get_job(job_id):
             "part_number": jf.filter.part_number,
             "size": jf.filter.size,
             "is_completed": jf.is_completed,
-            "note": jf.note
+            "note": jf.note,
+            "initial_resistance": jf.initial_resistance,
+            "final_resistance": jf.final_resistance
         }
         for jf in job.job_filters
 
@@ -154,7 +158,9 @@ def admin_get_all_jobs():
                     "part_number": jf.filter.part_number,
                     "size": jf.filter.size,
                     "is_completed": jf.is_completed,
-                    "note": jf.note
+                    "note": jf.note,
+                    "initial_resistance": jf.initial_resistance,
+                    "final_resistance": jf.final_resistance
                 }
                 for jf in j.job_filters
             ]

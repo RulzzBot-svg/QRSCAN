@@ -137,6 +137,8 @@ class JobFilter(db.Model):
     is_inspected = Column(Boolean, default=False, nullable=False)
     is_completed = Column(Boolean, default=False)
     note = Column(Text)
+    initial_resistance = Column(Float, nullable=True)
+    final_resistance = Column(Float, nullable=True)
 
     job = relationship("Job", back_populates="job_filters")
     filter = relationship("Filter", back_populates="job_filters")
