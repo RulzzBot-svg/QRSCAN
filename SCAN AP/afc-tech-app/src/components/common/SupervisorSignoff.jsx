@@ -136,7 +136,7 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
 			<div className="absolute inset-0 bg-base-200/60 backdrop-blur-sm" onClick={handleClose} />
-			<div className="relative bg-base-100 rounded-lg shadow-lg w-11/12 max-w-2xl p-4">
+			<div className="relative bg-base-100 rounded-lg shadow-lg w-11/12 max-w-lg p-4 max-h-[90vh] overflow-y-auto">
 				<h3 className="text-lg font-bold mb-2">Supervisor Sign-off</h3>
 				<div className="grid grid-cols-2 gap-2">
 					<div>
@@ -185,8 +185,8 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 						<input className="input input-bordered w-full" value={jobIds} onChange={e=>setJobIds(e.target.value)} />
 					</div>
 					<div className="col-span-2">
-						<div className="flex items-center gap-2">
-							<button className="btn btn-sm" onClick={loadSummary} type="button">Load Completed Work</button>
+						<div className="flex flex-col sm:flex-row gap-2 items-start">
+							<button className="btn btn-sm w-full sm:w-auto" onClick={loadSummary} type="button">Load Completed Work</button>
 							<div className="text-sm opacity-70">Loaded: {summaryJobs.length} jobs, {new Set(summaryJobs.map(j=>j.ahu_id)).size} AHUs</div>
 						</div>
 						<div className="mt-2 max-h-40 overflow-y-auto border rounded p-2 bg-base-100">
@@ -205,12 +205,12 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 					<div className="col-span-2">
 						<label className="block text-sm">Signature</label>
 						<div className="border rounded p-2 mt-2">
-							<canvas ref={canvasRef} width={600} height={140} className="w-full h-28 bg-white" onMouseDown={start} onMouseMove={draw} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={draw} onTouchEnd={end} />
+							<canvas ref={canvasRef} width={480} height={140} className="w-full h-28 bg-white" onMouseDown={start} onMouseMove={draw} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={draw} onTouchEnd={end} />
 						</div>
-						<div className="mt-2 flex gap-2">
-							<button className="btn btn-sm" onClick={clear}>Clear</button>
-							<button className="btn btn-sm btn-primary" onClick={submit}>Submit</button>
-							<button className="btn btn-sm" onClick={handleClose}>Cancel</button>
+						<div className="mt-2 flex flex-col sm:flex-row gap-2">
+							<button className="btn btn-sm w-full sm:w-auto" onClick={clear}>Clear</button>
+							<button className="btn btn-sm btn-primary w-full sm:w-auto" onClick={submit}>Submit</button>
+							<button className="btn btn-sm w-full sm:w-auto" onClick={handleClose}>Cancel</button>
 						</div>
 					</div>
 				</div>

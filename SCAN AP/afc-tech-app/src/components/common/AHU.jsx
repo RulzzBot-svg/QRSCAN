@@ -65,12 +65,12 @@ function AHU() {
     return (
         <div data-theme="corporate" className="min-h-screen bg-base-200 p-4">
             <div className="max-w-3xl mx-auto">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                     <div>
                         <h1 className="text-2xl font-bold">AHU: {ahuId}</h1>
                         <div className="text-sm opacity-70">{ahu?.hospital_name || ""} • {ahu?.location || ""}</div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <span className={`badge ${counts.ok > 0 ? 'badge-success' : 'badge-ghost'}`}>{counts.ok} OK</span>
                         {counts.overdue > 0 ? <span className="badge badge-error">{counts.overdue} overdue</span> : null}
                         {counts.dueSoon > 0 ? <span className="badge badge-warning">{counts.dueSoon} due soon</span> : null}
@@ -86,12 +86,12 @@ function AHU() {
                             <h3 className="font-semibold mb-2">Filters</h3>
                             <div className="space-y-2">
                                 {(ahu?.filters || []).map((f) => (
-                                    <div key={f.id} className="flex items-center justify-between p-3 border rounded">
+                                    <div key={f.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded">
                                         <div>
                                             <div className="font-semibold">{f.phase} — {f.part_number}</div>
                                             <div className="text-xs opacity-70">Size: {f.size} • Qty: {f.quantity}</div>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right mt-2 sm:mt-0">
                                             {f.status === 'Overdue' ? <span className="badge badge-error">Overdue</span> : null}
                                             {f.status === 'Due Soon' ? <span className="badge badge-warning">Due Soon</span> : null}
                                             {(!f.status || f.status === 'Completed' || f.status === 'Pending') ? <span className="badge badge-success">OK</span> : null}

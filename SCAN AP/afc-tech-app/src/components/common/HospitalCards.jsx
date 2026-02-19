@@ -163,10 +163,10 @@ function HospitalCards() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   {/* Left: title/city */}
                   <div className="min-w-0 flex-1">
-                    <div className="text-lg font-semibold text-primary whitespace-nowrap overflow-hidden text-ellipsis">
+                    <div className="text-lg font-semibold text-primary break-words">
                       {hospital.name}
                     </div>
-                    <div className="text-xs text-base-content/60 whitespace-nowrap overflow-hidden text-ellipsis">
+                    <div className="text-xs text-base-content/60 break-words">
                       {hospital.city}
                     </div>
                   </div>

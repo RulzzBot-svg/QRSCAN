@@ -126,7 +126,7 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-base-200/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative modal-box w-11/12 max-w-3xl max-h-[90vh] overflow-y-auto bg-base-100" role="dialog" aria-modal="true">
+      <div className="relative modal-box w-full max-w-md max-h-[90vh] overflow-y-auto bg-base-100" role="dialog" aria-modal="true">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0 }}>Supervisor Sign-off</h2>
           <button aria-label="Close" onClick={onClose} style={{ border: 'none', background: 'transparent', fontSize: 22, cursor: 'pointer' }}>×</button>
@@ -166,7 +166,7 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
               onTouchStart={start}
               onTouchMove={move}
               onTouchEnd={end}
-              width={520}
+              width={480}
               height={140}
               className="w-full h-28 bg-white"
               style={{ touchAction: 'none' }}
@@ -178,7 +178,7 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
           </div>
         </div>
 
-        <div className="mt-4 flex gap-2 justify-end">
+        <div className="mt-4 flex flex-col sm:flex-row gap-2 justify-end">
           <button onClick={onClose} disabled={saving} className="btn btn-outline">Cancel</button>
           <button onClick={handleSign} disabled={saving || loading} className="btn btn-success">{saving ? 'Saving…' : 'Sign & Complete'}</button>
         </div>

@@ -255,7 +255,7 @@ function FilterInfo() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mt-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-3">
                 <div className="font-medium">
                   <p className="text-base-content/60 text-sm">
                     Last Serviced Date
@@ -366,7 +366,7 @@ function FilterInfo() {
                 <div className="p-4 border-t border-base-300 bg-base-100">
                   <div className="space-y-4">
                     {/* Checkboxes Row */}
-                    <div className="flex gap-6">
+                    <div className="flex flex-wrap gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
@@ -397,7 +397,7 @@ function FilterInfo() {
                     </div>
 
                     {/* Resistance Fields Row */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div onClick={(e) => e.stopPropagation()}>
                         <label className="label">
                           <span className="label-text text-xs">Initial Resistance</span>
@@ -455,7 +455,7 @@ function FilterInfo() {
         </div>
 
         {/* ACTION BUTTONS */}
-        <div className="flex justify-between gap-2 mb-4 mt-3.5 pt-3">
+        <div className="flex flex-col sm:flex-row justify-between gap-2 mb-4 mt-3.5 pt-3">
           <button
             className="btn btn-ghost btn-outline"
             disabled={!ahu}
@@ -471,7 +471,7 @@ function FilterInfo() {
 
         {/* STICKY ACTION BAR */}
         <div className="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-4">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-3xl mx-auto px-2">
             <button
               className={`btn btn-primary w-full ${submitting ? "loading" : ""}`}
               onClick={handleJobCompletion}
@@ -484,7 +484,7 @@ function FilterInfo() {
 
         {/* SUCCESS MODAL */}
         <dialog ref={modalRef} className="modal">
-          <div className="modal-box text-center">
+          <div className="modal-box text-center w-full max-w-md mx-2 sm:mx-auto">
             <h3 className="font-bold text-lg text-primary">Job Saved!</h3>
 
             <p className="py-4 text-base-content/70">
