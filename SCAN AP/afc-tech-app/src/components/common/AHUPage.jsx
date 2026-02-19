@@ -16,15 +16,15 @@ function AHUPage() {
 
   useEffect(() => {
     setLoading(true);
-    // Use admin endpoint which includes filter counts and status per AHU
+    // Use ahus endpoint which includes filter counts and status per AHU
     (async () => {
       try {
-        const res = await API.get("/admin/ahus");
+        const res = await API.get("/ahus");
         const list = Array.isArray(res.data) ? res.data : [];
         const filteredList = list.filter((a) => String(a.hospital_id) === String(hospitalId));
         setAhus(filteredList);
       } catch (err) {
-        console.warn("Online admin endpoint failed, falling back to local cache", err);
+        console.warn("Online ahus endpoint failed, falling back to local cache", err);
         try {
           const db = await dbPromise;
           const all = await db.getAll("ahuCache");

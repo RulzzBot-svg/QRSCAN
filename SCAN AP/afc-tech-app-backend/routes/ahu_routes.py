@@ -319,6 +319,75 @@ def delete_filter(filter_id):
 
 
 # ---------------------------------------------------
+# Get all AHUs (accessible by all authenticated users for read-only)
+# ---------------------------------------------------
+@ahu_bp.route("/ahus", methods=["GET"])
+def get_all_ahus():
+    """
+    Get all AHUs with their status information.
+    This endpoint is accessible by all users (both tech and admin) for read-only access.
+    """
+    try:
+        ahus = (
+            db.session.query(AHU)
+                .options(joinedload(AHU.hospital), joinedload(AHU.building), selectinload(AHU.filters))
+            .order_by(AHU.hospital_id.asc(), AHU.excel_order.asc(), AHU.id.asc())
+            .all()
+        )
+
+        payload = []
+        for a in ahus:
+            active_filters = [f for f in a.filters if getattr(f, "is_active", True)]
+
+            status_data = compute_ahu_status_from_filters(active_filters)
+
+            overdue_count = 0
+            due_soon_count = 0
+            last_serviced_dates = []
+
+            for f in active_filters:
+                st = safe_filter_status(f)
+                if st.get("status") == "Overdue":
+                    overdue_count += 1
+                elif st.get("status") == "Due Soon":
+                    due_soon_count += 1
+
+                if getattr(f, "last_service_date", None):
+                    last_serviced_dates.append(f.last_service_date)
+
+            payload.append({
+                "id": a.id,
+                "hospital_id": a.hospital_id,
+                "hospital": a.hospital.name if a.hospital else None,
+                "name": a.name,
+                "location": a.location,
+                "notes": a.notes,
+
+                "overdue_count": overdue_count,
+                "due_soon_count": due_soon_count,
+                "last_serviced": (
+                    max(last_serviced_dates).isoformat()
+                    if last_serviced_dates else None
+                ),
+
+                "status": status_data["status"],
+                "next_due_date": status_data["next_due_date"],
+                "days_until_due": status_data["days_until_due"],
+                "days_overdue": status_data["days_overdue"],
+
+                "filters_count": len(active_filters),
+                "building_id": a.building_id,
+                "building": (a.building.name if a.building and getattr(a.building, 'name', None) else None),
+            })
+
+        return jsonify(payload), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------
 # Admin: Get all AHUs
 # ---------------------------------------------------
 @ahu_bp.route("/admin/ahus", methods=["GET"])

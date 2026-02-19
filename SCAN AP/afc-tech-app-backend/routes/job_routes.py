@@ -125,7 +125,55 @@ def get_job(job_id):
 
 
 # -----------------------------
-# Get all jobs
+# Get all jobs (read-only, accessible by all users)
+# -----------------------------
+
+@job_bp.route("/jobs", methods=["GET"])
+def get_all_jobs():
+    """
+    Get all jobs with their details.
+    This endpoint is accessible by all users for read-only access.
+    """
+    jobs = (
+        Job.query
+        .options(
+            joinedload(Job.ahu),
+            joinedload(Job.technician),
+            joinedload(Job.job_filters).joinedload(JobFilter.filter)
+        )
+        .order_by(Job.completed_at.desc())
+        .all()
+    )
+
+    payload = []
+
+    for j in jobs:
+        payload.append({
+            "id": j.id,
+            "ahu_id": j.ahu_id,
+            "ahu_name": j.ahu.name if j.ahu else None,
+            "technician": j.technician.name if j.technician else None,
+            "completed_at": j.completed_at.isoformat(),
+            "filters": [
+                {
+                    "filter_id": jf.filter_id,
+                    "phase": jf.filter.phase,
+                    "part_number": jf.filter.part_number,
+                    "size": jf.filter.size,
+                    "is_completed": jf.is_completed,
+                    "note": jf.note,
+                    "initial_resistance": jf.initial_resistance,
+                    "final_resistance": jf.final_resistance
+                }
+                for jf in j.job_filters
+            ]
+        })
+
+    return jsonify(payload), 200
+
+
+# -----------------------------
+# Get all jobs (admin endpoint)
 # -----------------------------
 
 @job_bp.route("/admin/jobs", methods=["GET"])

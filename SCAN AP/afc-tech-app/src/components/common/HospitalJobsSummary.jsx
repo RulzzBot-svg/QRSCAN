@@ -17,13 +17,13 @@ export default function HospitalJobsSummary({ hospitalId, defaultStart, defaultE
       setLoading(true); setError(null)
       try{
         // Fetch AHUs to map ahu_id -> hospital_id and name
-        const ahuRes = await fetch('/api/admin/ahus')
+        const ahuRes = await fetch('/api/ahus')
         const ahuJson = ahuRes.ok ? await ahuRes.json() : []
         const ahuMap = new Map()
         for(const a of ahuJson){ ahuMap.set(String(a.id), { hospital_id: a.hospital_id, name: a.name }) }
 
         // Fetch jobs (backend may support filtering but fetch all to be safe)
-        const jobsRes = await fetch('/api/admin/jobs')
+        const jobsRes = await fetch('/api/jobs')
         if(!jobsRes.ok) throw new Error('Failed to fetch jobs')
         const jobs = await jobsRes.json()
 

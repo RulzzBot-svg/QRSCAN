@@ -7,6 +7,21 @@ from datetime import date, timedelta
 hospital_bp = Blueprint("hospital", __name__)
 
 
+@hospital_bp.route("/hospitals", methods=["GET"])
+def get_hospitals():
+    """Get all hospitals - accessible by all users."""
+    hospitals = Hospital.query.all()
+    result = [
+        {
+            "id": h.id,
+            "name": h.name,
+            "active": getattr(h, "active", True)
+        }
+        for h in hospitals
+    ]
+    return jsonify(result), 200
+
+
 @hospital_bp.route("/hospital/all", methods=["GET"])
 def get_all_hospitals():
     hospitals = Hospital.query.all()

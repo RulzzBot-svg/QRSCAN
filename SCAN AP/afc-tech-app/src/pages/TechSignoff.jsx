@@ -14,8 +14,8 @@ export default function TechSignoff(){
   useEffect(()=>{
     async function load(){
       try{
-        const h = await API.get('/admin/hospitals')
-        const ah = await API.get('/admin/ahus')
+        const h = await API.get('/hospitals')
+        const ah = await API.get('/ahus')
         const hospitalsJson = Array.isArray(h.data) ? h.data : []
         const ahusJson = Array.isArray(ah.data) ? ah.data : []
         setHospitals(hospitalsJson)
