@@ -142,8 +142,8 @@ function FilterInfo() {
       is_inspected: inspected[row.id] || false,
       is_completed: checked[row.id] || false,
       note: notes[row.id] || "",
-      initial_resistance: initialResistance[row.id] ? parseFloat(initialResistance[row.id]) : null,
-      final_resistance: finalResistance[row.id] ? parseFloat(finalResistance[row.id]) : null,
+      initial_resistance: initialResistance[row.id] !== "" && initialResistance[row.id] !== undefined ? parseFloat(initialResistance[row.id]) : null,
+      final_resistance: finalResistance[row.id] !== "" && finalResistance[row.id] !== undefined ? parseFloat(finalResistance[row.id]) : null,
     }));
 
     if (!filterPayload.some((f) => f.is_completed || f.is_inspected)) {

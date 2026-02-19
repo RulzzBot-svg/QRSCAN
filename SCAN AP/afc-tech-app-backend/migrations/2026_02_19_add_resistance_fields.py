@@ -8,7 +8,10 @@ with app.app_context():
     # Add initial_resistance and final_resistance columns to job_filters table
     db.session.execute(text('''
     ALTER TABLE job_filters 
-    ADD COLUMN IF NOT EXISTS initial_resistance FLOAT,
+    ADD COLUMN IF NOT EXISTS initial_resistance FLOAT;
+    '''))
+    db.session.execute(text('''
+    ALTER TABLE job_filters 
     ADD COLUMN IF NOT EXISTS final_resistance FLOAT;
     '''))
     db.session.commit()
