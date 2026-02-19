@@ -447,7 +447,7 @@ function AdminAHUs() {
                           <div className="text-xs opacity-70 truncate">{a.location || ""}</div>
                         </div>
                       </div>
-                      <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/ahu/${a.id}`, "_blank")} type="button">
+                      <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/FilterInfo/${a.id}`, "_blank")} type="button">
                         Open
                       </button>
                     </div>
