@@ -21,6 +21,9 @@ function FilterInfo() {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [inspected, setInspected] = useState({});
   const [tech, setTech] = useState(null);
+  const [expandedRows, setExpandedRows] = useState({});
+  const [initialResistance, setInitialResistance] = useState({});
+  const [finalResistance, setFinalResistance] = useState({});
 
   /* ----------------------------- */
   /* Load technician from localStorage */
@@ -109,6 +112,18 @@ function FilterInfo() {
     setNotes((prev) => ({ ...prev, [id]: value }));
   };
 
+  const toggleRowExpansion = (id) => {
+    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleInitialResistanceChange = (id, value) => {
+    setInitialResistance((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleFinalResistanceChange = (id, value) => {
+    setFinalResistance((prev) => ({ ...prev, [id]: value }));
+  };
+
   const completedCount = filterRows.filter((row) => checked[row.id]).length;
   const inspectedCount = filterRows.filter((row) => inspected[row.id] && !checked[row.id]).length;
   const doneCount = filterRows.filter((row) => checked[row.id] || inspected[row.id]).length;
@@ -128,6 +143,8 @@ function FilterInfo() {
       is_inspected: inspected[row.id] || false,
       is_completed: checked[row.id] || false,
       note: notes[row.id] || "",
+      initial_resistance: initialResistance[row.id] ? parseFloat(initialResistance[row.id]) : null,
+      final_resistance: finalResistance[row.id] ? parseFloat(finalResistance[row.id]) : null,
     }));
 
     if (!filterPayload.some((f) => f.is_completed || f.is_inspected)) {
@@ -279,78 +296,163 @@ function FilterInfo() {
           max={filterRows.length}
         />
 
-        {/* FILTER TABLE (UNCHANGED) */}
-        <div className="overflow-x-auto bg-base-100 shadow rounded-lg border border-base-300">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-base-200 border-b border-base-300">
-              <tr>
-                <th className="px-4 py-3">Qty</th>
-                <th className="px-4 py-3">Phase</th>
-                <th className="px-4 py-3">Part</th>
-                <th className="px-4 py-3">Size</th>
-                <th className="px-4 py-3">Last Serviced</th>
-                <th className="px-4 py-3 text-center text-primary">
-                  Inspected
-                </th>
-                <th className="px-4 py-4 text-center text-primary">
-                  Replaced
-                </th>
-                <th className="px-4 py-3 text-center">Notes</th>
-              </tr>
-            </thead>
+        {/* FILTER TABLE (DROPDOWN) */}
+        <div className="space-y-2 mb-4">
+          {filterRows.map((row) => (
+            <div
+              key={row.id}
+              className={`bg-base-100 shadow rounded-lg border border-base-300 overflow-hidden ${
+                checked[row.id] ? "border-success" : ""
+              }`}
+            >
+              {/* Collapsed Header - Always Visible */}
+              <div
+                className={`p-4 cursor-pointer hover:bg-base-200 transition-colors ${
+                  checked[row.id] ? "bg-success/10" : ""
+                }`}
+                onClick={() => toggleRowExpansion(row.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="grid grid-cols-5 gap-4 flex-1 text-sm">
+                    <div>
+                      <div className="text-base-content/60 text-xs">Qty</div>
+                      <div className="font-medium">{row.quantity}</div>
+                    </div>
+                    <div>
+                      <div className="text-base-content/60 text-xs">Phase</div>
+                      <div className="font-medium">{row.phase}</div>
+                    </div>
+                    <div>
+                      <div className="text-base-content/60 text-xs">Part</div>
+                      <div className="font-medium">{row.part_number}</div>
+                    </div>
+                    <div>
+                      <div className="text-base-content/60 text-xs">Size</div>
+                      <div className="font-medium">{row.size}</div>
+                    </div>
+                    <div>
+                      <div className="text-base-content/60 text-xs">Last Serviced</div>
+                      <div>
+                        <span className="badge badge-success badge-sm">
+                          {row.last_service_date
+                            ? formatDate(row.last_service_date)
+                            : "Never"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={`h-5 w-5 transition-transform ${
+                        expandedRows[row.id] ? "rotate-180" : ""
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
 
-            <tbody>
-              {filterRows.map((row) => (
-                <tr
-                  key={row.id}
-                  className={`border-b border-base-300 ${
-                    checked[row.id] ? "bg-success/10" : "bg-base-100"
-                  }`}
-                >
-                  <td className="px-4 py-3 font-medium">{row.quantity}</td>
-                  <td className="px-4 py-3">{row.phase}</td>
-                  <td className="px-4 py-3">{row.part_number}</td>
-                  <td className="px-4 py-3">{row.size}</td>
-                  <td className="px-4 py-3">
-                    <span className="badge badge-success">
-                      {row.last_service_date
-                        ? formatDate(row.last_service_date)
-                        : "Never"}
-                    </span>
-                  </td>
+              {/* Expanded Details */}
+              {expandedRows[row.id] && (
+                <div className="p-4 border-t border-base-300 bg-base-100">
+                  <div className="space-y-4">
+                    {/* Checkboxes Row */}
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-primary"
+                          checked={inspected[row.id] || false}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleInspected(row.id);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className="text-sm font-medium">Inspected</span>
+                      </label>
 
-                  <td className="px-4 py-3 text-center">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary"
-                      checked={inspected[row.id] || false}
-                      onChange={() => handleInspected(row.id)}
-                    />
-                  </td>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-primary"
+                          checked={checked[row.id] || false}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleCompleted(row.id);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className="text-sm font-medium">Replaced</span>
+                      </label>
+                    </div>
 
-                  <td className="px-4 py-3 text-center">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary"
-                      checked={checked[row.id] || false}
-                      onChange={() => handleCompleted(row.id)}
-                    />
-                  </td>
+                    {/* Resistance Fields Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <label className="label">
+                          <span className="label-text text-xs">Initial Resistance</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input input-bordered input-sm w-full"
+                          placeholder="Enter value"
+                          value={initialResistance[row.id] || ""}
+                          onChange={(e) =>
+                            handleInitialResistanceChange(row.id, e.target.value)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
 
-                  <td className="px-4 py-3 text-center">
-                    <textarea
-                      className="textarea textarea-bordered textarea-xs w-28"
-                      placeholder="Notes"
-                      value={notes[row.id] || ""}
-                      onChange={(e) =>
-                        handleNoteChange(row.id, e.target.value)
-                      }
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <label className="label">
+                          <span className="label-text text-xs">Final Resistance</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input input-bordered input-sm w-full"
+                          placeholder="Enter value"
+                          value={finalResistance[row.id] || ""}
+                          onChange={(e) =>
+                            handleFinalResistanceChange(row.id, e.target.value)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes Field */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <label className="label">
+                        <span className="label-text text-xs">Notes</span>
+                      </label>
+                      <textarea
+                        className="textarea textarea-bordered w-full"
+                        placeholder="Add notes here..."
+                        rows="3"
+                        value={notes[row.id] || ""}
+                        onChange={(e) => handleNoteChange(row.id, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
 
         {/* ACTION BUTTONS */}
