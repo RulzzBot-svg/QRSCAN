@@ -98,7 +98,7 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 
 	async function loadSummary(){
 		try{
-			const res = await API.get('/admin/jobs')
+			const res = await API.get('/jobs')
 			const jobs = Array.isArray(res.data) ? res.data : []
 
 			const ahuMap = new Map()
