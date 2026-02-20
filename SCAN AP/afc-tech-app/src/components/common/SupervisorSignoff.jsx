@@ -102,7 +102,7 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 			const jobs = Array.isArray(res.data) ? res.data : []
 
 			const ahuMap = new Map()
-			for(const a of ahus) ahuMap.set(String(a.id), a.hospital_id)
+			for(const a of ahus) ahuMap.set(String(a.id), a)
 
 			const s = new Date(startDate)
 			const e = new Date(endDate)
@@ -110,8 +110,9 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 
 			const filtered = jobs.filter(j => {
 				const jobAhu = String(j.ahu_id)
-				const hospId = ahuMap.get(jobAhu)
-				if(String(hospId) !== String(hospitalId)) return false
+				const ahuObj = ahuMap.get(jobAhu)
+				if(!ahuObj) return false
+				if(String(ahuObj.hospital_id) !== String(hospitalId)) return false
 				const dt = new Date(j.completed_at)
 				return dt >= s && dt <= e
 			})
@@ -122,6 +123,16 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 			console.error('Failed to load summary', err)
 			alert('Failed to load completed work')
 		}
+	}
+
+	function formatAhuLabel(ahuId){
+		const ahuObj = ahus.find(a => String(a.id) === String(ahuId))
+		if(!ahuObj) return `AH#${ahuId}`
+		const parts = []
+		if(ahuObj.building) parts.push(ahuObj.building)
+		if(ahuObj.location) parts.push(ahuObj.location)
+		parts.push(ahuObj.name || `AH#${ahuObj.id}`)
+		return parts.join(' — ')
 	}
 
 	function handleClose(){
@@ -195,8 +206,8 @@ export default function SupervisorSignoff({ open, onClose, hospitals = [], ahus 
 							) : (
 								summaryJobs.map(j => (
 									<div key={j.id} className="text-sm py-1 border-b last:border-b-0 bg-green-50">
-										<div className="font-semibold">{j.ahu_id} — Job #{j.id}</div>
-										<div className="text-xs opacity-70">{new Date(j.completed_at).toLocaleString()}</div>
+										<div className="font-semibold">{formatAhuLabel(j.ahu_id)}</div>
+										<div className="text-xs opacity-70">Job #{j.id} — {new Date(j.completed_at).toLocaleString()}</div>
 									</div>
 								))
 							)}

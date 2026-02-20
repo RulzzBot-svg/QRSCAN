@@ -237,9 +237,11 @@ function FilterInfo() {
                   <h1 className="text-xl font-bold text-primary">
                     {ahu.name}
                   </h1>
-                  <p className="text-sm text-base-content/70">
-                    📍 {ahu.location}
-                  </p>
+                  {ahu.location && (
+                    <p className="text-sm text-base-content/70">
+                      📍 {ahu.location}
+                    </p>
+                  )}
                 </div>
 
                 <span
