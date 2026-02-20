@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
-from models import Hospital, AHU, Filter
+from models import Hospital, AHU, Building, Filter
 from sqlalchemy.orm import selectinload
+from sqlalchemy import func
 from db import db
 from datetime import date, timedelta
 
@@ -99,6 +100,30 @@ def get_ahus_for_hospital(hospital_id):
             "status": status,
         })
 
+    return jsonify(result), 200
+
+
+@hospital_bp.route("/hospital/<int:hospital_id>/buildings", methods=["GET"])
+def get_buildings_for_hospital(hospital_id):
+    """Get all buildings for a hospital with AHU counts."""
+    # Single query: fetch buildings + AHU counts using a LEFT JOIN + GROUP BY
+    rows = (
+        db.session.query(Building, func.count(AHU.id).label("ahu_count"))
+        .outerjoin(AHU, AHU.building_id == Building.id)
+        .filter(Building.hospital_id == hospital_id, Building.active.is_(True))
+        .group_by(Building.id)
+        .all()
+    )
+    result = [
+        {
+            "id": b.id,
+            "name": b.name,
+            "floor_area": b.floor_area,
+            "active": b.active,
+            "ahu_count": ahu_count,
+        }
+        for b, ahu_count in rows
+    ]
     return jsonify(result), 200
 
 

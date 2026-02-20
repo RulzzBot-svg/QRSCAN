@@ -155,7 +155,7 @@ function HospitalCards() {
           return (
             <div
               key={hospital.id}
-              onClick={() => navigate(`/AHU/${hospital.id}`)}
+              onClick={() => navigate(`/buildings/${hospital.id}`)}
               className="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:bg-base-100 transition-all cursor-pointer"
             >
               <div className="card-body p-5 ">
@@ -200,9 +200,9 @@ function HospitalCards() {
                 {/* Buttons */}
                 <button
                   className="btn btn-primary btn-sm w-full mb-2 "
-                  onClick={(e) => {e.stopPropagation(); navigate(`/AHU/${hospital.id}`)}}
+                  onClick={(e) => {e.stopPropagation(); navigate(`/buildings/${hospital.id}`)}}
                 >
-                  Load AHUs
+                  View Buildings
                 </button>
                 <button
                   className="btn btn-sm"
