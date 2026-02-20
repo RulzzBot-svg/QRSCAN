@@ -6,7 +6,7 @@ import { dbPromise } from "../../offline/db";
 import { formatDate } from "../../utils/dates";
 
 function AHUPage() {
-  const { hospitalId } = useParams();
+  const { hospitalId, buildingId } = useParams();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
@@ -21,14 +21,20 @@ function AHUPage() {
       try {
         const res = await API.get("/ahus");
         const list = Array.isArray(res.data) ? res.data : [];
-        const filteredList = list.filter((a) => String(a.hospital_id) === String(hospitalId));
+        let filteredList = list.filter((a) => String(a.hospital_id) === String(hospitalId));
+        if (buildingId) {
+          filteredList = filteredList.filter((a) => String(a.building_id) === String(buildingId));
+        }
         setAhus(filteredList);
       } catch (err) {
         console.warn("Online ahus endpoint failed, falling back to local cache", err);
         try {
           const db = await dbPromise;
           const all = await db.getAll("ahuCache");
-          const localList = (all || []).filter((a) => String(a.hospital_id) === String(hospitalId));
+          let localList = (all || []).filter((a) => String(a.hospital_id) === String(hospitalId));
+          if (buildingId) {
+            localList = localList.filter((a) => String(a.building_id) === String(buildingId));
+          }
           setAhus(localList);
         } catch (e) {
           console.error("Failed to load AHUs from local cache", e);
@@ -38,7 +44,7 @@ function AHUPage() {
         setLoading(false);
       }
     })();
-  }, [hospitalId]);
+  }, [hospitalId, buildingId]);
 
   // Filter by ID (coerce to string) or location
   const filtered = ahus.filter((a) => {
@@ -83,9 +89,9 @@ function AHUPage() {
         {/* Back */}
         <button
           className="btn btn-ghost mb-3"
-          onClick={() => navigate("/hospitals")}
+          onClick={() => buildingId ? navigate(`/buildings/${hospitalId}`) : navigate("/hospitals")}
         >
-          ⬅ Back to Hospitals
+          {buildingId ? "⬅ Back to Buildings" : "⬅ Back to Hospitals"}
         </button>
 
         {/* Header */}

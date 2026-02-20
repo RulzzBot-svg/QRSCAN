@@ -7,6 +7,7 @@ import HospitalCards from "./components/common/HospitalCards";
 import AHU from "./components/common/AHU";
 import FilterInfo from "./components/common/FilterInfo";
 import AHUPage from "./components/common/AHUPage";
+import BuildingsPage from "./components/common/BuildingsPage";
 import jobCompleted from "./components/common/job-completed";
 import "./index.css";
 import QRScanner from "./components/common/QRScanner";
@@ -36,8 +37,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/login" element={<Login />} />
         <Route path="/Home" element={<App />} />
         <Route path="/hospitals" element={<HospitalCards />} />
+        <Route path="/buildings/:hospitalId" element={<BuildingsPage />} />
         <Route path="/AHU" element={<AHU />} />
         <Route path="/AHU/:hospitalId" element={<AHUPage />} />
+        <Route path="/AHU/:hospitalId/building/:buildingId" element={<AHUPage />} />
         <Route path="/FilterInfo/:ahuId" element={<FilterInfo />} />
         <Route path="/job-completed" element={<jobCompleted />} />
         <Route path="/scan" element={<QRScanner />} />
