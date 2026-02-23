@@ -8,6 +8,10 @@ function BuildingsPage() {
 
   const [buildings, setBuildings] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  const [search, setSearch] = useState("");
+  const [minAhus, setMinAhus] = useState("");
+  const [activeOnly, setActiveOnly] = useState(false);
 
   useEffect(() => {
     getBuildingsForHospital(hospitalId)
@@ -20,6 +24,8 @@ function BuildingsPage() {
       })
       .finally(() => setLoading(false));
   }, [hospitalId]);
+
+  
 
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200 p-4">
@@ -45,9 +51,27 @@ function BuildingsPage() {
         </div>
       )}
 
+      {/* Filters */}
+      <div className="flex gap-2 items-center mb-4">
+        <input className="input input-sm input-bordered w-full" placeholder="Search buildings..." value={search} onChange={(e)=>setSearch(e.target.value)} />
+        <input className="input input-sm input-bordered w-24" placeholder="Min AHUs" type="number" min="0" value={minAhus} onChange={(e)=>setMinAhus(e.target.value)} />
+        <label className="label cursor-pointer">
+          <input type="checkbox" className="checkbox checkbox-sm mr-2" checked={activeOnly} onChange={(e)=>setActiveOnly(e.target.checked)} />
+          <span className="label-text">Active only</span>
+        </label>
+      </div>
+
       {!loading && buildings.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {buildings.map((building) => (
+          {buildings.filter(b => {
+            if (search && !(b.name || "").toLowerCase().includes(search.toLowerCase())) return false;
+            if (minAhus) {
+              const m = parseInt(minAhus,10);
+              if (!isNaN(m) && (b.ahu_count || 0) < m) return false;
+            }
+            if (activeOnly && !b.active) return false;
+            return true;
+          }).map((building) => (
             <div
               key={building.id}
               onClick={() => navigate(`/AHU/${hospitalId}/building/${building.id}`)}

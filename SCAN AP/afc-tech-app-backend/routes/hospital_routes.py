@@ -90,6 +90,7 @@ def get_ahus_for_hospital(hospital_id):
 
         result.append({
             "id": a.id,
+            "building_id": getattr(a, "building_id", None),
             "name": a.name,
             "location": a.location,
             "filters_count": filters_count,

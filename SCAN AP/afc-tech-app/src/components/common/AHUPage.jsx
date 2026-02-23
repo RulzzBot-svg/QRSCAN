@@ -13,6 +13,10 @@ function AHUPage() {
   const [visible, setVisible] = useState(6);
   const [ahus, setAhus] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all"); // all | Overdue | Due Soon | Completed | Pending
+  const [minFilters, setMinFilters] = useState("");
+  const [nextFrom, setNextFrom] = useState("");
+  const [nextTo, setNextTo] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -46,11 +50,30 @@ function AHUPage() {
     })();
   }, [hospitalId, buildingId]);
 
-  // Filter by ID (coerce to string) or location
+  // Filter by ID (coerce to string) or location + additional filters
   const filtered = ahus.filter((a) => {
     const idStr = String(a.id || "");
     const loc = String(a.location || "");
-    return idStr.toLowerCase().includes(search.toLowerCase()) || loc.toLowerCase().includes(search.toLowerCase());
+    const nameStr = String(a.name || "");
+    if (!(idStr.toLowerCase().includes(search.toLowerCase()) || loc.toLowerCase().includes(search.toLowerCase()) || nameStr.toLowerCase().includes(search.toLowerCase()))) return false;
+
+    if (statusFilter !== "all") {
+      if (!a.status || String(a.status).toLowerCase() !== String(statusFilter).toLowerCase()) return false;
+    }
+
+    if (minFilters) {
+      const m = parseInt(minFilters, 10);
+      if (!isNaN(m) && (a.filters_count || 0) < m) return false;
+    }
+
+    if (nextFrom || nextTo) {
+      const nd = a.next_due_date ? new Date(a.next_due_date) : null;
+      if (!nd) return false;
+      if (nextFrom && nd < new Date(nextFrom)) return false;
+      if (nextTo && nd > new Date(nextTo)) return false;
+    }
+
+    return true;
   });
 
   // Prefer the human-friendly name when available; otherwise format id
@@ -114,6 +137,21 @@ function AHUPage() {
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60">
             🔍
           </span>
+        </div>
+
+        {/* Extra filters */}
+        <div className="flex gap-2 items-center mb-3">
+          <select className="select select-sm select-bordered" value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)}>
+            <option value="all">Any status</option>
+            <option value="Overdue">Overdue</option>
+            <option value="Due Soon">Due Soon</option>
+            <option value="Completed">Completed</option>
+            <option value="Pending">Pending</option>
+          </select>
+          <input type="number" min="0" className="input input-sm input-bordered w-28" placeholder="Min filters" value={minFilters} onChange={(e)=>setMinFilters(e.target.value)} />
+          <input type="date" className="input input-sm input-bordered" value={nextFrom} onChange={(e)=>setNextFrom(e.target.value)} />
+          <input type="date" className="input input-sm input-bordered" value={nextTo} onChange={(e)=>setNextTo(e.target.value)} />
+          <button className="btn btn-xs btn-ghost ml-auto" onClick={()=>{setStatusFilter('all'); setMinFilters(''); setNextFrom(''); setNextTo(''); setSearch('');}}>Clear</button>
         </div>
 
         {/* Loading */}

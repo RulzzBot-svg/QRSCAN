@@ -11,6 +11,13 @@ function AHU() {
     const [loading, setLoading] = useState(false);
     const [ahu, setAhu] = useState(null);
     const [counts, setCounts] = useState({ filters: 0, overdue: 0, dueSoon: 0, ok: 0 });
+    // Local filter UI state
+    const [filterText, setFilterText] = useState("");
+    const [filterPhase, setFilterPhase] = useState("");
+    const [filterStatus, setFilterStatus] = useState("all"); // all | ok | dueSoon | overdue | pending | inactive
+    const [filterNextFrom, setFilterNextFrom] = useState("");
+    const [filterNextTo, setFilterNextTo] = useState("");
+    const [filterMinQty, setFilterMinQty] = useState("");
 
     useEffect(() => {
         if (!ahuId) return;
@@ -84,8 +91,59 @@ function AHU() {
                     ) : (
                         <div>
                             <h3 className="font-semibold mb-2">Filters</h3>
+                            {/* Filter controls */}
+                            <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <input className="input input-sm input-bordered" placeholder="Filter by part, phase or size..." value={filterText} onChange={(e)=>setFilterText(e.target.value)} />
+                                <input className="input input-sm input-bordered" placeholder="Phase" value={filterPhase} onChange={(e)=>setFilterPhase(e.target.value)} />
+                                <select className="select select-sm select-bordered" value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)}>
+                                    <option value="all">Any status</option>
+                                    <option value="ok">OK</option>
+                                    <option value="dueSoon">Due Soon</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                                <input type="date" className="input input-sm input-bordered" value={filterNextFrom} onChange={(e)=>setFilterNextFrom(e.target.value)} />
+                                <input type="date" className="input input-sm input-bordered" value={filterNextTo} onChange={(e)=>setFilterNextTo(e.target.value)} />
+                                <input type="number" min="0" className="input input-sm input-bordered" placeholder="Min qty" value={filterMinQty} onChange={(e)=>setFilterMinQty(e.target.value)} />
+                            </div>
+
                             <div className="space-y-2">
-                                {(ahu?.filters || []).map((f) => (
+                                {((ahu?.filters || []).filter((f) => {
+                                    // text filter
+                                    const q = (filterText || "").trim().toLowerCase();
+                                    if (q) {
+                                        const hay = `${f.part_number || ""} ${f.phase || ""} ${f.size || ""}`.toLowerCase();
+                                        if (!hay.includes(q)) return false;
+                                    }
+
+                                    if (filterPhase && !(String(f.phase || "").toLowerCase().includes(filterPhase.toLowerCase()))) return false;
+
+                                    // status filter
+                                    const st = (f.status || "").toLowerCase();
+                                    if (filterStatus !== "all") {
+                                        if (filterStatus === 'ok' && !(st === 'completed' || st === 'pending' || st === 'ok' || !st)) return false;
+                                        if (filterStatus === 'dueSoon' && st !== 'due soon' && st !== 'dueSoon' && st !== 'due_soon') return false;
+                                        if (filterStatus === 'overdue' && st !== 'overdue') return false;
+                                        if (filterStatus === 'pending' && st !== 'pending') return false;
+                                        if (filterStatus === 'inactive' && f.is_active !== false) return false;
+                                    }
+
+                                    // next due range
+                                    if (filterNextFrom || filterNextTo) {
+                                        const next = f.next_due_date ? new Date(f.next_due_date) : null;
+                                        if (!next) return false;
+                                        if (filterNextFrom && next < new Date(filterNextFrom)) return false;
+                                        if (filterNextTo && next > new Date(filterNextTo)) return false;
+                                    }
+
+                                    if (filterMinQty) {
+                                        const min = parseInt(filterMinQty, 10);
+                                        if (!isNaN(min) && (Number(f.quantity) || 0) < min) return false;
+                                    }
+
+                                    return true;
+                                })).map((f) => (
                                     <div key={f.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded">
                                         <div>
                                             <div className="font-semibold">{f.phase} — {f.part_number}</div>

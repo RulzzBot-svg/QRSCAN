@@ -38,6 +38,7 @@ function AdminAHUs() {
   const [showSignoff, setShowSignoff] = useState(false);
   const [qbMacroLoading, setQbMacroLoading] = useState(false);
   const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({}); // { [ahuId]: array of filter objects }
+  const [buildingFilter, setBuildingFilter] = useState("");
 
   // NEW: Global (page-level) filter bar state (independent of tables)
   const [globalFilters, setGlobalFilters] = useState({
@@ -303,16 +304,30 @@ function AdminAHUs() {
 
       <div className="flex gap-4 px-4 pb-4">
         {/* Left: Hospital tree (UNCHANGED) */}
-        <aside className="w-64 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto max-h-[calc(100vh-8rem)] shrink-0">
-          <div className="font-medium mb-2">Hospitals</div>
-          <input
-            className="input input-sm input-bordered w-full mb-3"
-            placeholder="Filter hospitals..."
-            onChange={(e) => setQuery(e.target.value)}
-            value={query}
-          />
+          <aside className="w-64 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto max-h-[calc(100vh-8rem)] shrink-0">
+            <div className="font-medium mb-2">Hospitals</div>
+            <input
+              className="input input-sm input-bordered w-full mb-2"
+              placeholder="Search hospitals..."
+              onChange={(e) => setQuery(e.target.value)}
+              value={query}
+            />
+            <input
+              className="input input-sm input-bordered w-full mb-3"
+              placeholder="Filter by building name..."
+              onChange={(e) => setBuildingFilter(e.target.value)}
+              value={buildingFilter}
+            />
           <div className="space-y-2">
-            {grouped.map((g) => {
+              {grouped.filter(g => {
+                  if (query && !g.hospitalName.toLowerCase().includes(query.toLowerCase())) return false;
+                  if (buildingFilter) {
+                    // check whether any building matches
+                    const has = g.buildings.some(b => b.buildingName.toLowerCase().includes(buildingFilter.toLowerCase()));
+                    if (!has) return false;
+                  }
+                  return true;
+                }).map((g) => {
               const total = g.items.length;
               const overdue = g.items.reduce((s, x) => s + (x.overdue_count || 0), 0);
               return (
