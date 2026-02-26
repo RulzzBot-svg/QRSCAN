@@ -53,6 +53,7 @@ class Building(db.Model):
     active = Column(Boolean, default=True)
 
     hospital = relationship("Hospital")
+    ahus = relationship("AHU", back_populates="building", cascade="all, delete-orphan")
 
 
 # -------------------------
@@ -77,7 +78,6 @@ class Notification(db.Model):
     ahu = relationship("AHU")
     job = relationship("Job")
     technician = relationship("Technician")
-    ahus = relationship("AHU", back_populates="building", cascade="all, delete-orphan")
 
 
 # -------------------------

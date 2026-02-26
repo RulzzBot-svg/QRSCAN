@@ -21,21 +21,29 @@ def get_all_tech():
 
 @tech_bp.route("/technicians/login",methods=["POST"])
 def login_technicians():
-    data= request.json
-    name = data.get("name")
-    pin = data.get("pin")
+    try:
+        data = request.get_json(silent=True) or {}
+        name = data.get("name")
+        pin = data.get("pin")
 
-    tech = Technician.query.filter_by(name=name, pin=pin, active=True).first()
+        if not name or not pin:
+            return jsonify({"error": "Missing name or pin"}), 400
 
-    if not tech:
-        return jsonify({"error":"Invalid credentials"}),401
-    
-    return jsonify({
-        "id":tech.id,
-        "name":tech.name,
-        "active":tech.active,
-        "role": getattr(tech, "role", "technician")  # Include role, default to technician for backward compatibility
-    }),200
+        tech = Technician.query.filter_by(name=name, pin=pin, active=True).first()
+
+        if not tech:
+            return jsonify({"error": "Invalid credentials"}), 401
+
+        return jsonify({
+            "id": tech.id,
+            "name": tech.name,
+            "active": tech.active,
+            "role": getattr(tech, "role", "technician")
+        }), 200
+    except Exception as e:
+        # Log the exception for server-side diagnostics and return generic 500
+        print(f"Error in login_technicians: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @tech_bp.route("/technicians/<int:tech_id>", methods=["GET"])
