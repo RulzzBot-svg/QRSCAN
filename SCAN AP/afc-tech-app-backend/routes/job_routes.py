@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from models import Job, JobFilter, Filter, AHU, Technician
+from models import JobSignature, Notification
 from db import db
 from datetime import datetime
 from sqlalchemy.orm import joinedload
@@ -58,7 +59,7 @@ def create_job():
         db.session.add(job)
         db.session.flush()  # get job.id before committing
 
-        # Add JobFilter entries
+        # Add JobFilter entries and create notifications for any notes
         for f in filter_results:
             filter_id = f.get("filter_id")
             filter_obj = db.session.get(Filter, filter_id)
@@ -78,6 +79,30 @@ def create_job():
 
             if jf.is_completed:
                 filter_obj.last_service_date = datetime.utcnow().date()
+
+            # Persist notification for per-filter note (if provided)
+            if jf.note and str(jf.note).strip():
+                notif = Notification(
+                    hospital_id=ahu.hospital_id,
+                    ahu_id=ahu.id,
+                    job_id=job.id,
+                    technician_id=tech_id,
+                    comment_text=str(jf.note).strip(),
+                    status="pending"
+                )
+                db.session.add(notif)
+
+        # Create notification for overall job notes (if present)
+        if job.overall_notes and str(job.overall_notes).strip():
+            notif_overall = Notification(
+                hospital_id=ahu.hospital_id,
+                ahu_id=ahu.id,
+                job_id=job.id,
+                technician_id=tech_id,
+                comment_text=str(job.overall_notes).strip(),
+                status="pending"
+            )
+            db.session.add(notif_overall)
 
         db.session.commit()
 
@@ -234,7 +259,7 @@ def get_jobs_for_tech(tech_id):
 
     return jsonify(result), 200
 
-from models import JobSignature
+
 
 @job_bp.route("/jobs/<int:job_id>/signature", methods=["POST"])
 def save_job_signature(job_id):

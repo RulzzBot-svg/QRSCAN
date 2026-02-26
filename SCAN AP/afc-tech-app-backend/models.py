@@ -53,6 +53,30 @@ class Building(db.Model):
     active = Column(Boolean, default=True)
 
     hospital = relationship("Hospital")
+
+
+# -------------------------
+# NOTIFICATIONS
+# -------------------------
+class Notification(db.Model):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=True)
+    ahu_id = Column(Integer, ForeignKey("ahus.id"), nullable=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=True)
+    technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=True)
+
+    comment_text = Column(Text)
+    status = Column(String(20), default="pending")  # pending, completed
+    created_at = Column(DateTime, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(String(150), nullable=True)
+
+    hospital = relationship("Hospital")
+    ahu = relationship("AHU")
+    job = relationship("Job")
+    technician = relationship("Technician")
     ahus = relationship("AHU", back_populates="building", cascade="all, delete-orphan")
 
 

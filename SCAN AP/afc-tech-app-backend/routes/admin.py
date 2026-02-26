@@ -140,6 +140,65 @@ def admin_overview():
     }), 200
 
 
+@admin_bp.route("/notifications", methods=["GET"])
+@require_admin
+def list_notifications():
+    from models import Notification
+    try:
+        notifs = Notification.query.order_by(Notification.created_at.desc()).all()
+        result = []
+        for n in notifs:
+            result.append({
+                "id": n.id,
+                "hospital_id": n.hospital_id,
+                "hospital_name": n.hospital.name if n.hospital else None,
+                "ahu_id": n.ahu_id,
+                "ahu_name": n.ahu.name if n.ahu else None,
+                "job_id": n.job_id,
+                "technician_id": n.technician_id,
+                "technician_name": n.technician.name if n.technician else None,
+                "comment_text": n.comment_text,
+                "status": n.status,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+                "resolved_at": n.resolved_at.isoformat() if n.resolved_at else None,
+                "resolved_by": n.resolved_by
+            })
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error listing notifications: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@admin_bp.route("/notifications/<int:notif_id>/status", methods=["POST"])
+@require_admin
+def update_notification_status(notif_id):
+    from models import Notification
+    try:
+        data = request.get_json() or {}
+        status = data.get("status")
+        resolved_by = data.get("resolved_by")
+
+        notif = Notification.query.get(notif_id)
+        if not notif:
+            return jsonify({"error": "Notification not found"}), 404
+
+        if status == "completed":
+            notif.status = "completed"
+            notif.resolved_at = datetime.utcnow()
+            notif.resolved_by = resolved_by
+        else:
+            notif.status = "pending"
+            notif.resolved_at = None
+            notif.resolved_by = None
+
+        db.session.commit()
+        return jsonify({"message": "Notification updated"}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating notification: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @admin_bp.route("/jobs", methods=["GET"])
 @require_admin
 def get_all_jobs():

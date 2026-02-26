@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import AdminSidebar from "./AdminSidebar";
+import NotificationsDropdown from "./NotificationsDropdown";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -59,6 +60,9 @@ export default function AdminLayout() {
 
           <div className="flex-1 font-bold text-primary">
             AFC Admin
+          </div>
+          <div className="flex-none">
+            <NotificationsDropdown />
           </div>
         </div>
 
