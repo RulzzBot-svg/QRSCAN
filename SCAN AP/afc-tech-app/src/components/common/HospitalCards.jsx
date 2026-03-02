@@ -28,7 +28,7 @@ function HospitalCards() {
   }, []);
 
   // Pagination: how many hospitals to show at once
-  const [visible, setVisible] = useState(4);
+  const [visible, setVisible] = useState(12);
 
   // Per-hospital computed counts: { [hospitalId]: { filters_count, overdue_count, due_soon_count, ok_count } }
   const [countsMap, setCountsMap] = useState({});
@@ -237,7 +237,7 @@ function HospitalCards() {
         <div className="mt-6 flex justify-center">
           <button
             className="btn btn-outline btn-primary w-full max-w-xs"
-            onClick={() => setVisible(visible + 4)}
+            onClick={() => setVisible(visible + 12)}
           >
             Show More
           </button>
