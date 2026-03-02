@@ -60,10 +60,10 @@ export default function NotificationsDropdown() {
         }}
         aria-label="Notifications"
       >
-        🔔
         {pendingCount > 0 && (
-          <span className="badge badge-secondary ml-1">{pendingCount}</span>
+          <span className="badge badge-secondary mr-1">{pendingCount}</span>
         )}
+        🔔
       </button>
 
       {open && (

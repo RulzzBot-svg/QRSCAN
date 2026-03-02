@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getHospitals } from "../../api/hospitals";
+import { getHospitals, getAHUsForHospital } from "../../api/hospitals";
 import { saveHospitalBundle, isHospitalDownloaded } from "../../offline/offlineBundle";
 import { dbPromise } from "../../offline/db";
 import { parseIsoToDate } from "../../utils/dates";
@@ -55,9 +55,26 @@ function HospitalCards() {
         // If hospital bundle is downloaded, compute counts from local DB
         const downloaded = await isHospitalDownloaded(hospitalId);
         if (!downloaded) {
-          // Avoid fetching remote bundle here to prevent many concurrent requests.
-          setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 } }));
-          return;
+          // Fetch summary counts from server for non-downloaded hospitals
+          try {
+            const res = await getAHUsForHospital(hospitalId);
+            const ahus = Array.isArray(res.data) ? res.data : [];
+            let ahu_count = ahus.length;
+            let ahus_overdue = 0;
+            let ahus_due_soon = 0;
+            let ahus_ok = 0;
+            for (const a of ahus) {
+              if ((a.overdue_count || 0) > 0) ahus_overdue += 1;
+              else if ((a.due_soon_count || 0) > 0) ahus_due_soon += 1;
+              else if ((a.filters_count || 0) > 0) ahus_ok += 1;
+            }
+            setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count, ahus_overdue, ahus_due_soon, ahus_ok } }));
+            return;
+          } catch (err) {
+            console.warn('Failed to fetch remote AHU summary', hospitalId, err);
+            setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 } }));
+            return;
+          }
         }
 
         const db = await dbPromise;
