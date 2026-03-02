@@ -359,6 +359,9 @@ function AdminAHUs() {
               <div className="flex items-center gap-2">
                 <div className="text-sm font-semibold">AHUs</div>
                 <div className="text-xs opacity-70">{filtered.length} shown</div>
+            <span className="badge badge-error badge-xs align-middle">Overdue</span> = past due,{" "}
+            <span className="badge badge-warning badge-xs align-middle">Due Soon</span> = within 14 days,{" "}
+            <span className="badge badge-info badge-xs align-middle">540 Days</span> = 18 Months
               </div>
 
               <div className="flex items-center gap-2">

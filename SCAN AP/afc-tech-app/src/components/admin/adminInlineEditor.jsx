@@ -559,11 +559,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
             </tbody>
           </table>
 
-          <div className="mt-1 text-xs opacity-60">
-            <span className="badge badge-error badge-xs align-middle">Overdue</span> = past due,{" "}
-            <span className="badge badge-warning badge-xs align-middle">Due Soon</span> = within 14 days,{" "}
-            <span className="badge badge-info badge-xs align-middle">540 Days</span> = 18 Months
-          </div>
         </div>
       )}
 
