@@ -111,6 +111,9 @@ function AdminAHUs() {
   // multi-select
   const toggleSelect = (id) => setSelected((s) => ({ ...s, [id]: !s[id] }));
 
+  // Limit how many AHU filter editors mount at once to avoid too many concurrent requests
+  const [visibleAhus, setVisibleAhus] = useState(50);
+
   const handleBulkAction = (action) => {
     const ids = Object.keys(selected).filter((k) => selected[k]);
     if (!ids.length) return alert("No rows selected");
@@ -446,7 +449,7 @@ function AdminAHUs() {
 
             {/* Compact card list */}
             <div className="p-2 overflow-auto lg:max-h-[calc(100vh-240px)] space-y-2">
-              {filtered.map((a) => {
+              {filtered.slice(0, visibleAhus).map((a) => {
                 return (
                   <div key={a.id} className="border border-base-300 rounded-lg overflow-hidden">
                     {/* Compact AHU header */}
@@ -485,6 +488,17 @@ function AdminAHUs() {
               })}
 
               {filtered.length === 0 && <div className="text-center py-8 opacity-70">No AHUs found</div>}
+              {filtered.length > visibleAhus && (
+                <div className="text-center py-2">
+                  <button
+                    className="btn btn-xs"
+                    onClick={() => setVisibleAhus((v) => v + 50)}
+                    type="button"
+                  >
+                    Show more AHUs ({Math.min(filtered.length - visibleAhus, 50)})
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>

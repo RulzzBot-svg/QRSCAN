@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getHospitals, getAHUsForHospital } from "../../api/hospitals";
+import { getHospitals, getAHUsForHospital, getHospitalAHUSummary } from "../../api/hospitals";
 import { saveHospitalBundle, isHospitalDownloaded } from "../../offline/offlineBundle";
 import { dbPromise } from "../../offline/db";
 import { parseIsoToDate } from "../../utils/dates";
@@ -32,6 +32,8 @@ function HospitalCards() {
 
   // Per-hospital computed counts: { [hospitalId]: { filters_count, overdue_count, due_soon_count, ok_count } }
   const [countsMap, setCountsMap] = useState({});
+  // Bulk server-provided summary (one fetch for all hospitals)
+  const [bulkMap, setBulkMap] = useState({});
   // map of hospitalId -> downloaded boolean
   const [offlineMap, setOfflineMap] = useState({});
 
@@ -55,26 +57,8 @@ function HospitalCards() {
         // If hospital bundle is downloaded, compute counts from local DB
         const downloaded = await isHospitalDownloaded(hospitalId);
         if (!downloaded) {
-          // Fetch summary counts from server for non-downloaded hospitals
-          try {
-            const res = await getAHUsForHospital(hospitalId);
-            const ahus = Array.isArray(res.data) ? res.data : [];
-            let ahu_count = ahus.length;
-            let ahus_overdue = 0;
-            let ahus_due_soon = 0;
-            let ahus_ok = 0;
-            for (const a of ahus) {
-              if ((a.overdue_count || 0) > 0) ahus_overdue += 1;
-              else if ((a.due_soon_count || 0) > 0) ahus_due_soon += 1;
-              else if ((a.filters_count || 0) > 0) ahus_ok += 1;
-            }
-            setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count, ahus_overdue, ahus_due_soon, ahus_ok } }));
-            return;
-          } catch (err) {
-            console.warn('Failed to fetch remote AHU summary', hospitalId, err);
-            setCountsMap((m) => ({ ...m, [hospitalId]: { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 } }));
-            return;
-          }
+          // for non-downloaded hospitals, rely on the bulk server summary
+          return;
         }
 
         const db = await dbPromise;
@@ -120,6 +104,30 @@ function HospitalCards() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, visible, offlineMap]);
+
+  // Fetch a single bulk AHU summary for all hospitals to avoid per-hospital network storms
+  useEffect(() => {
+    let mounted = true;
+    getHospitalAHUSummary()
+      .then((res) => {
+        if (!mounted) return;
+        const arr = Array.isArray(res.data) ? res.data : [];
+        const map = {};
+        for (const it of arr) {
+          map[it.hospital_id] = {
+            ahu_count: it.ahu_count || 0,
+            ahus_overdue: it.ahus_overdue || 0,
+            ahus_due_soon: it.ahus_due_soon || 0,
+            ahus_ok: it.ahus_ok || 0,
+          };
+        }
+        setBulkMap(map);
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch bulk AHU summary', err);
+      });
+    return () => { mounted = false; };
+  }, [hospitals]);
 
   // Check which hospitals are available offline in IndexedDB
   useEffect(() => {
@@ -168,7 +176,7 @@ function HospitalCards() {
       {/* Grid of Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {filtered.slice(0, visible).map((hospital) => {
-          const c = countsMap[hospital.id] || { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 };
+          const c = countsMap[hospital.id] || bulkMap[hospital.id] || { ahu_count: 0, ahus_overdue: 0, ahus_due_soon: 0, ahus_ok: 0 };
           return (
             <div
               key={hospital.id}
