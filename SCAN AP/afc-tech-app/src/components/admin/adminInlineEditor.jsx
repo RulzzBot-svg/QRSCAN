@@ -381,7 +381,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
                     <td className="px-1 py-0.5">
                       <input
-                        className="input input-xs input-bordered w-10"
+                        className="input input-xs input-bordered w-14"
                         value={f.phase}
                         onChange={(e) =>
                           updateFilter(f.id, "phase", e.target.value)
