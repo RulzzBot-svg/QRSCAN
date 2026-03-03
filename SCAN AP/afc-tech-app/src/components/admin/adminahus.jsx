@@ -36,6 +36,12 @@ function AdminAHUs() {
   const [showImport, setShowImport] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
   const [showSignoff, setShowSignoff] = useState(false);
+  const [showAddAhu, setShowAddAhu] = useState(false);
+  const [newAhuHospital, setNewAhuHospital] = useState(null);
+  const [newAhuBuilding, setNewAhuBuilding] = useState("");
+  const [newAhuName, setNewAhuName] = useState("");
+  const [newAhuLocation, setNewAhuLocation] = useState("");
+  const [newAhuNotes, setNewAhuNotes] = useState("");
   const [qbMacroLoading, setQbMacroLoading] = useState(false);
   const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({}); // { [ahuId]: array of filter objects }
   const [buildingFilter, setBuildingFilter] = useState("");
@@ -49,7 +55,7 @@ function AdminAHUs() {
   });
 
   useEffect(() => {
-    const load = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
         const res = await API.get("/admin/ahus");
@@ -64,8 +70,20 @@ function AdminAHUs() {
         setLoading(false);
       }
     };
-    load();
+    fetchData();
   }, []);
+
+  // helper to refresh data after mutations
+  const refreshData = async () => {
+    try {
+      const res = await API.get("/admin/ahus");
+      setAhus(Array.isArray(res.data) ? res.data : []);
+      const hr = await API.get("/admin/hospitals");
+      setHospitals(Array.isArray(hr.data) ? hr.data : []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Group by hospital then building (LEFT PANEL — unchanged)
   const grouped = useMemo(() => {
@@ -279,6 +297,9 @@ function AdminAHUs() {
         <div className="flex items-center gap-2">
           <button className="btn btn-xs" onClick={() => setShowImport(true)} type="button">
             Import
+          </button>
+          <button className="btn btn-xs btn-primary" onClick={() => setShowAddAhu(true)} type="button">
+            Add AHU
           </button>
           <button
             className={`btn btn-xs ${
@@ -542,6 +563,72 @@ function AdminAHUs() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Add AHU modal */}
+      {showAddAhu && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
+          <div className="bg-base-100 border p-4 rounded-lg w-96">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-semibold">Add AHU</div>
+              <div className="flex gap-2">
+                <button className="btn btn-sm" onClick={() => setShowAddAhu(false)} type="button">Close</button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <label className="label"><span className="label-text">Hospital</span></label>
+                <select className="select select-sm select-bordered w-full" value={newAhuHospital || ""} onChange={(e) => setNewAhuHospital(e.target.value)}>
+                  <option value="">Select hospital</option>
+                  {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label"><span className="label-text">Building (optional)</span></label>
+                <input className="input input-sm input-bordered w-full" value={newAhuBuilding || ""} onChange={(e) => setNewAhuBuilding(e.target.value)} />
+              </div>
+              <div>
+                <label className="label"><span className="label-text">Name</span></label>
+                <input className="input input-sm input-bordered w-full" value={newAhuName || ""} onChange={(e) => setNewAhuName(e.target.value)} />
+              </div>
+              <div>
+                <label className="label"><span className="label-text">Location</span></label>
+                <input className="input input-sm input-bordered w-full" value={newAhuLocation || ""} onChange={(e) => setNewAhuLocation(e.target.value)} />
+              </div>
+              <div>
+                <label className="label"><span className="label-text">Notes</span></label>
+                <input className="input input-sm input-bordered w-full" value={newAhuNotes || ""} onChange={(e) => setNewAhuNotes(e.target.value)} />
+              </div>
+              <div className="flex justify-end">
+                <button className="btn btn-sm btn-primary" onClick={async () => {
+                  // basic validation
+                  if (!newAhuHospital) return alert('Please select a hospital');
+                  try {
+                    const payload = {
+                      hospital_id: Number(newAhuHospital),
+                      name: newAhuName || undefined,
+                      location: newAhuLocation || undefined,
+                      notes: newAhuNotes || undefined,
+                    };
+                    // include building if numeric id provided or as name (backend will ignore non-numeric)
+                    if (newAhuBuilding) payload.building_id = isNaN(Number(newAhuBuilding)) ? undefined : Number(newAhuBuilding);
+
+                    const res = await API.post('/admin/ahus', payload);
+                    alert('AHU created: ' + (res.data && res.data.id));
+                    setShowAddAhu(false);
+                    // clear form
+                    setNewAhuHospital(null); setNewAhuBuilding(''); setNewAhuName(''); setNewAhuLocation(''); setNewAhuNotes('');
+                    // refresh list
+                    await refreshData();
+                  } catch (err) {
+                    console.error('Create AHU failed', err);
+                    alert('Failed to create AHU');
+                  }
+                }} type="button">Create</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

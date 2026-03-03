@@ -464,3 +464,63 @@ def reactivate_filter(filter_id):
     db.session.commit()
 
     return jsonify({"message": "Filter reactivated", "id": f.id}), 200
+
+
+# ---------------------------------------------------
+# Admin: Create AHU
+# ---------------------------------------------------
+@ahu_bp.route("/admin/ahus", methods=["POST"])
+@require_admin
+def admin_create_ahu():
+    try:
+        data = request.json or {}
+
+        hospital_id = data.get("hospital_id")
+        if hospital_id is None:
+            return jsonify({"error": "hospital_id is required"}), 400
+
+        try:
+            hospital_id = int(hospital_id)
+        except Exception:
+            return jsonify({"error": "hospital_id must be numeric"}), 400
+
+        name = data.get("name") or f"AHU {hospital_id}"
+        location = data.get("location")
+        notes = data.get("notes")
+        building_id = data.get("building_id")
+        excel_order = data.get("excel_order")
+
+        # optional numeric conversions
+        try:
+            building_id = int(building_id) if building_id is not None else None
+        except Exception:
+            building_id = None
+        try:
+            excel_order = int(excel_order) if excel_order is not None else None
+        except Exception:
+            excel_order = None
+
+        a = AHU(
+            hospital_id=hospital_id,
+            building_id=building_id,
+            name=name,
+            location=location,
+            notes=notes,
+            excel_order=excel_order,
+        )
+        db.session.add(a)
+        db.session.commit()
+
+        return jsonify({
+            "id": a.id,
+            "hospital_id": a.hospital_id,
+            "building_id": a.building_id,
+            "name": a.name,
+            "location": a.location,
+            "notes": a.notes,
+            "excel_order": a.excel_order,
+        }), 201
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500

@@ -532,13 +532,29 @@ def seed_from_excel(path, selected_sheet=None):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python seed_from_excel.py <sheet_name>")
+        print("Usage: python seed_from_excel.py <sheet_name>|all")
         print("Available sheets:")
         xls = pd.ExcelFile(EXCEL_PATH)
         for sheet in xls.sheet_names:
             print(f"  - {sheet}")
+        print("  - all   (seed every sheet except 'FILTER')")
         sys.exit(1)
 
-    selected_sheet = sys.argv[1]
+    selected = sys.argv[1]
     with app.app_context():
-        seed_from_excel(EXCEL_PATH, selected_sheet)
+        if str(selected).strip().lower() == "all":
+            xls = pd.ExcelFile(EXCEL_PATH)
+            sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
+            if not sheets:
+                print("No data sheets found to seed.")
+                sys.exit(1)
+            for sheet in sheets:
+                try:
+                    print(f"\n--- Seeding sheet: {sheet} ---")
+                    seed_from_excel(EXCEL_PATH, sheet)
+                except Exception as e:
+                    print(f"Error seeding sheet '{sheet}': {e}")
+            print("\nAll requested sheets processed.")
+        else:
+            selected_sheet = selected
+            seed_from_excel(EXCEL_PATH, selected_sheet)
