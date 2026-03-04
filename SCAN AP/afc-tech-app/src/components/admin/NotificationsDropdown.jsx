@@ -1,17 +1,16 @@
 import React, { useEffect, useState, useRef } from "react";
 import { API } from "../../api/api";
 
-const SEVERITY_CLASSES = {
-  critical: "alert-critical",
-  warning: "alert-warning",
-  info: "alert-info",
-  success: "alert-success",
+const SEVERITY_CONFIG = {
+  critical: { color: "bg-red-500", icon: "⚠️", bg: "bg-red-50", border: "border-red-100" },
+  warning: { color: "bg-amber-500", icon: "🟠", bg: "bg-amber-50", border: "border-amber-100" },
+  info: { color: "bg-blue-500", icon: "ℹ️", bg: "bg-blue-50", border: "border-blue-100" },
+  success: { color: "bg-emerald-500", icon: "✅", bg: "bg-emerald-50", border: "border-emerald-100" },
 };
 
 export default function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
-  const [filter, setFilter] = useState("all");
   const ref = useRef();
 
   const fetchNotifs = async () => {
@@ -46,20 +45,7 @@ export default function NotificationsDropdown() {
     return (n.level || n.type || n.severity || "info").toLowerCase();
   };
 
-  const counts = notifs.reduce(
-    (acc, n) => {
-      const s = severityOf(n);
-      acc[s] = (acc[s] || 0) + 1;
-      if (n.status === "pending") acc.pending += 1;
-      return acc;
-    },
-    { critical: 0, warning: 0, info: 0, success: 0, pending: 0 }
-  );
-
-  const visible = notifs.filter((n) => {
-    if (filter === "all") return true;
-    return severityOf(n) === filter;
-  });
+  const pendingCount = notifs.filter(n => n.status === "pending").length;
 
   const timeAgo = (iso) => {
     try {
@@ -69,9 +55,7 @@ export default function NotificationsDropdown() {
       if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
       if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
       return `${Math.floor(diff / 86400)}d ago`;
-    } catch (e) {
-      return "";
-    }
+    } catch (e) { return ""; }
   };
 
   const updateStatus = async (id, status) => {
@@ -88,104 +72,103 @@ export default function NotificationsDropdown() {
   };
 
   return (
-    <div className="relative" ref={ref}>
-      <style>{`
-        :root{--primary:#2c3e50;--warning:#f39c12;--danger:#e74c3c;--info:#3498db;--success:#27ae60;--light:#f5f7fa;--shadow:rgba(0,0,0,0.08);--radius:8px}
-        .nd-panel{width:380px;background:#fff;border-radius:10px;box-shadow:0 6px 24px var(--shadow);overflow:hidden;font-family:Inter, system-ui, Arial}
-        .nd-header{background:var(--primary);color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
-        .nd-title{font-size:14px;font-weight:600}
-        .nd-filters{display:flex;gap:8px}
-        .nd-filter-btn{background:rgba(255,255,255,0.12);border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer}
-        .nd-filter-btn.active{background:rgba(255,255,255,0.22)}
-        .nd-summary{display:flex;gap:12px;padding:10px 14px;background:#fafafa;border-bottom:1px solid rgba(0,0,0,0.04)}
-        .nd-summary .item{display:flex;align-items:center;gap:8px;font-size:13px}
-        .nd-summary .count{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700}
-        .critical-count{background:rgba(231,76,60,0.12);color:var(--danger)}
-        .warning-count{background:rgba(243,156,18,0.12);color:var(--warning)}
-        .info-count{background:rgba(52,152,219,0.12);color:var(--info)}
-        .nd-list{max-height:320px;overflow:auto}
-        .alert{padding:12px 14px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;gap:12px;align-items:flex-start}
-        .alert-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .alert-content{flex:1}
-        .alert-title{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px}
-        .alert-message{font-size:13px;color:#444}
-        .alert-time{font-size:12px;color:#8b98a6}
-        .alert-actions{margin-top:8px;display:flex;gap:8px}
-        .btn-nd{padding:6px 10px;border-radius:6px;border:0;background:#f3f4f6;cursor:pointer}
-        .btn-nd.primary{background:#fff;color:var(--primary);border:1px solid rgba(0,0,0,0.04)}
-        .alert-dismiss{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#9aa6b2}
-        .alert-critical .alert-icon{background:rgba(231,76,60,0.08);color:var(--danger)}
-        .alert-warning .alert-icon{background:rgba(243,156,18,0.07);color:var(--warning)}
-        .alert-info .alert-icon{background:rgba(52,152,219,0.08);color:var(--info)}
-        .alert-success .alert-icon{background:rgba(39,174,96,0.08);color:var(--success)}
-      `}</style>
-
+    <div className="relative inline-block" ref={ref}>
+      {/* Trigger Button */}
       <button
-        className="btn btn-ghost btn-square"
+        className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
         onClick={(e) => {
           e.stopPropagation();
-          const next = !open;
-          setOpen(next);
-          if (next) fetchNotifs();
+          setOpen(!open);
+          if (!open) fetchNotifs();
         }}
-        aria-label="Notifications"
       >
-        {counts.pending > 0 && (
-          <span className="badge badge-secondary mr-1">{counts.pending}</span>
+        <span className="text-xl">🔔</span>
+        {pendingCount > 0 && (
+          <span className="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-white">
+            {pendingCount}
+          </span>
         )}
-        🔔
       </button>
 
+      {/* Dropdown Panel */}
       {open && (
-        <div className="absolute right-0 mt-2 nd-panel z-50">
-          <div className="nd-header">
-            <div className="nd-title">System Notifications</div>
-            <div className="nd-filters">
-              {[["all","All"],["critical","Critical"],["warning","Warning"],["info","Info"]].map(([key,label])=>(
-                <button key={key} className={`nd-filter-btn ${filter===key?"active":""}`} onClick={()=>setFilter(key)}>{label}</button>
-              ))}
-            </div>
+        <div className="absolute right-0 mt-3 w-[400px] bg-white rounded-xl shadow-2xl  z-50 overflow-hidden">
+          {/* Simple Header */}
+          <div className="bg-sky-300 px-4 py-4">
+            <h3 className="text-white font-bold text-base">System Notifications</h3>
           </div>
 
-          <div className="nd-summary">
-            <div className="item"><div className="count critical-count">{counts.critical}</div><div>Critical</div></div>
-            <div className="item"><div className="count warning-count">{counts.warning}</div><div>Warning</div></div>
-            <div className="item"><div className="count info-count">{counts.info}</div><div>Info</div></div>
-          </div>
+          {/* List Section */}
+          <div className="max-h-[480px] overflow-y-auto bg-gray-50/50 p-3 space-y-3">
+            {notifs.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-sm text-gray-400 font-medium font-inter">All clear! No alerts.</p>
+              </div>
+            ) : (
+              notifs.map((n) => {
+                const sev = severityOf(n);
+                const config = SEVERITY_CONFIG[sev] || SEVERITY_CONFIG.info;
+                return (
+                  <div key={n.id} className={`relative bg-white border ${config.border} rounded-xl shadow-sm group transition-all`}>
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${config.color} rounded-l-xl`} />
+                    
+                    <div className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full ${config.bg} flex items-center justify-center text-lg`}>
+                          {config.icon}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 truncate">
+                              <h4 className="text-sm font-bold text-gray-900 truncate">
+                                {n.hospital_name || n.title || 'System Alert'}
+                              </h4>
+                              {n.ahu_name && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase">
+                                  {n.ahu_name}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap ml-2">
+                              {timeAgo(n.created_at)}
+                            </span>
+                          </div>
+                          
+                          <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                            {n.comment_text}
+                          </p>
+                          
+                          <div className="flex gap-2">
+                            {n.status !== 'completed' && (
+                              <button 
+                                onClick={() => updateStatus(n.id, 'completed')}
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                              >
+                                Mark Completed
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => updateStatus(n.id, 'dismissed')}
+                              className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-bold rounded-lg transition-colors"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
 
-          <div className="nd-list">
-            {visible.length === 0 && (
-              <div style={{padding:24,textAlign:'center',color:'#95a5a6'}}>All clear! No notifications to display.</div>
-            )}
-
-            {visible.map((n) => {
-              const sev = severityOf(n);
-              const cls = SEVERITY_CLASSES[sev] || "alert-info";
-              return (
-                <div key={n.id} className={`alert ${cls}`}>
-                  <div className="alert-icon">
-                    {sev === 'critical' ? '⚠️' : sev === 'warning' ? '🟠' : sev === 'info' ? 'ℹ️' : '✅'}
-                  </div>
-                  <div className="alert-content">
-                    <div className="alert-title">
-                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                        <strong style={{fontSize:13}}>{n.hospital_name || n.title || 'Notification'}</strong>
-                        {n.ahu_name && <span style={{fontSize:12,color:'#7e8a95'}}>{n.ahu_name}</span>}
+                        <button 
+                          onClick={() => updateStatus(n.id, 'dismissed')}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-300 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <div style={{fontSize:12,color:'#7e8a95'}}>{timeAgo(n.created_at)}</div>
-                    </div>
-                    <div className="alert-message">{n.comment_text}</div>
-                    <div className="alert-actions">
-                      {n.status !== 'completed' && (
-                        <button className="btn-nd primary" onClick={()=>updateStatus(n.id,'completed')}>Mark Completed</button>
-                      )}
-                      <button className="btn-nd" onClick={()=>updateStatus(n.id,'dismissed')}>Dismiss</button>
                     </div>
                   </div>
-                  <div className="alert-dismiss" title="Dismiss" onClick={()=>updateStatus(n.id,'dismissed')}>✖</div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}
