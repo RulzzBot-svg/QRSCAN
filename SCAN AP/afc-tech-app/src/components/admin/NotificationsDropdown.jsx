@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { API } from "../../api/api";
-import { parseIsoToDate, formatDateTime } from "../../utils/dates";
+import { parseIsoToDate, formatDate } from "../../utils/dates";
 
 const SEVERITY_CONFIG = {
   critical: { color: "bg-red-500", icon: "⚠️", bg: "bg-red-50", border: "border-red-100" },
@@ -61,7 +61,7 @@ const timeAgo = (iso) => {
       if (!d || isNaN(d.getTime())) return "";
       const diffInSeconds = Math.floor((Date.now() - d.getTime()) / 1000);
       if (diffInSeconds < 0) return "";
-      if (diffInSeconds < 3600) return "Just now";
+      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
       return `${Math.floor(diffInSeconds / 3600)}h ago`;
     } catch (e) { return ""; }
   };
@@ -169,7 +169,7 @@ const timeAgo = (iso) => {
                                 try {
                                   const d = parseIsoToDate(n.created_at);
                                   const adj = adjustBySubtractingHours(d, 7);
-                                  return adj && !isNaN(adj.getTime()) ? formatDateTime(adj) : "";
+                                  return adj && !isNaN(adj.getTime()) ? formatDate(adj) : "";
                                 } catch (e) { return ""; }
                               })()}</span>
                             <span>•</span>
