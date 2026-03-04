@@ -164,7 +164,7 @@ function FilterInfo() {
       gps_lat: location.lat,
       gps_long: location.long,
       filters: filterPayload,
-      completed_at: new Date().toISOString(),
+      completed_at: new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString(),
     };
 
     try {
@@ -181,7 +181,7 @@ function FilterInfo() {
         setAhu(res.data);
         await cacheAHU(res.data);
         // notify admin UI that a job (and therefore a notification) may exist
-        try { window.dispatchEvent(new Event('jobCreated')); } catch(e) {}
+        try { window.dispatchEvent(new Event('jobCreated')); } catch (e) { }
       }
       openModal();
     } catch (err) {
@@ -248,13 +248,12 @@ function FilterInfo() {
                 </div>
 
                 <span
-                  className={`badge ${
-                    ahu.status === "Overdue"
-                      ? "badge-error"
-                      : ahu.status === "Due Soon"
+                  className={`badge ${ahu.status === "Overdue"
+                    ? "badge-error"
+                    : ahu.status === "Due Soon"
                       ? "badge-warning"
                       : "badge-success"
-                  }`}
+                    }`}
                 >
                   {ahu.status}
                 </span>
@@ -267,14 +266,18 @@ function FilterInfo() {
                   </p>
                   {filterRows.some((f) => f.last_service_date)
                     ? formatDate(
-                        new Date(
-                          Math.max(
-                            ...filterRows
-                              .filter((f) => f.last_service_date)
-                              .map((f) => parseIsoToDate(f.last_service_date).getTime())
-                          )
+                      new Date(
+                        Math.max(
+                          ...filterRows
+                            .filter((f) => f.last_service_date)
+                            .map((f) => {
+                              const d = parseIsoToDate(f.last_service_date);
+                              // Subtract 8 hours to align UTC database time to LA time
+                              return d.getTime() - (8 * 60 * 60 * 1000);
+                            })
                         )
                       )
+                    )
                     : "Never"}
                 </div>
 
@@ -305,15 +308,13 @@ function FilterInfo() {
           {filterRows.map((row) => (
             <div
               key={row.id}
-              className={`bg-base-100 shadow rounded-lg border border-base-300 overflow-hidden ${
-                checked[row.id] ? "border-success" : ""
-              }`}
+              className={`bg-base-100 shadow rounded-lg border border-base-300 overflow-hidden ${checked[row.id] ? "border-success" : ""
+                }`}
             >
               {/* Collapsed Header - Always Visible */}
               <div
-                className={`p-4 cursor-pointer hover:bg-base-200 transition-colors ${
-                  checked[row.id] ? "bg-success/10" : ""
-                }`}
+                className={`p-4 cursor-pointer hover:bg-base-200 transition-colors ${checked[row.id] ? "bg-success/10" : ""
+                  }`}
                 onClick={() => toggleRowExpansion(row.id)}
               >
                 <div className="flex items-center justify-between">
@@ -339,7 +340,7 @@ function FilterInfo() {
                       <div>
                         <span className="badge badge-success badge-sm">
                           {row.last_service_date
-                            ? formatDate(row.last_service_date)
+                            ? formatDate(new Date(parseIsoToDate(row.last_service_date).getTime() - (8 * 60 * 60 * 1000)))
                             : "Never"}
                         </span>
                       </div>
@@ -348,9 +349,8 @@ function FilterInfo() {
                   <div className="ml-4">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className={`h-5 w-5 transition-transform ${
-                        expandedRows[row.id] ? "rotate-180" : ""
-                      }`}
+                      className={`h-5 w-5 transition-transform ${expandedRows[row.id] ? "rotate-180" : ""
+                        }`}
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
