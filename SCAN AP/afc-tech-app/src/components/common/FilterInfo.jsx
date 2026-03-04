@@ -179,6 +179,8 @@ function FilterInfo() {
         const res = await getAHUbyQR(ahuId);
         setAhu(res.data);
         await cacheAHU(res.data);
+        // notify admin UI that a job (and therefore a notification) may exist
+        try { window.dispatchEvent(new Event('jobCreated')); } catch(e) {}
       }
       openModal();
     } catch (err) {

@@ -17,6 +17,8 @@ export async function syncQueuedJobs({max=10} = {}){
             const payload = j.payload ?? j;
             await API.post("/jobs", payload);
             await markJobSynced(localId);
+            // notify other UI parts (e.g., admin notifications) to refresh
+            try { window.dispatchEvent(new Event('jobCreated')); } catch(e) {}
             synced+=1
         }catch(err){
             const msg= err?.response?.data?.console.error || err?.message || "Uknown syncing error.";
