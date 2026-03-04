@@ -164,6 +164,7 @@ function FilterInfo() {
       gps_lat: location.lat,
       gps_long: location.long,
       filters: filterPayload,
+      completed_at: new Date().toISOString(),
     };
 
     try {

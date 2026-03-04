@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify
 from models import Job, JobFilter, Filter, AHU, Technician
 from models import JobSignature, Notification
 from db import db
-from datetime import datetime
+from datetime import datetime, timezone
+from dateutil.parser import isoparse
 from sqlalchemy.orm import joinedload
 from middleware.auth import require_admin
 
@@ -47,6 +48,20 @@ def create_job():
         
         #ahu.last_service_date = datetime.utcnow()
 
+        # Determine completed_at: prefer client-provided ISO timestamp (if present), otherwise server UTC
+        incoming_completed = data.get("completed_at")
+        if incoming_completed:
+            try:
+                dt = isoparse(incoming_completed)
+                # If naive, assume UTC
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                completed_at_val = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            except Exception:
+                completed_at_val = datetime.utcnow()
+        else:
+            completed_at_val = datetime.utcnow()
+
         # Create job record
         job = Job(
             ahu_id=ahu_id,
@@ -54,7 +69,7 @@ def create_job():
             overall_notes=overall_notes,
             gps_lat=gps_lat,
             gps_long=gps_long,
-            completed_at=datetime.utcnow()
+            completed_at=completed_at_val
         )
         db.session.add(job)
         db.session.flush()  # get job.id before committing

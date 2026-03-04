@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { API } from "../../api/api";
+import { parseIsoToDate, formatDateTime } from "../../utils/dates";
 
 const SEVERITY_CONFIG = {
   critical: { color: "bg-red-500", icon: "⚠️", bg: "bg-red-50", border: "border-red-100" },
@@ -47,14 +48,21 @@ export default function NotificationsDropdown() {
 
   const pendingCount = notifs.filter(n => n.status === "pending").length;
 
-  const timeAgo = (iso) => {
+// Use project's date helpers so parsing/formatting matches other UI (Jobs page)
+// Adjust a Date by subtracting `hours` hours (positive hours subtracts)
+const adjustBySubtractingHours = (d, hours) => {
+  if (!d) return null;
+  return new Date(d.getTime() - hours * 60 * 60 * 1000);
+};
+
+const timeAgo = (iso) => {
     try {
-      const d = new Date(iso);
-      const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-      if (diff < 60) return `${diff}s ago`;
-      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-      return `${Math.floor(diff / 86400)}d ago`;
+      const d = parseIsoToDate(iso);
+      if (!d || isNaN(d.getTime())) return "";
+      const diffInSeconds = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (diffInSeconds < 0) return "";
+      if (diffInSeconds < 3600) return "Just now";
+      return `${Math.floor(diffInSeconds / 3600)}h ago`;
     } catch (e) { return ""; }
   };
 
@@ -154,6 +162,18 @@ export default function NotificationsDropdown() {
                             >
                               Dismiss
                             </button>
+                          </div>
+                          {/* Bottom row: full timestamp and technician */}
+                          <div className="mt-3 text-[11px] text-gray-400 flex items-center gap-2">
+                            <span>{(() => {
+                                try {
+                                  const d = parseIsoToDate(n.created_at);
+                                  const adj = adjustBySubtractingHours(d, 7);
+                                  return adj && !isNaN(adj.getTime()) ? formatDateTime(adj) : "";
+                                } catch (e) { return ""; }
+                              })()}</span>
+                            <span>•</span>
+                            <span>{n.technician_name || n.technician || "Unknown"}</span>
                           </div>
                         </div>
 
