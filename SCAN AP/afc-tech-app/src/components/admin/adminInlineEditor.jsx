@@ -1,6 +1,7 @@
 // adminInlineEditor.jsx
 import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
+import { parseIsoToDate, formatDate } from "../../utils/dates";
 
 const FREQUENCY_OPTIONS = [
   { label: "30 Days", value: 30 },
@@ -23,7 +24,7 @@ const buildSize = ({ h, w, d }) => {
 };
 
 const startOfDay = (d) => {
-  const x = new Date(d);
+  const x = new Date(d instanceof Date ? d.getTime() : parseIsoToDate(d)?.getTime());
   x.setHours(0, 0, 0, 0);
   return x;
 };
@@ -31,12 +32,23 @@ const startOfDay = (d) => {
 const computeNextDueDate = (f) => {
   if (!f?.last_service_date || !f?.frequency_days) return null;
 
-  const last = new Date(f.last_service_date);
-  if (Number.isNaN(last.getTime())) return null;
+  const last = parseIsoToDate(f.last_service_date);
+  if (!last || Number.isNaN(last.getTime())) return null;
 
-  const next = new Date(last);
+  const next = new Date(last.getTime());
   next.setDate(next.getDate() + Number(f.frequency_days));
   return next;
+};
+
+// Produce a local YYYY-MM-DD string for comparisons (avoid UTC shifts)
+const toLocalIsoDate = (d) => {
+  if (!d) return null;
+  const dt = d instanceof Date ? d : parseIsoToDate(d);
+  if (!dt || Number.isNaN(dt.getTime())) return null;
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 };
 
 const getRowStatus = (f) => {
@@ -276,7 +288,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
         if (!nextDue) {
           if (globalFilters.status !== "pending") return false;
         } else {
-          const nextDueStr = nextDue.toISOString().split("T")[0];
+          const nextDueStr = toLocalIsoDate(nextDue);
           if (globalFilters.nextFrom && nextDueStr < globalFilters.nextFrom)
             return false;
           if (globalFilters.nextTo && nextDueStr > globalFilters.nextTo)
@@ -381,7 +393,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
                     <td className="px-1 py-0.5">
                       <input
-                        className="input input-xs input-bordered w-14"
+                        className="input input-xs input-bordered w-20"
                         value={f.phase}
                         onChange={(e) =>
                           updateFilter(f.id, "phase", e.target.value)
@@ -450,16 +462,17 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
                     <td className="px-1 py-0.5 text-xs">
                       {f.last_service_date
-                        ? new Date(f.last_service_date).toLocaleDateString(
-                            "en-US",
-                            { month: "2-digit", day: "2-digit", year: "numeric" }
-                          )
+                        ? formatDate(f.last_service_date, "en-US", {
+                            month: "2-digit",
+                            day: "2-digit",
+                            year: "numeric",
+                          })
                         : "—"}
                     </td>
 
                     <td className="px-1 py-0.5 text-xs">
                       {nextDue
-                        ? nextDue.toLocaleDateString("en-US", {
+                        ? formatDate(nextDue, "en-US", {
                             month: "2-digit",
                             day: "2-digit",
                             year: "numeric",
