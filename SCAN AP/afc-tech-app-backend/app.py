@@ -31,13 +31,19 @@ def create_app():
 
     # Allow CORS for API routes from our frontends and localhost (for dev).
     # In production, restrict origins to your deployed frontend domains.
-    CORS(app, resources={r"/api/*": {"origins": [
-        "https://qrscan-lyart.vercel.app",
-        "https://qrscan-8ql2.onrender.com",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://192.168.1.131:5173"
-    ]}}, supports_credentials=True)
+    CORS(app,
+         resources={r"/api/*": {"origins": [
+             "https://qrscan-lyart.vercel.app",
+             "https://qrscan-8ql2.onrender.com",
+             "http://localhost:5174",
+             "http://127.0.0.1:5174",
+             "http://192.168.1.131:5173"
+         ]}},
+         supports_credentials=True,
+         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "X-Tech-ID", "X-Requested-With"],
+         expose_headers=["Content-Disposition"]
+    )
 
     db.init_app(app)
 
