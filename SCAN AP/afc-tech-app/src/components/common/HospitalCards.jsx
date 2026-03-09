@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getHospitals, getAHUsForHospital, getHospitalAHUSummary } from "../../api/hospitals";
+import { getHospitals, getAHUsForHospital } from "../../api/hospitals";
 import { saveHospitalBundle, isHospitalDownloaded } from "../../offline/offlineBundle";
 import { dbPromise } from "../../offline/db";
 import { parseIsoToDate } from "../../utils/dates";
@@ -105,29 +105,7 @@ function HospitalCards() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, visible, offlineMap]);
 
-  // Fetch a single bulk AHU summary for all hospitals to avoid per-hospital network storms
-  useEffect(() => {
-    let mounted = true;
-    getHospitalAHUSummary()
-      .then((res) => {
-        if (!mounted) return;
-        const arr = Array.isArray(res.data) ? res.data : [];
-        const map = {};
-        for (const it of arr) {
-          map[it.hospital_id] = {
-            ahu_count: it.ahu_count || 0,
-            ahus_overdue: it.ahus_overdue || 0,
-            ahus_due_soon: it.ahus_due_soon || 0,
-            ahus_ok: it.ahus_ok || 0,
-          };
-        }
-        setBulkMap(map);
-      })
-      .catch((err) => {
-        console.warn('Failed to fetch bulk AHU summary', err);
-      });
-    return () => { mounted = false; };
-  }, [hospitals]);
+  // Bulk AHU summary removed: rely on local DB counts or per-hospital data
 
   // Check which hospitals are available offline in IndexedDB
   useEffect(() => {
