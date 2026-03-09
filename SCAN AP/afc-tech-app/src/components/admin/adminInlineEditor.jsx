@@ -96,6 +96,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   const [filters, setFilters] = useState([]);
   const [filterInvoices, setFilterInvoices] = useState({});
 
+  // localStorage key per-AHU for client-side persistence when server-save fails
+  const localInvoicesKey = `filterInvoices:ahu:${ahuId}`;
 
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -139,37 +141,74 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
             if (m) {
               try {
                 const parsed = JSON.parse(m[1]);
-                setFilterInvoices(parsed || {});
+                // merge with any locally-stored invoices (local overrides server)
+                let local = {};
+                try {
+                  const raw = localStorage.getItem(localInvoicesKey);
+                  if (raw) local = JSON.parse(raw) || {};
+                } catch (e) {
+                  local = {};
+                }
+                setFilterInvoices({ ...(parsed || {}), ...local });
               } catch (e) {
                 // ignore parse errors
               }
             } else {
-              setFilterInvoices({});
+              // prefer local cache if present
+              try {
+                const raw = localStorage.getItem(localInvoicesKey);
+                setFilterInvoices(raw ? JSON.parse(raw) : {});
+              } catch (e) {
+                setFilterInvoices({});
+              }
             }
           } else {
             const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
             const ahuData = ahuRes?.data || {};
             if (ahuData.not_found) {
               // no AHU details available on server
-              setFilterInvoices({});
+              try {
+                const raw = localStorage.getItem(localInvoicesKey);
+                setFilterInvoices(raw ? JSON.parse(raw) : {});
+              } catch (e) {
+                setFilterInvoices({});
+              }
             } else {
               const notes = ahuData.notes || "";
               const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
               if (m) {
                 try {
                   const parsed = JSON.parse(m[1]);
-                  setFilterInvoices(parsed || {});
+                  // merge with local cache (local overrides server)
+                  let local = {};
+                  try {
+                    const raw = localStorage.getItem(localInvoicesKey);
+                    if (raw) local = JSON.parse(raw) || {};
+                  } catch (e) {
+                    local = {};
+                  }
+                  setFilterInvoices({ ...(parsed || {}), ...local });
                 } catch (e) {
                   // ignore parse errors
                 }
               } else {
-                setFilterInvoices({});
+                try {
+                  const raw = localStorage.getItem(localInvoicesKey);
+                  setFilterInvoices(raw ? JSON.parse(raw) : {});
+                } catch (e) {
+                  setFilterInvoices({});
+                }
               }
             }
           }
         } catch (e) {
           // ignore if AHU details not available
-          setFilterInvoices({});
+          try {
+            const raw = localStorage.getItem(localInvoicesKey);
+            setFilterInvoices(raw ? JSON.parse(raw) : {});
+          } catch (err) {
+            setFilterInvoices({});
+          }
         }
         setLoaded(true);
       } catch (e) {
@@ -182,6 +221,15 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
     load();
   }, [ahuId, isOpen, loaded]);
+
+  // Persist filterInvoices to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(localInvoicesKey, JSON.stringify(filterInvoices || {}));
+    } catch (e) {
+      // ignore storage errors (e.g., quota)
+    }
+  }, [filterInvoices, localInvoicesKey]);
 
   const updateFilter = (id, field, value) => {
     setFilters((prev) =>
