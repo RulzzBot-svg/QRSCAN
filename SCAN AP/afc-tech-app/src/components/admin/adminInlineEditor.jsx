@@ -222,12 +222,16 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     load();
   }, [ahuId, isOpen, loaded]);
 
-  // Persist filterInvoices to localStorage whenever it changes
+  // 1. Updated Persistence Effect
+  // This ensures that every time 'filterInvoices' state changes, 
+  // it's burned into the browser's memory.
   useEffect(() => {
-    try {
-      localStorage.setItem(localInvoicesKey, JSON.stringify(filterInvoices || {}));
-    } catch (e) {
-      // ignore storage errors (e.g., quota)
+    if (ahuId && Object.keys(filterInvoices).length > 0) {
+      try {
+        localStorage.setItem(localInvoicesKey, JSON.stringify(filterInvoices));
+      } catch (e) {
+        console.error("Storage error:", e);
+      }
     }
   }, [filterInvoices, localInvoicesKey]);
 
@@ -264,21 +268,21 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       frequency_days: Number(filter.frequency_days),
     };
     try {
-      await API.put(`/admin/filters/${filter.id}`, payload);
+      await API.patch(`/admin/filters/${filter.id}`, payload);
 
-      // persist previous-invoice mapping for this filter (non-blocking)
-      const prevInv = filterInvoices[filter.id];
-      try {
-        await API.patch(`/admin/ahus/${ahuId}`, { filter_invoices: { [filter.id]: prevInv || "" } });
-      } catch (e) {
-        console.warn('Failed to save filter invoice mapping', e);
-      }
+      const currentInvoice = filterInvoices[filter.id];
 
-      showToast("Saved.", "success");
+      await API.patch(`/admin/ahus/${ahuId}`, { filter_invoices: { [filter.id]: currentInvoice } });
+      showToast("Filter updated.", "success");
     } catch (err) {
+      console.error("Failed to save filter:", err);
+      showToast("Failed to save filter.", "error");
       throw err;
     }
+
   };
+
+
 
   const saveNew = async (filter) => {
     const payload = {
@@ -291,27 +295,30 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
     try {
       const res = await API.post(`/admin/ahus/${ahuId}/filters`, payload);
-      const newId = res?.data?.id;
+      const newId = res?.data?.id; // The real ID from the DB
 
-      // if user entered a previous-invoice into the temp row, map it to the new id
+      // Get the invoice typed into the temp row
       const tmpInv = filterInvoices[filter.id];
+
       if (newId && tmpInv) {
-        try {
-          await API.patch(`/admin/ahus/${ahuId}`, { filter_invoices: { [newId]: tmpInv } });
-          setFilterInvoices((prev) => {
-            const copy = { ...prev };
-            delete copy[filter.id];
-            copy[newId] = tmpInv;
-            return copy;
-          });
-        } catch (e) {
-          console.warn('Failed to persist new filter invoice mapping', e);
-        }
+        // Send the invoice to the DB using the NEW real ID
+        await API.patch(`/admin/ahus/${ahuId}`, {
+          filter_invoices: { [newId]: tmpInv }
+        });
+
+        // Clean up local state: move invoice from temp ID to real ID
+        setFilterInvoices((prev) => {
+          const copy = { ...prev };
+          delete copy[filter.id];
+          copy[newId] = tmpInv;
+          return copy;
+        });
       }
 
-      showToast("Filter added.", "success");
-      setLoaded(false);
+      showToast("Filter added and saved!", "success");
+      setLoaded(false); // Reload to get fresh data from DB
     } catch (err) {
+      showToast("Error adding filter.", "error");
       throw err;
     }
   };
@@ -434,7 +441,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
   return (
     <div className="bg-base-50">
-      
+
       {/* Header with counts and action buttons */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="text-xs opacity-70">
@@ -634,12 +641,20 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                     <td className="px-1 py-0.5">
                       <input
                         type="text"
+                        placeholder="Invoice #"
                         className="input input-xs input-bordered w-24"
+                        // Display the value from state (which was loaded from localStorage)
                         value={filterInvoices[f.id] || ""}
                         disabled={f._inactive}
-                        onChange={(e) =>
-                          setFilterInvoices((prev) => ({ ...prev, [f.id]: e.target.value }))
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFilterInvoices((prev) => {
+                            const updated = { ...prev, [f.id]: val };
+                            // Optional: Also manually trigger a save here for extra safety
+                            localStorage.setItem(localInvoicesKey, JSON.stringify(updated));
+                            return updated;
+                          });
+                        }}
                       />
                     </td>
 
@@ -718,12 +733,12 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
         <div className="toast toast-center toast-middle z-9999">
           <div
             className={`alert text-xs ${toast.type === "success"
-                ? "alert-success"
-                : toast.type === "error"
-                  ? "alert-error"
-                  : toast.type === "warning"
-                    ? "alert-warning"
-                    : "alert-info"
+              ? "alert-success"
+              : toast.type === "error"
+                ? "alert-error"
+                : toast.type === "warning"
+                  ? "alert-warning"
+                  : "alert-info"
               }`}
           >
             <span>{toast.message}</span>
