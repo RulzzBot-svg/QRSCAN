@@ -94,9 +94,9 @@ const getFrequencyColor = (freqDays) => {
 
 function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange }) {
   const [filters, setFilters] = useState([]);
-  const [invoiceLast, setInvoiceLast] = useState("");
-  const [invoice30, setInvoice30] = useState("");
-  const [invoice90, setInvoice90] = useState("");
+  const [filterInvoices, setFilterInvoices] = useState({});
+
+
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState(new Set());
@@ -131,17 +131,15 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
             _inactive: f.is_active === false,
           }))
         );
-        // load AHU notes to extract invoice metadata (if present)
+        // load AHU notes to extract per-filter invoice metadata (if present)
         try {
           const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
           const notes = ahuRes?.data?.notes || "";
-          const m = notes.match(/INVOICES_JSON::(\{.*\})/);
+          const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
           if (m) {
             try {
               const parsed = JSON.parse(m[1]);
-              setInvoiceLast(parsed.last || "");
-              setInvoice30(parsed["30"] || "");
-              setInvoice90(parsed["90"] || "");
+              setFilterInvoices(parsed || {});
             } catch (e) {
               // ignore parse errors
             }
@@ -193,9 +191,21 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       quantity: Number(filter.quantity),
       frequency_days: Number(filter.frequency_days),
     };
+    try {
+      await API.put(`/admin/filters/${filter.id}`, payload);
 
-    await API.put(`/admin/filters/${filter.id}`, payload);
-    showToast("Saved.", "success");
+      // persist previous-invoice mapping for this filter (non-blocking)
+      const prevInv = filterInvoices[filter.id];
+      try {
+        await API.patch(`/admin/ahus/${ahuId}`, { filter_invoices: { [filter.id]: prevInv || "" } });
+      } catch (e) {
+        console.warn('Failed to save filter invoice mapping', e);
+      }
+
+      showToast("Saved.", "success");
+    } catch (err) {
+      throw err;
+    }
   };
 
   const saveNew = async (filter) => {
@@ -207,9 +217,31 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       frequency_days: Number(filter.frequency_days),
     };
 
-    await API.post(`/admin/ahus/${ahuId}/filters`, payload);
-    showToast("Filter added.", "success");
-    setLoaded(false);
+    try {
+      const res = await API.post(`/admin/ahus/${ahuId}/filters`, payload);
+      const newId = res?.data?.id;
+
+      // if user entered a previous-invoice into the temp row, map it to the new id
+      const tmpInv = filterInvoices[filter.id];
+      if (newId && tmpInv) {
+        try {
+          await API.patch(`/admin/ahus/${ahuId}`, { filter_invoices: { [newId]: tmpInv } });
+          setFilterInvoices((prev) => {
+            const copy = { ...prev };
+            delete copy[filter.id];
+            copy[newId] = tmpInv;
+            return copy;
+          });
+        } catch (e) {
+          console.warn('Failed to persist new filter invoice mapping', e);
+        }
+      }
+
+      showToast("Filter added.", "success");
+      setLoaded(false);
+    } catch (err) {
+      throw err;
+    }
   };
 
   const addFilter = () => {
@@ -330,46 +362,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
   return (
     <div className="bg-base-50">
-      {/* Invoice quick fields (minimal footprint) */}
-      <div className="mb-2 flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Last invoice #"
-          className="input input-xs input-bordered w-36"
-          value={invoiceLast}
-          onChange={(e) => setInvoiceLast(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Last 30d invoice #"
-          className="input input-xs input-bordered w-32"
-          value={invoice30}
-          onChange={(e) => setInvoice30(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Last 90d invoice #"
-          className="input input-xs input-bordered w-32"
-          value={invoice90}
-          onChange={(e) => setInvoice90(e.target.value)}
-        />
-        <button
-          type="button"
-          className="btn btn-xs btn-primary"
-          onClick={async () => {
-            try {
-              const payload = { invoices: { last: invoiceLast, "30": invoice30, "90": invoice90 } };
-              await API.patch(`/admin/ahus/${ahuId}`, payload);
-              showToast("Invoices saved.", "success");
-            } catch (err) {
-              console.error('Failed to save invoices', err);
-              showToast('Failed to save invoices.', 'error');
-            }
-          }}
-        >
-          Save Invoices
-        </button>
-      </div>
+      
       {/* Header with counts and action buttons */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="text-xs opacity-70">
@@ -409,6 +402,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                 <th className="px-1">Last</th>
                 <th className="px-1">Next</th>
                 <th className="px-1">Status</th>
+                <th className="px-1">Previous Invoice</th>
                 <th className="px-1">Save</th>
                 <th className="px-1">Remove</th>
               </tr>
@@ -524,20 +518,20 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                     <td className="px-1 py-0.5 text-xs">
                       {f.last_service_date
                         ? formatDate(f.last_service_date, "en-US", {
-                            month: "2-digit",
-                            day: "2-digit",
-                            year: "numeric",
-                          })
+                          month: "2-digit",
+                          day: "2-digit",
+                          year: "numeric",
+                        })
                         : "—"}
                     </td>
 
                     <td className="px-1 py-0.5 text-xs">
                       {nextDue
                         ? formatDate(nextDue, "en-US", {
-                            month: "2-digit",
-                            day: "2-digit",
-                            year: "numeric",
-                          })
+                          month: "2-digit",
+                          day: "2-digit",
+                          year: "numeric",
+                        })
                         : "—"}
                     </td>
 
@@ -563,6 +557,18 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                           {st.label}
                         </span>
                       )}
+                    </td>
+
+                    <td className="px-1 py-0.5">
+                      <input
+                        type="text"
+                        className="input input-xs input-bordered w-24"
+                        value={filterInvoices[f.id] || ""}
+                        disabled={f._inactive}
+                        onChange={(e) =>
+                          setFilterInvoices((prev) => ({ ...prev, [f.id]: e.target.value }))
+                        }
+                      />
                     </td>
 
                     <td className="px-1 py-0.5">
@@ -616,7 +622,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
               {filteredFilters.length === 0 && filters.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="text-center py-3 opacity-70 text-xs">
+                  <td colSpan={12} className="text-center py-3 opacity-70 text-xs">
                     No filters for this AHU.
                   </td>
                 </tr>
@@ -624,7 +630,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
               {filteredFilters.length === 0 && filters.length > 0 && (
                 <tr>
-                  <td colSpan={11} className="text-center py-3 opacity-70 text-xs">
+                  <td colSpan={12} className="text-center py-3 opacity-70 text-xs">
                     No filters match the current filters. Clear filters to see all{" "}
                     {filters.length} filter(s).
                   </td>
@@ -639,15 +645,14 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       {toast && (
         <div className="toast toast-center toast-middle z-9999">
           <div
-            className={`alert text-xs ${
-              toast.type === "success"
+            className={`alert text-xs ${toast.type === "success"
                 ? "alert-success"
                 : toast.type === "error"
                   ? "alert-error"
                   : toast.type === "warning"
                     ? "alert-warning"
                     : "alert-info"
-            }`}
+              }`}
           >
             <span>{toast.message}</span>
           </div>

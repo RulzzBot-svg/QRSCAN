@@ -540,16 +540,17 @@ def admin_update_ahu(ahu_id):
         data = request.json or {}
         notes = data.get("notes")
         invoices = data.get("invoices")  # expected as object like { last: "..", "30": "..", "90": ".." }
+        filter_invoices = data.get("filter_invoices")  # expected mapping { filter_id: invoice_number }
 
-        # Preserve existing notes but replace any existing INVOICES_JSON::... block
+        # Preserve existing notes but strip any existing JSON blocks we'll manage
         existing = a.notes or ""
         import re, json
 
-        m = re.search(r'INVOICES_JSON::({.*})', existing)
-        base = existing
-        if m:
-            base = (existing[: m.start()]).strip()
-            base = base.rstrip("|").strip()
+        # remove any existing INVOICES_JSON::... or FILTER_INVOICES_JSON::... blocks
+        cleaned = re.sub(r'INVOICES_JSON::\{.*?\}', '', existing)
+        cleaned = re.sub(r'FILTER_INVOICES_JSON::\{.*?\}', '', cleaned)
+        base = cleaned.strip()
+        base = base.rstrip("|").strip()
 
         new_notes = base or ""
 
@@ -569,6 +570,17 @@ def admin_update_ahu(ahu_id):
                     new_notes = inv_block
             except Exception:
                 # fallback: ignore invoices if serialization fails
+                pass
+
+        if filter_invoices is not None:
+            try:
+                fi_json = json.dumps(filter_invoices)
+                fi_block = f"FILTER_INVOICES_JSON::{fi_json}"
+                if new_notes:
+                    new_notes = new_notes + " | " + fi_block
+                else:
+                    new_notes = fi_block
+            except Exception:
                 pass
 
         a.notes = new_notes
