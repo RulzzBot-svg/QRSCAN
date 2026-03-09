@@ -28,6 +28,12 @@ function AHU() {
                 const res = await API.get(`/ahu/qr/${encodeURIComponent(ahuId)}`);
                 if (cancelled) return;
                 const data = res.data;
+                if (data && data.not_found) {
+                    // AHU doesn't exist on server — treat as empty
+                    setAhu(null);
+                    setCounts({ filters: 0, overdue: 0, dueSoon: 0, ok: 0 });
+                    return;
+                }
                 setAhu(data);
 
                 let filters = data.filters || [];

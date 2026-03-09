@@ -134,7 +134,22 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
         // load AHU notes to extract per-filter invoice metadata (if present)
         try {
           const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
-          const notes = ahuRes?.data?.notes || "";
+          const ahuData = ahuRes?.data || {};
+          if (ahuData.not_found) {
+            // no AHU details available on server
+            setFilterInvoices({});
+          } else {
+            const notes = ahuData.notes || "";
+            const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
+            if (m) {
+              try {
+                const parsed = JSON.parse(m[1]);
+                setFilterInvoices(parsed || {});
+              } catch (e) {
+                // ignore parse errors
+              }
+            }
+          }
           const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
           if (m) {
             try {

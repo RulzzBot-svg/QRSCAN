@@ -109,7 +109,8 @@ def get_ahu_by_qr(ahu_id):
             ahu_obj = AHU.query.filter_by(name=ahu_id).first()
 
         if not ahu_obj:
-            return jsonify({"error": "AHU not found"}), 404
+            # Return 200 with a not_found flag to avoid noisy 404s in clients
+            return jsonify({"not_found": True}), 200
 
         # Only ACTIVE filters should be returned/used for status
         active_filters = (
@@ -546,7 +547,17 @@ def admin_update_ahu(ahu_id):
         existing = a.notes or ""
         import re, json
 
-        # remove any existing INVOICES_JSON::... or FILTER_INVOICES_JSON::... blocks
+
+        # extract any existing FILTER_INVOICES_JSON block so we can merge rather than overwrite
+        fi_existing = {}
+        m_fi = re.search(r'FILTER_INVOICES_JSON::(\{.*?\})', existing)
+        if m_fi:
+            try:
+                fi_existing = json.loads(m_fi.group(1)) or {}
+            except Exception:
+                fi_existing = {}
+
+        # remove managed JSON blocks from notes (we'll re-attach merged versions)
         cleaned = re.sub(r'INVOICES_JSON::\{.*?\}', '', existing)
         cleaned = re.sub(r'FILTER_INVOICES_JSON::\{.*?\}', '', cleaned)
         base = cleaned.strip()
@@ -574,12 +585,25 @@ def admin_update_ahu(ahu_id):
 
         if filter_invoices is not None:
             try:
-                fi_json = json.dumps(filter_invoices)
-                fi_block = f"FILTER_INVOICES_JSON::{fi_json}"
-                if new_notes:
-                    new_notes = new_notes + " | " + fi_block
-                else:
-                    new_notes = fi_block
+                # merge incoming mapping into existing map
+                for k, v in (filter_invoices or {}).items():
+                    # keys may be numeric in payload; normalize to str
+                    ks = str(k)
+                    if v is None or (isinstance(v, str) and v.trim() == ""):
+                        # remove entry when empty
+                        if ks in fi_existing:
+                            del fi_existing[ks]
+                    else:
+                        fi_existing[ks] = v
+
+                # only attach block if non-empty
+                if fi_existing:
+                    fi_json = json.dumps(fi_existing)
+                    fi_block = f"FILTER_INVOICES_JSON::{fi_json}"
+                    if new_notes:
+                        new_notes = new_notes + " | " + fi_block
+                    else:
+                        new_notes = fi_block
             except Exception:
                 pass
 
