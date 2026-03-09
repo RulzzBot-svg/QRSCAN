@@ -92,7 +92,7 @@ const getFrequencyColor = (freqDays) => {
   return map[m] || null;
 };
 
-function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange }) {
+function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange, ahuNotes = null }) {
   const [filters, setFilters] = useState([]);
   const [filterInvoices, setFilterInvoices] = useState({});
 
@@ -133,13 +133,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
         );
         // load AHU notes to extract per-filter invoice metadata (if present)
         try {
-          const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
-          const ahuData = ahuRes?.data || {};
-          if (ahuData.not_found) {
-            // no AHU details available on server
-            setFilterInvoices({});
-          } else {
-            const notes = ahuData.notes || "";
+          if (ahuNotes !== null) {
+            const notes = ahuNotes || "";
             const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
             if (m) {
               try {
@@ -148,19 +143,33 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
               } catch (e) {
                 // ignore parse errors
               }
+            } else {
+              setFilterInvoices({});
             }
-          }
-          const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
-          if (m) {
-            try {
-              const parsed = JSON.parse(m[1]);
-              setFilterInvoices(parsed || {});
-            } catch (e) {
-              // ignore parse errors
+          } else {
+            const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
+            const ahuData = ahuRes?.data || {};
+            if (ahuData.not_found) {
+              // no AHU details available on server
+              setFilterInvoices({});
+            } else {
+              const notes = ahuData.notes || "";
+              const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
+              if (m) {
+                try {
+                  const parsed = JSON.parse(m[1]);
+                  setFilterInvoices(parsed || {});
+                } catch (e) {
+                  // ignore parse errors
+                }
+              } else {
+                setFilterInvoices({});
+              }
             }
           }
         } catch (e) {
           // ignore if AHU details not available
+          setFilterInvoices({});
         }
         setLoaded(true);
       } catch (e) {

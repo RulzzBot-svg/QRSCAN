@@ -501,6 +501,7 @@ function AdminAHUs() {
                         ahuId={a.id} 
                         isOpen={true} 
                         globalFilters={globalFilters}
+                        ahuNotes={a.notes}
                         onSelectionChange={(selectedIds) => handleFilterSelection(a.id, selectedIds)}
                       />
                     </div>
