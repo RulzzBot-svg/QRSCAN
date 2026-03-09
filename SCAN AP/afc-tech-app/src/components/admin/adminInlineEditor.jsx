@@ -94,6 +94,9 @@ const getFrequencyColor = (freqDays) => {
 
 function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange }) {
   const [filters, setFilters] = useState([]);
+  const [invoiceLast, setInvoiceLast] = useState("");
+  const [invoice30, setInvoice30] = useState("");
+  const [invoice90, setInvoice90] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState(new Set());
@@ -128,6 +131,24 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
             _inactive: f.is_active === false,
           }))
         );
+        // load AHU notes to extract invoice metadata (if present)
+        try {
+          const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
+          const notes = ahuRes?.data?.notes || "";
+          const m = notes.match(/INVOICES_JSON::(\{.*\})/);
+          if (m) {
+            try {
+              const parsed = JSON.parse(m[1]);
+              setInvoiceLast(parsed.last || "");
+              setInvoice30(parsed["30"] || "");
+              setInvoice90(parsed["90"] || "");
+            } catch (e) {
+              // ignore parse errors
+            }
+          }
+        } catch (e) {
+          // ignore if AHU details not available
+        }
         setLoaded(true);
       } catch (e) {
         console.error("Error loading filters:", e);
@@ -309,6 +330,46 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
   return (
     <div className="bg-base-50">
+      {/* Invoice quick fields (minimal footprint) */}
+      <div className="mb-2 flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="Last invoice #"
+          className="input input-xs input-bordered w-36"
+          value={invoiceLast}
+          onChange={(e) => setInvoiceLast(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Last 30d invoice #"
+          className="input input-xs input-bordered w-32"
+          value={invoice30}
+          onChange={(e) => setInvoice30(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Last 90d invoice #"
+          className="input input-xs input-bordered w-32"
+          value={invoice90}
+          onChange={(e) => setInvoice90(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn btn-xs btn-primary"
+          onClick={async () => {
+            try {
+              const payload = { invoices: { last: invoiceLast, "30": invoice30, "90": invoice90 } };
+              await API.patch(`/admin/ahus/${ahuId}`, payload);
+              showToast("Invoices saved.", "success");
+            } catch (err) {
+              console.error('Failed to save invoices', err);
+              showToast('Failed to save invoices.', 'error');
+            }
+          }}
+        >
+          Save Invoices
+        </button>
+      </div>
       {/* Header with counts and action buttons */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="text-xs opacity-70">

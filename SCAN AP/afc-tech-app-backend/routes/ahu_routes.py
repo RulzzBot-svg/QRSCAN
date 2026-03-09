@@ -524,3 +524,58 @@ def admin_create_ahu():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------
+# Admin: Update AHU (partial) - allow updating notes / invoice metadata
+# ---------------------------------------------------
+@ahu_bp.route("/admin/ahus/<int:ahu_id>", methods=["PATCH"])
+@require_admin
+def admin_update_ahu(ahu_id):
+    try:
+        a = db.session.get(AHU, ahu_id)
+        if not a:
+            return jsonify({"error": "AHU not found"}), 404
+
+        data = request.json or {}
+        notes = data.get("notes")
+        invoices = data.get("invoices")  # expected as object like { last: "..", "30": "..", "90": ".." }
+
+        # Preserve existing notes but replace any existing INVOICES_JSON::... block
+        existing = a.notes or ""
+        import re, json
+
+        m = re.search(r'INVOICES_JSON::({.*})', existing)
+        base = existing
+        if m:
+            base = (existing[: m.start()]).strip()
+            base = base.rstrip("|").strip()
+
+        new_notes = base or ""
+
+        if notes is not None and notes != "":
+            if new_notes:
+                new_notes = new_notes + " | " + str(notes)
+            else:
+                new_notes = str(notes)
+
+        if invoices is not None:
+            try:
+                inv_json = json.dumps(invoices)
+                inv_block = f"INVOICES_JSON::{inv_json}"
+                if new_notes:
+                    new_notes = new_notes + " | " + inv_block
+                else:
+                    new_notes = inv_block
+            except Exception:
+                # fallback: ignore invoices if serialization fails
+                pass
+
+        a.notes = new_notes
+        db.session.commit()
+
+        return jsonify({"id": a.id, "notes": a.notes}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
