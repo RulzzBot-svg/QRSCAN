@@ -268,7 +268,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       frequency_days: Number(filter.frequency_days),
     };
     try {
-      await API.patch(`/admin/filters/${filter.id}`, payload);
+      await API.put(`/admin/filters/${filter.id}`, payload);
 
       const currentInvoice = filterInvoices[filter.id];
 
