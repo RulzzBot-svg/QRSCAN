@@ -13,6 +13,8 @@ function AdminDashboard() {
 
   const [hospitalRows, setHospitalRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -80,15 +82,52 @@ function AdminDashboard() {
     }
   };
 
+  const syncFilterDates = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await API.post("/admin/backfill-filter-dates");
+      setSyncResult({ ok: true, message: res.data.message, updated: res.data.updated });
+      // Refresh dashboard so new statuses are reflected
+      await loadDashboard();
+    } catch (err) {
+      setSyncResult({ ok: false, message: err?.response?.data?.error || "Sync failed" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
       <main className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-primary">Admin Dashboard</h1>
-          <button className="btn btn-sm btn-ghost" onClick={loadDashboard} disabled={loading}>
-            {loading ? <span className="loading loading-spinner loading-xs" /> : "↻ Refresh"}
-          </button>
+          <div className="flex gap-2 items-center">
+            <button
+              className="btn btn-sm btn-outline btn-warning"
+              onClick={syncFilterDates}
+              disabled={syncing || loading}
+              title="Update all AHU filter dates from completed job history"
+            >
+              {syncing ? <span className="loading loading-spinner loading-xs" /> : "⟳ Sync Filter Dates from Jobs"}
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={loadDashboard} disabled={loading}>
+              {loading ? <span className="loading loading-spinner loading-xs" /> : "↻ Refresh"}
+            </button>
+          </div>
         </div>
+
+        {/* SYNC RESULT ALERT */}
+        {syncResult && (
+          <div className={`alert ${syncResult.ok ? "alert-success" : "alert-error"} mb-4`}>
+            <span>{syncResult.message}</span>
+            {syncResult.ok && syncResult.updated?.length > 0 && (
+              <span className="ml-2 text-xs opacity-70">
+                ({syncResult.updated.length} filter{syncResult.updated.length !== 1 ? "s" : ""} updated)
+              </span>
+            )}
+          </div>
+        )}
 
         {/* KPI CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">

@@ -92,8 +92,8 @@ def create_job():
             )
             db.session.add(jf)
 
-            if jf.is_completed:
-                filter_obj.last_service_date = datetime.utcnow().date()
+            if jf.is_completed or jf.is_inspected:
+                filter_obj.last_service_date = completed_at_val.date()
 
             # Persist notification for per-filter note (if provided)
             if jf.note and str(jf.note).strip():
