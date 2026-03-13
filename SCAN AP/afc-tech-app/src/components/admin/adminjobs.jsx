@@ -58,6 +58,7 @@ function AdminJobs() {
 
               <div className="text-sm text-base-content/70 mb-4 space-y-1">
                 <div><strong>AHU:</strong> {selectedJob.ahu_name} ({selectedJob.ahu_id})</div>
+                <div><strong>Hospital:</strong> {selectedJob.hospital_name || selectedJob.hospital_id || '—'}</div>
                 <div><strong>Technician:</strong> {selectedJob.technician}</div>
                 <div>
                   <strong>Completed:</strong>{" "}
