@@ -126,13 +126,44 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       setLoading(true);
       try {
         const res = await API.get(`/admin/ahus/${ahuId}/filters?include_inactive=1`);
-        setFilters(
-          (Array.isArray(res.data) ? res.data : []).map((f) => ({
-            ...f,
-            sizeParts: parseSize(f.size),
-            _inactive: f.is_active === false,
-          }))
-        );
+        const fetched = (Array.isArray(res.data) ? res.data : []).map((f) => ({
+          ...f,
+          sizeParts: parseSize(f.size),
+          _inactive: f.is_active === false,
+        }));
+
+        // Try to augment filters' last_service_date using job history for this AHU
+        try {
+          const jobsRes = await API.get(`/admin/jobs`);
+          const jobs = Array.isArray(jobsRes.data) ? jobsRes.data : [];
+
+          // Build map of most recent completed_at per filter id for this AHU
+          const lastByFilter = {};
+          for (const job of jobs) {
+            if (String(job.ahu_id) !== String(ahuId) && String(job.ahu_id) !== String(job.ahu_id)) continue;
+            if (!job.filters || !Array.isArray(job.filters)) continue;
+            const completedAt = job.completed_at;
+            for (const jf of job.filters) {
+              const fid = jf.filter_id || jf.id || jf.filterId;
+              if (!fid) continue;
+              // Keep the most recent completed_at
+              if (!lastByFilter[fid] || new Date(completedAt) > new Date(lastByFilter[fid])) {
+                lastByFilter[fid] = completedAt;
+              }
+            }
+          }
+
+          // Apply mapping to fetched filters where applicable
+          for (const f of fetched) {
+            const candidate = lastByFilter[f.id];
+            if (candidate) f.last_service_date = candidate;
+          }
+        } catch (e) {
+          // If job fetch fails, silently continue using server's last_service_date
+          console.warn("Could not augment filter last_service_date from jobs:", e);
+        }
+
+        setFilters(fetched);
         // load AHU notes to extract per-filter invoice metadata (if present)
         try {
           if (ahuNotes !== null) {

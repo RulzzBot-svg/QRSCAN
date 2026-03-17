@@ -39,7 +39,7 @@ function AdminJobs() {
                   onClick={() => setSelectedJob(j)}
                 >
                   <td>{j.id}</td>
-                  <td className="font-medium">{j.ahu_id}</td>
+                  <td className="font-medium">{j.ahu_name || j.ahu_id}</td>
                   <td>{j.technician}</td>
                   <td>{formatDateTime(j.completed_at)}</td>
                 </tr>

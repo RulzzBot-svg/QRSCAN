@@ -179,14 +179,20 @@ def get_filters_for_admin(ahu_id):
 
         if not ahu:
             return jsonify({"error": "AHU not found"}), 404
-        
-        active_only = request.args.get("active_only","0")=="1"
 
-        q = db.session.query(Filter).filter(Filter.ahu_id == ahu_id)
-        
+        # Normalize AHU id to numeric for querying filters
+        aid = ahu.id
+
+        # Support either explicit `active_only=1` or `include_inactive=1` from clients.
+        # `include_inactive=1` means do not filter out inactive rows.
+        include_inactive = request.args.get("include_inactive", "0") == "1"
+        active_only = request.args.get("active_only", "0") == "1"
+
+        q = db.session.query(Filter).filter(Filter.ahu_id == aid)
+
         filters = q.order_by(Filter.excel_order.asc(), Filter.id.asc()).all()
-        if active_only:
-            filters=[f for f in filters if getattr(f, "is_active",True)]
+        if active_only and not include_inactive:
+            filters = [f for f in filters if getattr(f, "is_active", True)]
 
 
         return jsonify([
