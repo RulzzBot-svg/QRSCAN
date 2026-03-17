@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify, request
-from models import Hospital, AHU, Job, Technician
+from models import Hospital, AHU, Job, Technician, Filter, JobFilter
 from models import SupervisorSignoff
 from db import db
 from sqlalchemy.orm import joinedload
+from sqlalchemy import func
 import re
 from datetime import datetime
 from middleware.auth import require_admin
@@ -425,3 +426,58 @@ def launch_qb_macro():
             "error": "Unexpected server error",
             "detail": str(e)
         }), 500
+
+
+# -----------------------------
+# Backfill: update filter last_service_date from job history
+# -----------------------------
+@admin_bp.route("/backfill-filter-dates", methods=["POST"])
+@require_admin
+def backfill_filter_dates():
+    """
+    Retroactively update Filter.last_service_date for every filter that was
+    inspected or replaced in a past job but whose stored date is out of date.
+
+    For each filter, the most recent Job.completed_at among all JobFilter rows
+    where is_inspected=True OR is_completed=True is used as the new
+    last_service_date (only when that date is more recent than the stored one).
+    """
+    try:
+        latest_per_filter = (
+            db.session.query(
+                JobFilter.filter_id,
+                func.max(Job.completed_at).label("latest_completed_at")
+            )
+            .join(Job, Job.id == JobFilter.job_id)
+            .filter(
+                (JobFilter.is_inspected == True) | (JobFilter.is_completed == True)
+            )
+            .group_by(JobFilter.filter_id)
+            .all()
+        )
+
+        updated = []
+        for filter_id, latest_completed_at in latest_per_filter:
+            f = db.session.get(Filter, filter_id)
+            if f is None:
+                continue
+            latest_date = latest_completed_at.date()
+            if f.last_service_date is None or latest_date > f.last_service_date:
+                old_date = f.last_service_date.isoformat() if f.last_service_date else None
+                f.last_service_date = latest_date
+                updated.append({
+                    "filter_id": filter_id,
+                    "ahu_id": f.ahu_id,
+                    "old_date": old_date,
+                    "new_date": latest_date.isoformat()
+                })
+
+        db.session.commit()
+        return jsonify({
+            "message": f"{len(updated)} filter(s) updated",
+            "updated": updated
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in backfill_filter_dates: {e}")
+        return jsonify({"error": str(e)}), 500
