@@ -167,7 +167,7 @@ function AHUPage() {
             {filtered.slice(0, visible).map((ahu) => (
               <div
                 key={ahu.id}
-                onClick={() => navigate(`/FilterInfo/${ahu.id}`)}
+                onClick={() => navigate(`/FilterInfo/${ahu.id}`, { state: { hospitalId, buildingId } })}
                 className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md hover:border-primary transition-all cursor-pointer"
               >
                 <div className="card-body p-4">

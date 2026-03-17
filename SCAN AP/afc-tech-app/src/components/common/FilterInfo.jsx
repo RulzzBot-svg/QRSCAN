@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 
 import { getAHUbyQR } from "../../api/ahu";
@@ -11,6 +11,7 @@ import { parseIsoToDate, formatDate } from "../../utils/dates";
 function FilterInfo() {
   const navigate = useNavigate();
   const { ahuId } = useParams();
+  const location = useLocation();
   const modalRef = useRef(null);
 
   const [ahu, setAhu] = useState(null);
@@ -464,7 +465,18 @@ function FilterInfo() {
           <button
             className="btn btn-ghost btn-outline"
             disabled={!ahu}
-            onClick={() => navigate(`/AHU/${ahu.hospital_id}`)}
+            onClick={() => {
+              const state = (location && location.state) || {};
+              if (state.buildingId) {
+                navigate(`/AHU/${state.hospitalId}/building/${state.buildingId}`);
+              } else if (state.hospitalId) {
+                navigate(`/AHU/${state.hospitalId}`);
+              } else if (ahu && ahu.hospital_id) {
+                navigate(`/AHU/${ahu.hospital_id}`);
+              } else {
+                navigate(-1);
+              }
+            }}
           >
             ⬅ Back to list
           </button>
