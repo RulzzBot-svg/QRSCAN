@@ -30,7 +30,8 @@ function AdminAHUs() {
   const [loading, setLoading] = useState(true);
 
   // UI state
-  const [query, setQuery] = useState("");
+  const [hospitalQuery, setHospitalQuery] = useState(""); // searches hospitals in the left pane
+  const [ahuQuery, setAhuQuery] = useState(""); // searches AHUs in the right pane
   const [selected, setSelected] = useState({}); // { [ahuId]: true }
   const [selectedHospitalKey, setSelectedHospitalKey] = useState(null);
   const [showImport, setShowImport] = useState(false);
@@ -112,7 +113,7 @@ function AdminAHUs() {
 
   // NOTE: This is your existing "Search ALL AHUs..." behavior (searches through all AHUs)
   const filtered = useMemo(() => {
-    const q = (query || "").toLowerCase();
+    const q = (ahuQuery || "").toLowerCase();
     return ahus.filter((a) => {
       if (selectedHospitalKey && String(a.hospital_id) !== String(selectedHospitalKey)) return false;
       if (!q) return true;
@@ -120,11 +121,10 @@ function AdminAHUs() {
         String(a.id || "").toLowerCase().includes(q) ||
         String(a.name || "").toLowerCase().includes(q) ||
         String(a.location || "").toLowerCase().includes(q) ||
-        String(a.hospital || "").toLowerCase().includes(q) ||
         String(a.excel_block || a.group || a.display_name || "").toLowerCase().includes(q)
       );
     });
-  }, [ahus, query, selectedHospitalKey]);
+  }, [ahus, ahuQuery, selectedHospitalKey]);
 
   // multi-select
   const toggleSelect = (id) => setSelected((s) => ({ ...s, [id]: !s[id] }));
@@ -333,8 +333,8 @@ function AdminAHUs() {
             <input
               className="input input-sm input-bordered w-full mb-2"
               placeholder="Search hospitals..."
-              onChange={(e) => setQuery(e.target.value)}
-              value={query}
+              onChange={(e) => setHospitalQuery(e.target.value)}
+              value={hospitalQuery}
             />
             <input
               className="input input-sm input-bordered w-full mb-3"
@@ -343,8 +343,8 @@ function AdminAHUs() {
               value={buildingFilter}
             />
           <div className="space-y-2">
-              {grouped.filter(g => {
-                  if (query && !g.hospitalName.toLowerCase().includes(query.toLowerCase())) return false;
+                {grouped.filter(g => {
+                  if (hospitalQuery && !g.hospitalName.toLowerCase().includes(hospitalQuery.toLowerCase())) return false;
                   if (buildingFilter) {
                     // check whether any building matches
                     const has = g.buildings.some(b => b.buildingName.toLowerCase().includes(buildingFilter.toLowerCase()));
@@ -391,8 +391,8 @@ function AdminAHUs() {
               <div className="flex items-center gap-2">
                 <input
                   placeholder="Search ALL AHUs..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  value={ahuQuery}
+                  onChange={(e) => setAhuQuery(e.target.value)}
                   className="input input-xs input-bordered w-72"
                 />
                 <button className="btn btn-xs" onClick={() => handleBulkAction("Export CSV")} type="button">
