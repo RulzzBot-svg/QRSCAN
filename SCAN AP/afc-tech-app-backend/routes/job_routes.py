@@ -178,6 +178,7 @@ def get_all_jobs():
         Job.query
         .options(
             joinedload(Job.ahu).joinedload(AHU.hospital),
+            joinedload(Job.ahu).joinedload(AHU.building),
             joinedload(Job.technician),
             joinedload(Job.job_filters).joinedload(JobFilter.filter)
         )
@@ -192,6 +193,8 @@ def get_all_jobs():
             "id": j.id,
             "ahu_id": j.ahu_id,
             "ahu_name": j.ahu.name if j.ahu else None,
+                "building_id": j.ahu.building.id if j.ahu and j.ahu.building else None,
+                "building_name": j.ahu.building.name if j.ahu and j.ahu.building else None,
             "hospital_id": j.ahu.hospital.id if j.ahu and j.ahu.hospital else None,
             "hospital_name": j.ahu.hospital.name if j.ahu and j.ahu.hospital else None,
             "technician": j.technician.name if j.technician else None,
@@ -225,6 +228,7 @@ def admin_get_all_jobs():
         Job.query
         .options(
             joinedload(Job.ahu).joinedload(AHU.hospital),
+            joinedload(Job.ahu).joinedload(AHU.building),
             joinedload(Job.technician),
             joinedload(Job.job_filters).joinedload(JobFilter.filter)
         )
@@ -239,6 +243,8 @@ def admin_get_all_jobs():
             "id": j.id,
             "ahu_id": j.ahu_id,
             "ahu_name": j.ahu.name if j.ahu else None,
+                "building_id": j.ahu.building.id if j.ahu and j.ahu.building else None,
+                "building_name": j.ahu.building.name if j.ahu and j.ahu.building else None,
             "hospital_id": j.ahu.hospital.id if j.ahu and j.ahu.hospital else None,
             "hospital_name": j.ahu.hospital.name if j.ahu and j.ahu.hospital else None,
             "technician": j.technician.name if j.technician else None,

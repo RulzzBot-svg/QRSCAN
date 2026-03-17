@@ -39,7 +39,13 @@ function AdminJobs() {
                   onClick={() => setSelectedJob(j)}
                 >
                   <td>{j.id}</td>
-                  <td className="font-medium">{j.ahu_name || j.ahu_id}</td>
+                  <td className="font-medium">
+                    {j.ahu_name || j.ahu_id}
+                    {" "}
+                    {(j.building_name || j.hospital_name) ? (
+                      <span className="text-xs opacity-60">{`${j.building_name || ""}${j.building_name && j.hospital_name ? "-" : ""}${j.hospital_name || ""}`}</span>
+                    ) : null}
+                  </td>
                   <td>{j.technician}</td>
                   <td>{formatDateTime(j.completed_at)}</td>
                 </tr>
@@ -57,8 +63,16 @@ function AdminJobs() {
               </h3>
 
               <div className="text-sm text-base-content/70 mb-4 space-y-1">
-                <div><strong>AHU:</strong> {selectedJob.ahu_name} ({selectedJob.ahu_id})</div>
-                <div><strong>Hospital:</strong> {selectedJob.hospital_name || selectedJob.hospital_id || '—'}</div>
+                <div>
+                  <strong>AHU:</strong> {selectedJob.ahu_name}
+                  {" "}
+                  {(selectedJob.building_name || selectedJob.hospital_name) ? (
+                    <em className="text-sm">{`${selectedJob.building_name || ""}${selectedJob.building_name && selectedJob.hospital_name ? "-" : ""}${selectedJob.hospital_name || ""}`}</em>
+                  ) : null}
+                  {" "}
+                  ({selectedJob.ahu_id})
+                </div>
+                <div style={{display: 'none'}}><strong>Hospital:</strong> {selectedJob.hospital_name || selectedJob.hospital_id || '—'}</div>
                 <div><strong>Technician:</strong> {selectedJob.technician}</div>
                 <div>
                   <strong>Completed:</strong>{" "}
