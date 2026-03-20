@@ -387,6 +387,19 @@ def seed_from_excel(path, selected_sheet=None):
                         return True
             return False
 
+        def looks_like_ahu_label(val):
+            """Return True when a cell looks like an AH/AHU label (e.g. 'AH-1', 'AHU-2', 'AH1')."""
+            s = clean_str(val)
+            if not s:
+                return False
+            s2 = s.upper()
+            # common patterns: starts with AH, AHU, contains 'AH-' etc.
+            if re.search(r"\bAHU\b|\bAH\b", s2):
+                return True
+            if re.search(r"AH[-_ ]?\d+", s2):
+                return True
+            return False
+
         for r in rows:
             if row_has_data(r):
                 current_block.append(r)
@@ -408,8 +421,14 @@ def seed_from_excel(path, selected_sheet=None):
 
             for r in block:
                 raw_ahu_no = clean_str(r.get(col_ahu))
+                raw_stage = clean_str(r.get(col_stage)) if col_stage else None
+                # prefer explicit AHU number in AHU column
                 if not is_placeholder(raw_ahu_no):
                     display_name = raw_ahu_no
+                    break
+                # if the stage column contains an AH label (some sheets put AH names in STAGE), use it
+                if looks_like_ahu_label(raw_stage):
+                    display_name = raw_stage
                     break
 
             # fallback: use first row's location/building if no AHU number provided
@@ -478,6 +497,9 @@ def seed_from_excel(path, selected_sheet=None):
             filter_order_map.setdefault(ahu_id, 1)
             for r in block:
                 phase = clean_str(r.get(col_stage))
+                # if the stage cell contains an AH label (header), don't treat it as a phase
+                if looks_like_ahu_label(phase):
+                    phase = None
                 size = clean_str(r.get(col_size))
                 qty = r.get(col_qty)
 
