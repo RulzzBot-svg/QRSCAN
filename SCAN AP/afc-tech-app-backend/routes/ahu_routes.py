@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from models import AHU, Filter, Technician
 from db import db
 import traceback
+from dateutil.parser import isoparse
 from middleware.auth import require_admin
 
 from sqlalchemy.orm import joinedload, selectinload
@@ -246,6 +247,13 @@ def add_filter(ahu_id):
             is_active=True,
         )
 
+        # Optional: accept last_service_date from admin UI
+        if data.get("last_service_date"):
+            try:
+                f.last_service_date = isoparse(str(data.get("last_service_date"))).date()
+            except Exception:
+                pass
+
         db.session.add(f)
         db.session.commit()
 
@@ -296,6 +304,17 @@ def update_filter(filter_id):
         f.size = data.get("size", f.size)
         f.quantity = int(data.get("quantity", f.quantity))
         f.frequency_days = int(data.get("frequency_days", f.frequency_days))
+        # allow last_service_date to be updated by admin (accepts YYYY-MM-DD or ISO)
+        if "last_service_date" in data:
+            try:
+                val = data.get("last_service_date")
+                if val is None or str(val).strip() == "":
+                    f.last_service_date = None
+                else:
+                    f.last_service_date = isoparse(str(val)).date()
+            except Exception:
+                # ignore bad parse
+                pass
 
         db.session.commit()
         return jsonify({"message": "Filter updated"}), 200

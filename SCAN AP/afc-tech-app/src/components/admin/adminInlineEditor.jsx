@@ -301,6 +301,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       size: filter.size,
       quantity: Number(filter.quantity),
       frequency_days: Number(filter.frequency_days),
+      last_service_date: filter.last_service_date ? toLocalIsoDate(filter.last_service_date) : null,
     };
     try {
       await API.put(`/admin/filters/${filter.id}`, payload);
@@ -326,6 +327,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       size: filter.size,
       quantity: Number(filter.quantity),
       frequency_days: Number(filter.frequency_days),
+      last_service_date: filter.last_service_date ? toLocalIsoDate(filter.last_service_date) : null,
     };
 
     try {
@@ -630,13 +632,13 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                     </td>
 
                     <td className="px-1 py-0.5 text-xs">
-                      {f.last_service_date
-                        ? formatDate(f.last_service_date, "en-US", {
-                          month: "2-digit",
-                          day: "2-digit",
-                          year: "numeric",
-                        })
-                        : "—"}
+                      <input
+                        type="date"
+                        className="input input-xs input-bordered w-28 text-xs"
+                        value={toLocalIsoDate(f.last_service_date) || ""}
+                        disabled={f._inactive}
+                        onChange={(e) => updateFilter(f.id, "last_service_date", e.target.value)}
+                      />
                     </td>
 
                     <td className="px-1 py-0.5 text-xs">
