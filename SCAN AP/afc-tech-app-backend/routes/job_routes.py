@@ -224,7 +224,9 @@ def get_all_jobs():
 @job_bp.route("/admin/jobs", methods=["GET"])
 @require_admin
 def admin_get_all_jobs():
-    jobs = (
+    # Allow optional filtering by AHU to avoid returning the entire jobs table
+    ahu_id = request.args.get("ahu_id")
+    q = (
         Job.query
         .options(
             joinedload(Job.ahu).joinedload(AHU.hospital),
@@ -232,9 +234,15 @@ def admin_get_all_jobs():
             joinedload(Job.technician),
             joinedload(Job.job_filters).joinedload(JobFilter.filter)
         )
-        .order_by(Job.completed_at.desc())
-        .all()
     )
+    if ahu_id:
+        try:
+            q = q.filter_by(ahu_id=int(ahu_id))
+        except Exception:
+            # if ahu_id not an int, ignore the filter and return all jobs
+            pass
+
+    jobs = q.order_by(Job.completed_at.desc()).all()
 
     payload = []
 

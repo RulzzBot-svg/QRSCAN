@@ -134,29 +134,33 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
         // Try to augment filters' last_service_date using job history for this AHU
         try {
-          const jobsRes = await API.get(`/admin/jobs`);
-          const jobs = Array.isArray(jobsRes.data) ? jobsRes.data : [];
+          // Only fetch job history if any fetched filter is missing a last_service_date
+          const needsJobs = fetched.some((ff) => !ff.last_service_date);
+          if (needsJobs) {
+            const jobsRes = await API.get(`/admin/jobs?ahu_id=${ahuId}`);
+            const jobs = Array.isArray(jobsRes.data) ? jobsRes.data : [];
 
-          // Build map of most recent completed_at per filter id for this AHU
-          const lastByFilter = {};
-          for (const job of jobs) {
-            if (String(job.ahu_id) !== String(ahuId) && String(job.ahu_id) !== String(job.ahu_id)) continue;
-            if (!job.filters || !Array.isArray(job.filters)) continue;
-            const completedAt = job.completed_at;
-            for (const jf of job.filters) {
-              const fid = jf.filter_id || jf.id || jf.filterId;
-              if (!fid) continue;
-              // Keep the most recent completed_at
-              if (!lastByFilter[fid] || new Date(completedAt) > new Date(lastByFilter[fid])) {
-                lastByFilter[fid] = completedAt;
+            // Build map of most recent completed_at per filter id for this AHU
+            const lastByFilter = {};
+            for (const job of jobs) {
+              if (String(job.ahu_id) !== String(ahuId)) continue;
+              if (!job.filters || !Array.isArray(job.filters)) continue;
+              const completedAt = job.completed_at;
+              for (const jf of job.filters) {
+                const fid = jf.filter_id || jf.id || jf.filterId;
+                if (!fid) continue;
+                // Keep the most recent completed_at
+                if (!lastByFilter[fid] || new Date(completedAt) > new Date(lastByFilter[fid])) {
+                  lastByFilter[fid] = completedAt;
+                }
               }
             }
-          }
 
-          // Apply mapping to fetched filters where applicable
-          for (const f of fetched) {
-            const candidate = lastByFilter[f.id];
-            if (candidate) f.last_service_date = candidate;
+            // Apply mapping to fetched filters where applicable
+            for (const f of fetched) {
+              const candidate = lastByFilter[f.id];
+              if (candidate) f.last_service_date = candidate;
+            }
           }
         } catch (e) {
           // If job fetch fails, silently continue using server's last_service_date
