@@ -104,11 +104,116 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   const [selectedFilters, setSelectedFilters] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null);
   const [toast, setToast] = useState(null);
+  // QuickBooks Pull modal state (mocked integration)
+  const [qbOpen, setQbOpen] = useState(false);
+  const [qbRef, setQbRef] = useState("");
+  const [qbLoading, setQbLoading] = useState(false);
+  const [qbSo, setQbSo] = useState(null);
+  const [qbSelected, setQbSelected] = useState({});
 
   const showToast = (message, type = "info") => {
     setToast({ message, type });
     window.clearTimeout(showToast._t);
     showToast._t = window.setTimeout(() => setToast(null), 3000);
+  };
+
+  // QuickBooks Pull helpers (mocked Conductor endpoints)
+  const fetchQBSalesOrder = async (ref) => {
+    if (!ref) return;
+    setQbLoading(true);
+    try {
+      const res = await API.get(`/qbd/sales_order`, { params: { ref } });
+      setQbSo(res.data?.data || null);
+      setQbSelected({});
+    } catch (err) {
+      console.error("QB fetch error", err);
+      // If backend returns 404 or any error while in mock/demo mode,
+      // fall back to a client-side mock so the UI remains usable.
+      showToast("QuickBooks fetch failed; loading mock data.", "warning");
+
+      try {
+        // Build a sensible mock sales order from current filters so users
+        // can check/select the filter lines without a real backend.
+        const mock = {
+          id: `mock-${ref || Date.now()}`,
+          customer_id: `mock-cust-${ref || Date.now()}`,
+          customer_name: `Mock Customer ${ref || "(demo)"}`,
+          lines: (filters || []).map((f) => ({
+            id: `mock-line-${f.id}`,
+            item_name: f.part_number || `Filter ${f.id}`,
+            quantity: Number(f.quantity) || 1,
+            balance_remaining: Number(f.quantity) || 0,
+          })),
+        };
+
+        setQbSo(mock);
+        setQbSelected({});
+      } catch (e) {
+        // if building mock fails, clear state but keep the toast
+        setQbSo(null);
+      }
+    } finally {
+      setQbLoading(false);
+    }
+  };
+
+  const toggleQbLine = (lineId) => {
+    setQbSelected((prev) => {
+      const copy = { ...prev };
+      if (copy[lineId]) delete copy[lineId];
+      else copy[lineId] = { qty: 4 };
+      return copy;
+    });
+  };
+
+  const setQbQty = (lineId, qty) => {
+    setQbSelected((prev) => ({ ...prev, [lineId]: { qty: Number(qty) || 0 } }));
+  };
+
+  const createQbInvoice = async () => {
+    if (!qbSo) return;
+    const lines = Object.entries(qbSelected)
+      .filter(([, v]) => v && v.qty > 0)
+      .map(([line_id, v]) => ({ sales_order_line_id: line_id, quantity: v.qty }));
+    if (!lines.length) return showToast("Select at least one line.", "warning");
+
+    const payload = {
+      customer_id: qbSo.customer_id,
+      sales_order_id: qbSo.id,
+      lines,
+      fob: "UPS GROUND",
+    };
+
+    try {
+      setQbLoading(true);
+      const res = await API.post(`/qbd/create_invoice`, payload);
+      const data = res.data?.data;
+      showToast(`Created invoice ${data?.ref_number || data?.id}`, "success");
+      // Persist invoice ref to local filterInvoices map keyed by first selected filter (optional)
+      // Close modal and clear state
+      setQbOpen(false);
+      setQbSo(null);
+      setQbRef("");
+      setQbSelected({});
+    } catch (err) {
+      console.error("QB create error", err);
+      showToast("Failed to create invoice.", "error");
+    } finally {
+      setQbLoading(false);
+    }
+  };
+
+  const toggleSelectAllQb = (checked) => {
+    if (!qbSo || !Array.isArray(qbSo.lines)) return;
+    if (checked) {
+      const all = {};
+      for (const line of qbSo.lines) {
+        all[line.id] = { qty: Number(line.quantity) || 1 };
+      }
+      setQbSelected(all);
+    } else {
+      setQbSelected({});
+    }
   };
 
   useEffect(() => {
@@ -497,6 +602,13 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
           >
             + Add
           </button>
+          <button
+            type="button"
+            className="btn btn-xs btn-outline"
+            onClick={() => setQbOpen(true)}
+          >
+            QuickBooks Pull
+          </button>
         </div>
       </div>
 
@@ -781,6 +893,96 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
             <span>{toast.message}</span>
           </div>
         </div>
+      )}
+
+      {/* QuickBooks Pull Modal (mocked) */}
+      {qbOpen && (
+        <dialog open className="modal">
+          <div className="modal-box max-w-4xl">
+            <div className="flex items-start justify-between">
+              <h3 className="font-bold">QuickBooks Pull (Mock)</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  aria-label="Close QuickBooks Pull"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => { setQbOpen(false); setQbSo(null); setQbRef(""); setQbSelected({}); }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2 items-center my-3">
+              <input
+                className="input input-sm input-bordered w-64"
+                placeholder="Enter SO / PO ref"
+                value={qbRef}
+                onChange={(e) => setQbRef(e.target.value)}
+              />
+              <button className="btn btn-sm" onClick={() => fetchQBSalesOrder(qbRef)} disabled={qbLoading}>
+                {qbLoading ? "Loading..." : "Fetch"}
+              </button>
+
+              {/* Select all toggle for convenience (works even if no SO loaded) */}
+              <div className="ml-4 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={qbSo && Array.isArray(qbSo.lines) && qbSo.lines.length > 0 && qbSo.lines.every((l) => !!qbSelected[l.id])}
+                  onChange={(e) => toggleSelectAllQb(e.target.checked)}
+                />
+                <div className="opacity-70">Select all lines</div>
+              </div>
+
+              <div className="ml-auto text-sm opacity-60">Mock mode: no QuickBooks credentials required</div>
+            </div>
+
+            {qbSo ? (
+              <div>
+                <div className="text-sm mb-2">Order for <strong>{qbSo.customer_name}</strong></div>
+                <div className="overflow-auto max-h-64 border rounded">
+                  <table className="table table-xs w-full">
+                    <thead>
+                      <tr>
+                        <th></th>
+                        <th>Item</th>
+                        <th>Total</th>
+                        <th>Remaining</th>
+                        <th>Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qbSo.lines.map((line) => (
+                        <tr key={line.id}>
+                          <td>
+                            <input type="checkbox" className="checkbox checkbox-sm" checked={!!qbSelected[line.id]} onChange={() => toggleQbLine(line.id)} />
+                          </td>
+                          <td className="text-xs">{line.item_name}</td>
+                          <td className="text-xs">{line.quantity}</td>
+                          <td className="text-xs">{line.balance_remaining ?? line.quantity}</td>
+                          <td>
+                            <input type="number" className="input input-xs w-16" value={qbSelected[line.id]?.qty ?? 4} onChange={(e) => setQbQty(line.id, e.target.value)} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="modal-action mt-3">
+                  <button className="btn btn-sm" onClick={() => { setQbOpen(false); setQbSo(null); setQbRef(""); setQbSelected({}); }}>Close</button>
+                  <button className="btn btn-sm btn-primary" onClick={createQbInvoice} disabled={qbLoading}>Create Invoice</button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm opacity-60">
+                No order loaded.
+                <div className="mt-3">
+                  <button className="btn btn-sm" onClick={() => { setQbOpen(false); setQbSo(null); setQbRef(""); setQbSelected({}); }}>Close</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </dialog>
       )}
 
       {confirmAction && (

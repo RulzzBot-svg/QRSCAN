@@ -10,6 +10,7 @@ from routes.tech_routes import tech_bp
 from routes.job_routes import job_bp
 from routes.admin import admin_bp
 from routes.signature import signature_bp
+from routes.qbd_conductor import qbd_bp
 
 load_dotenv()
 
@@ -53,6 +54,7 @@ def create_app():
     app.register_blueprint(hospital_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(signature_bp, url_prefix="/api")
+    app.register_blueprint(qbd_bp, url_prefix="/api/qbd")
 
     @app.route("/")
     def home():
