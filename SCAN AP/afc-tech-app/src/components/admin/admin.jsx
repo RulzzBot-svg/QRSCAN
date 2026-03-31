@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { API } from "../../api/api";
 import KpiCard from "./kpiCard";
+import AdminCharts from "./AdminCharts";
 
 function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -98,10 +99,10 @@ function AdminDashboard() {
   };
 
   return (
-    <div data-theme="corporate" className="min-h-screen bg-base-200">
+    <div data-theme="corporate" className="min-h-screen bg-slate-50">
       <main className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-primary">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold text-slate-800">Overview</h1>
           <div className="flex gap-2 items-center">
             <button
               className="btn btn-sm btn-outline btn-warning"
@@ -109,7 +110,7 @@ function AdminDashboard() {
               disabled={syncing || loading}
               title="Update all AHU filter dates from completed job history"
             >
-              {syncing ? <span className="loading loading-spinner loading-xs" /> : "⟳ Sync Filter Dates from Jobs"}
+              {syncing ? <span className="loading loading-spinner loading-xs" /> : "⟳ Sync"}
             </button>
             <button className="btn btn-sm btn-ghost" onClick={loadDashboard} disabled={loading}>
               {loading ? <span className="loading loading-spinner loading-xs" /> : "↻ Refresh"}
@@ -117,95 +118,69 @@ function AdminDashboard() {
           </div>
         </div>
 
-        {/* SYNC RESULT ALERT */}
         {syncResult && (
           <div className={`alert ${syncResult.ok ? "alert-success" : "alert-error"} mb-4`}>
             <span>{syncResult.message}</span>
-            {syncResult.ok && syncResult.updated?.length > 0 && (
-              <span className="ml-2 text-xs opacity-70">
-                ({syncResult.updated.length} filter{syncResult.updated.length !== 1 ? "s" : ""} updated)
-              </span>
-            )}
           </div>
         )}
 
-        {/* KPI CARDS */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <KpiCard title="Hospitals" value={stats.hospitals} />
           <KpiCard title="Total AHUs" value={stats.ahus} />
-          <KpiCard title="Overdue" value={stats.overdue} color="error" />
-          <KpiCard title="Due Soon" value={stats.dueSoon} color="warning" />
-          <KpiCard title="Compliant" value={stats.compliant} color="success" />
+          <KpiCard title="Overdue" value={stats.overdue} color="error" subtitle="Immediate attention" />
+          {/* New KPI: Hospitals Compliant % */}
+          <KpiCard
+            title="Hospitals Compliant %"
+            value={`${Math.round((hospitalRows.filter(r => r.status === 'Compliant').length / Math.max(1, hospitalRows.length)) * 100)}%`}
+            color="success"
+          />
+          {/* New KPI: Avg AHU Compliance % */}
+          <KpiCard
+            title="Avg AHU Compliance"
+            value={`${Math.round((stats.compliant / Math.max(1, stats.ahus)) * 100)}%`}
+          />
         </div>
 
-        {/* HOSPITAL OVERVIEW */}
-        <div className="bg-base-100 border border-base-300 rounded-lg shadow">
-          <div className="p-4 border-b border-base-300 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Hospital Compliance Overview</h2>
-            <div className="text-sm text-base-content/50">
-              {hospitalRows.filter(r => r.status === "Compliant").length} of {hospitalRows.length} hospitals compliant
-            </div>
-          </div>
+        <AdminCharts hospitalRows={hospitalRows} stats={stats} />
+
+        <div className="mt-6 bg-base-100 border border-base-300 rounded-lg shadow p-4">
+          <h2 className="text-lg font-semibold mb-3">Hospital Details</h2>
 
           {loading ? (
             <div className="p-6 text-center">
               <span className="loading loading-spinner loading-lg"></span>
             </div>
           ) : (
-            <table className="table table-zebra w-full">
-              <thead>
-                <tr>
-                  <th>Hospital</th>
-                  <th className="text-center">AHUs</th>
-                  <th className="text-center">Overdue</th>
-                  <th className="text-center">Due Soon</th>
-                  <th className="text-center">Compliant</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hospitalRows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="font-medium">{row.name}</td>
-                    <td className="text-center">{row.ahus}</td>
-                    <td className="text-center">
-                      {row.overdue > 0 ? (
-                        <span className="text-error font-semibold">{row.overdue}</span>
-                      ) : (
-                        <span className="text-base-content/40">0</span>
-                      )}
-                    </td>
-                    <td className="text-center">
-                      {row.dueSoon > 0 ? (
-                        <span className="text-warning font-semibold">{row.dueSoon}</span>
-                      ) : (
-                        <span className="text-base-content/40">0</span>
-                      )}
-                    </td>
-                    <td className="text-center">
-                      {row.compliant > 0 ? (
-                        <span className="text-success font-semibold">{row.compliant}</span>
-                      ) : (
-                        <span className="text-base-content/40">0</span>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${
-                          row.status === "Overdue"
-                            ? "badge-error"
-                            : row.status === "Due Soon"
-                            ? "badge-warning"
-                            : "badge-success"
-                        }`}
-                      >
-                        {row.status}
-                      </span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="table table-zebra w-full">
+                <thead>
+                  <tr>
+                    <th>Hospital</th>
+                    <th className="text-center">AHUs</th>
+                    <th className="text-center">Overdue</th>
+                    <th className="text-center">Due Soon</th>
+                    <th className="text-center">Compliant</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {hospitalRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="font-medium">{row.name}</td>
+                      <td className="text-center">{row.ahus}</td>
+                      <td className="text-center">{row.overdue > 0 ? <span className="text-error font-semibold">{row.overdue}</span> : <span className="text-base-content/40">0</span>}</td>
+                      <td className="text-center">{row.dueSoon > 0 ? <span className="text-warning font-semibold">{row.dueSoon}</span> : <span className="text-base-content/40">0</span>}</td>
+                      <td className="text-center">{row.compliant > 0 ? <span className="text-success font-semibold">{row.compliant}</span> : <span className="text-base-content/40">0</span>}</td>
+                      <td>
+                        <span className={`badge ${row.status === "Overdue" ? "badge-error" : row.status === "Due Soon" ? "badge-warning" : "badge-success"}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </main>

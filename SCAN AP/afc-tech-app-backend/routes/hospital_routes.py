@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from models import Hospital, AHU, Building, Filter
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func
@@ -25,7 +25,28 @@ def get_hospitals():
 
 @hospital_bp.route("/hospital/all", methods=["GET"])
 def get_all_hospitals():
-    hospitals = Hospital.query.all()
+    # Support optional pagination via ?limit=<n>&offset=<n>
+    try:
+        limit = request.args.get("limit", None)
+        offset = request.args.get("offset", None)
+        if limit is not None:
+            limit = int(limit)
+        if offset is not None:
+            offset = int(offset)
+    except Exception:
+        limit = None
+        offset = None
+
+    total = Hospital.query.count()
+
+    query = Hospital.query
+    if offset is not None:
+        query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+
+    hospitals = query.all()
+
     result = [
         {
             "id": h.id,
@@ -36,6 +57,12 @@ def get_all_hospitals():
         }
         for h in hospitals
     ]
+
+    # If pagination was requested, return an envelope with total + data
+    if limit is not None or offset is not None:
+        return jsonify({"total": total, "data": result}), 200
+
+    # Backwards-compatible plain list response
     return jsonify(result)
 
 

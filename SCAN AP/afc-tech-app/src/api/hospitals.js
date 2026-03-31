@@ -1,6 +1,6 @@
 import { API } from "./api";
 
-export const getHospitals = () => API.get("/hospital/all");
+export const getHospitals = (params) => API.get("/hospital/all", { params });
 
 export const getAHUsForHospital = (id)=> API.get(`/hospital/${id}/ahus`);
 
