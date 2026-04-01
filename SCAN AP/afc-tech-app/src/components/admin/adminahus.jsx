@@ -328,7 +328,7 @@ function AdminAHUs() {
 
       <div className="flex gap-4 px-4 pb-4">
         {/* Left: Hospital tree (UNCHANGED) */}
-          <aside className="w-64 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto max-h-[calc(100vh-8rem)] shrink-0">
+          <aside className="w-64 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto lg:max-h-[calc(100vh-150px)] shrink-0">
             <div className="font-medium mb-2">Hospitals</div>
             <input
               className="input input-sm input-bordered w-full mb-2"
