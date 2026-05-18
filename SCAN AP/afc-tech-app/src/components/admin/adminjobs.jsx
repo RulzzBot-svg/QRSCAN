@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminSidebar from "./AdminSidebar";
 import { API } from "../../api/api";
-import { formatDateTime } from "../../utils/dates";
+import { formatDate } from "../../utils/dates";
 
 
 function AdminJobs() {
@@ -47,7 +47,7 @@ function AdminJobs() {
                     ) : null}
                   </td>
                   <td>{j.technician}</td>
-                  <td>{formatDateTime(j.completed_at)}</td>
+                  <td>{formatDate(j.completed_at, 'en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
                 </tr>
               ))}
             </tbody>
@@ -76,7 +76,7 @@ function AdminJobs() {
                 <div><strong>Technician:</strong> {selectedJob.technician}</div>
                 <div>
                   <strong>Completed:</strong>{" "}
-                  {formatDateTime(selectedJob.completed_at)}
+                  {formatDate(selectedJob.completed_at, 'en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
                 </div>
               </div>
 
