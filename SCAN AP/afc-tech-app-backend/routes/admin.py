@@ -7,6 +7,7 @@ from sqlalchemy import func
 import re
 from datetime import datetime
 from middleware.auth import require_admin
+from utility.http import internal_error, validate_signature_payload
 import subprocess
 import time
 import os
@@ -37,6 +38,10 @@ def create_supervisor_signoff():
         if not (hospital_id and date_str and supervisor_name and signature_data and job_ids):
             return jsonify({"error": "Missing required fields"}), 400
 
+        sig_err = validate_signature_payload(signature_data)
+        if sig_err:
+            return jsonify({"error": sig_err}), 400
+
         # Parse date
         try:
             date = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -63,7 +68,7 @@ def create_supervisor_signoff():
     except Exception as e:
         db.session.rollback()
         print(f"Error creating supervisor signoff: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)
 
 
 @admin_bp.route("/supervisor-signoff", methods=["GET"])
@@ -98,7 +103,7 @@ def get_supervisor_signoffs():
         return jsonify(result), 200
     except Exception as e:
         print(f"Error fetching supervisor signoffs: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)
 
 @admin_bp.route("/hospitals", methods=["GET"])
 @require_admin
@@ -117,7 +122,7 @@ def get_hospitals():
         return jsonify(result), 200
     except Exception as e:
         print(f"Error fetching hospitals: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)
 
 @admin_bp.route("/overview", methods=["GET"])
 @require_admin
@@ -167,7 +172,7 @@ def list_notifications():
         return jsonify(result), 200
     except Exception as e:
         print(f"Error listing notifications: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)
 
 
 @admin_bp.route("/notifications/<int:notif_id>/status", methods=["POST"])
@@ -197,7 +202,7 @@ def update_notification_status(notif_id):
     except Exception as e:
         db.session.rollback()
         print(f"Error updating notification: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)
 
 
 @admin_bp.route("/jobs", methods=["GET"])
@@ -301,7 +306,7 @@ def create_ahu():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)
 
 
 @admin_bp.route("/launch-qb-macro", methods=["POST"])
@@ -480,4 +485,4 @@ def backfill_filter_dates():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error in backfill_filter_dates: {e}")
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)

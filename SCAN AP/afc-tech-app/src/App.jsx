@@ -2,12 +2,12 @@ import React, { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import LogoutButton from "./components/common/logoutbutton";
 import { useOfflineSync } from "./offline/useOfflineSync";
+import { hasAuthToken } from "./api/api";
 
 export default function App() {
   const navigate = useNavigate();
   const { syncing, lastResult, runSync } = useOfflineSync();
 
-  // Safely read tech from localStorage (can be null / malformed)
   const tech = useMemo(() => {
     try {
       const raw = localStorage.getItem("tech");
@@ -17,20 +17,22 @@ export default function App() {
     }
   }, []);
 
-  // Redirect to login if no tech in storage (do this in an effect, not during render)
   useEffect(() => {
-    if (!tech) navigate("/");
+    if (!tech) {
+      navigate("/");
+      return;
+    }
+    if (navigator.onLine && !hasAuthToken()) {
+      navigate("/");
+    }
   }, [tech, navigate]);
 
-  // If not logged in, render nothing while redirecting
   if (!tech) return null;
+  if (navigator.onLine && !hasAuthToken()) return null;
 
   // Normalize role check (handles missing role, casing, extra spaces)
   const role = String(tech?.role || "").trim().toLowerCase();
   const isAdmin = role === "admin";
-
-  console.log(tech?.name);
-  console.log("API BASE URL:", import.meta.env.VITE_API_BASE_URL);
 
   return (
     <div data-theme="corporate" className="min-h-screen flex flex-col bg-base-200">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginTech } from "../../api/tech"
+import { loginTech } from "../../api/tech";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,14 +17,18 @@ export default function Login() {
       if (post) {
         setRedirectMessage("Please sign in to view the scanned AHU.");
       }
-    } catch (e) { }
+    } catch (e) {
+      /* ignore */
+    }
   }, []);
 
   const dismissRedirectMessage = () => {
     setRedirectMessage("");
     try {
       sessionStorage.removeItem("post_login_path");
-    } catch (e) { }
+    } catch (e) {
+      /* ignore */
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -33,54 +37,69 @@ export default function Login() {
     setLoading(true);
     try {
       if (!navigator.onLine) {
-        // Attempt offline login using stored offline cred
         const stored = localStorage.getItem("offline_tech");
         if (!stored) throw new Error("No offline credentials available");
         const offline = JSON.parse(stored);
         const pinHash = await digestPin(pin);
         if (offline.username === username && offline.pinHash === pinHash) {
-          // restore tech session
-          localStorage.setItem("tech", JSON.stringify({ id: offline.id, name: offline.name }));
+          localStorage.setItem(
+            "tech",
+            JSON.stringify({
+              id: offline.id,
+              name: offline.name,
+              role: offline.role || "technician",
+            })
+          );
           navigate("/Home");
           return;
         }
-        throw new Error("Offline login failed");
+        throw new Error("Offline login failed — go online to sign in");
       }
 
       const res = await loginTech(username, pin);
+      const { token, id, name, role } = res.data;
 
-      // Save tech session with role
+      if (!token) {
+        throw new Error("Login succeeded but no session token was returned");
+      }
+
+      localStorage.setItem("auth_token", token);
       localStorage.setItem(
         "tech",
         JSON.stringify({
-          id: res.data.id,
-          name: res.data.name,
-          role: res.data.role || "technician"  // Store role, default to technician
+          id,
+          name,
+          role: role || "technician",
         })
       );
 
-      // Save offline credential (hashed PIN) so user can login when offline
       try {
         const pinHash = await digestPin(pin);
         localStorage.setItem(
           "offline_tech",
-          JSON.stringify({ username, pinHash, id: res.data.id, name: res.data.name })
+          JSON.stringify({
+            username,
+            pinHash,
+            id,
+            name,
+            role: role || "technician",
+          })
         );
       } catch (e) {
         console.warn("Failed to store offline credential:", e);
       }
 
-      // Navigate to technician app
       const post = sessionStorage.getItem("post_login_path");
       if (post) {
         try {
           sessionStorage.removeItem("post_login_path");
-        } catch { }
+        } catch {
+          /* ignore */
+        }
         window.location.assign(post);
       } else {
         navigate("/Home");
       }
-
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Login failed");
     } finally {
@@ -88,20 +107,20 @@ export default function Login() {
     }
   };
 
-  // helper: hash PIN using SHA-256 and return hex
-  async function digestPin(pin) {
+  async function digestPin(pinValue) {
     const subtle = window?.crypto?.subtle;
     if (!subtle) {
-      throw new Error("WebCrypto unavailable (crypto.subtle missing). Use HTTPS/localhost or disable offline PIN storage.");
+      throw new Error(
+        "WebCrypto unavailable. Use HTTPS/localhost or sign in while online."
+      );
     }
     const enc = new TextEncoder();
-    const data = enc.encode(pin);
+    const data = enc.encode(pinValue);
     const hash = await subtle.digest("SHA-256", data);
     return Array.from(new Uint8Array(hash))
-      .map(b => b.toString(16).padStart(2, "0"))
+      .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }
-
 
   return (
     <div
@@ -109,7 +128,6 @@ export default function Login() {
       className="min-h-screen flex items-center justify-center bg-base-200"
     >
       <div className="w-full max-w-sm bg-base-100 border border-base-300 rounded-xl shadow-lg p-8">
-
         <h1 className="text-2xl font-bold text-primary text-center mb-6">
           Technician Login
         </h1>
@@ -117,13 +135,16 @@ export default function Login() {
         {redirectMessage && (
           <div className="mb-4 rounded-lg bg-info/20 border border-info p-3 text-sm text-info flex justify-between items-center">
             <div>{redirectMessage}</div>
-            <button className="btn btn-ghost btn-sm" onClick={dismissRedirectMessage}>Dismiss</button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={dismissRedirectMessage}
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* Username */}
           <div className="form-control">
             <label className="label">
               <span className="label-text">Name</span>
@@ -138,7 +159,6 @@ export default function Login() {
             />
           </div>
 
-          {/* PIN */}
           <div className="form-control">
             <label className="label">
               <span className="label-text">PIN</span>
@@ -153,14 +173,10 @@ export default function Login() {
             />
           </div>
 
-          {/* Error */}
           {error && (
-            <div className="text-sm text-error text-center">
-              {error}
-            </div>
+            <div className="text-sm text-error text-center">{error}</div>
           )}
 
-          {/* Submit */}
           <button
             type="submit"
             className={`btn btn-primary w-full ${loading ? "loading" : ""}`}

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { API } from '../api/api';
 
 function useCanvas(width = 400, height = 150) {
   const canvasRef = useRef(null);
@@ -91,10 +92,9 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
   useEffect(() => {
     if (!scheduleId) return;
     setLoading(true);
-    fetch(`/api/schedule/${encodeURIComponent(scheduleId)}/summary`)
-      .then(res => { if (!res.ok) throw new Error('Failed to fetch summary'); return res.json(); })
-      .then(data => setJobs(data.jobs || []))
-      .catch(err => setError(err.message))
+    API.get(`/schedule/${encodeURIComponent(scheduleId)}/summary`)
+      .then((res) => setJobs(res.data.jobs || []))
+      .catch((err) => setError(err.response?.data?.error || err.message))
       .finally(() => setLoading(false));
   }, [scheduleId]);
 
@@ -102,20 +102,19 @@ export default function SignatureModal({ scheduleId, onClose, onSigned }) {
     if (!supervisorName.trim()) { setError('Please enter supervisor name'); return; }
     setSaving(true); setError(null);
     try {
-      const signatureImage = paths.length ? toDataUrl('image/png') : null;
+      const signatureImage = paths.length ? toDataUrl('image/png') : 'data:image/png;base64,';
+      const hospitalId =
+        jobs.find((j) => j.hospital_id)?.hospital_id ?? jobs[0]?.hospital_id;
       const payload = {
-        schedule_id: scheduleId,
+        hospital_id: hospitalId,
+        date: new Date().toISOString().slice(0, 10),
         supervisor_name: supervisorName.trim(),
-        jobs: jobs.map(j => ({ id: j.id, ahuName: j.ahuName, status: j.status, filter: j.filter })),
-        signed_at: new Date().toISOString(),
-        signature_image: signatureImage
+        summary: `Supervisor sign-off for schedule ${scheduleId}`,
+        signature_data: signatureImage,
+        job_ids: jobs.map((j) => j.id),
       };
-      const res = await fetch('/api/supervisor_sign', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      if (!res.ok) { const text = await res.text(); throw new Error(text || 'Failed to save signature'); }
-      const body = await res.json();
-      onSigned && onSigned(body);
+      const res = await API.post('/admin/supervisor-signoff', payload);
+      onSigned && onSigned(res.data);
       onClose && onClose();
       clear();
       setSupervisorName('');

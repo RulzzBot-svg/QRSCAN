@@ -160,7 +160,6 @@ function FilterInfo() {
 
     const jobData = {
       ahu_id: resolvedAhuId,
-      tech_id: tech?.id || 1, // Use logged-in technician ID
       overall_notes: "",
       gps_lat: location.lat,
       gps_long: location.long,

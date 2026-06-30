@@ -3,7 +3,8 @@ from models import AHU, Filter, Technician
 from db import db
 import traceback
 from dateutil.parser import isoparse
-from middleware.auth import require_admin
+from middleware.auth import require_admin, require_auth
+from utility.http import internal_error
 
 from sqlalchemy.orm import joinedload, selectinload
 from utility.status import compute_filter_status
@@ -98,6 +99,7 @@ def compute_ahu_status_from_filters(filters):
 # Get AHU details by QR code
 # ---------------------------------------------------
 @ahu_bp.route("/qr/<string:ahu_id>", methods=["GET"])
+@require_auth
 def get_ahu_by_qr(ahu_id):
     try:
         # Support both numeric IDs (new) and legacy labels like "AHU-001".
@@ -155,13 +157,8 @@ def get_ahu_by_qr(ahu_id):
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return internal_error(e)
 
-
-@ahu_bp.route("/debug/ahu-ids", methods=["GET"])
-def debug_ahu_ids():
-    ahus = db.session.query(AHU.id).order_by(AHU.id.asc()).limit(150).all()
-    return jsonify([a[0] for a in ahus]), 200
 
 # ---------------------------------------------------
 # Admin: Get filters for an AHU (ACTIVE only)
@@ -348,6 +345,7 @@ def delete_filter(filter_id):
 # Get all AHUs (accessible by all authenticated users for read-only)
 # ---------------------------------------------------
 @ahu_bp.route("/ahus", methods=["GET"])
+@require_auth
 def get_all_ahus():
     """
     Get all AHUs with their status information.

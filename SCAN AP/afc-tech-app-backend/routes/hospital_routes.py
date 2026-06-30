@@ -4,19 +4,20 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import func
 from db import db
 from datetime import date, timedelta
+from middleware.auth import require_auth
 
 hospital_bp = Blueprint("hospital", __name__)
 
 
 @hospital_bp.route("/hospitals", methods=["GET"])
+@require_auth
 def get_hospitals():
-    """Get all hospitals - accessible by all users."""
     hospitals = Hospital.query.all()
     result = [
         {
             "id": h.id,
             "name": h.name,
-            "active": getattr(h, "active", True)
+            "active": getattr(h, "active", True),
         }
         for h in hospitals
     ]
@@ -24,8 +25,8 @@ def get_hospitals():
 
 
 @hospital_bp.route("/hospital/all", methods=["GET"])
+@require_auth
 def get_all_hospitals():
-    # Support optional pagination via ?limit=<n>&offset=<n>
     try:
         limit = request.args.get("limit", None)
         offset = request.args.get("offset", None)
@@ -53,26 +54,24 @@ def get_all_hospitals():
             "name": h.name,
             "city": h.city,
             "active": h.active,
-            "ahu_count": len(h.ahus)
+            "ahu_count": len(h.ahus),
         }
         for h in hospitals
     ]
 
-    # If pagination was requested, return an envelope with total + data
     if limit is not None or offset is not None:
         return jsonify({"total": total, "data": result}), 200
 
-    # Backwards-compatible plain list response
     return jsonify(result)
 
 
 @hospital_bp.route("/hospital/<int:hospital_id>/ahus", methods=["GET"])
+@require_auth
 def get_ahus_for_hospital(hospital_id):
     ahus = AHU.query.filter_by(hospital_id=hospital_id).all()
 
     result = []
     for a in ahus:
-        # Compute filter counts and due dates if filters are available
         overdue_count = 0
         due_soon_count = 0
         filters_count = 0
@@ -85,7 +84,6 @@ def get_ahus_for_hospital(hospital_id):
             freq = getattr(f, "frequency_days", None)
 
             if last:
-                # ensure date object
                 last_dt = last if isinstance(last, date) else last
                 if latest_service is None or (last_dt and last_dt > latest_service):
                     latest_service = last_dt
@@ -102,7 +100,6 @@ def get_ahus_for_hospital(hospital_id):
                 except Exception:
                     pass
 
-        # derive a simple overall status
         if overdue_count > 0:
             status = "Overdue"
         elif due_soon_count > 0:
@@ -112,7 +109,6 @@ def get_ahus_for_hospital(hospital_id):
         else:
             status = "Pending"
 
-        # earliest upcoming next_due if available
         next_due_date = min(next_due_dates).isoformat() if next_due_dates else None
 
         result.append({
@@ -132,9 +128,8 @@ def get_ahus_for_hospital(hospital_id):
 
 
 @hospital_bp.route("/hospital/<int:hospital_id>/buildings", methods=["GET"])
+@require_auth
 def get_buildings_for_hospital(hospital_id):
-    """Get all buildings for a hospital with AHU counts."""
-    # Single query: fetch buildings + AHU counts using a LEFT JOIN + GROUP BY
     rows = (
         db.session.query(Building, func.count(AHU.id).label("ahu_count"))
         .outerjoin(AHU, AHU.building_id == Building.id)
@@ -156,6 +151,7 @@ def get_buildings_for_hospital(hospital_id):
 
 
 @hospital_bp.route("/hospitals/<int:hospital_id>/offline-bundle", methods=["GET"])
+@require_auth
 def hospital_offline_bundle(hospital_id):
     hospital = (
         db.session.query(Hospital)
@@ -169,7 +165,6 @@ def hospital_offline_bundle(hospital_id):
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
 
-    # Build a lightweight JSON payload
     payload = {
         "hospital": {
             "id": hospital.id,
@@ -206,7 +201,7 @@ def hospital_offline_bundle(hospital_id):
                     "notes": getattr(f, "notes", None),
                 }
                 for f in (a.filters or [])
-            ]
+            ],
         })
 
     return jsonify(payload), 200
