@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from models import Technician
 from db import db
 from extensions import limiter
-from middleware.jwt_utils import create_access_token
+from middleware.jwt_utils import create_access_token, token_string
 from middleware.pin_utils import hash_pin, is_hashed, verify_pin
 from middleware.auth import require_admin, require_auth
 from utility.http import internal_error
@@ -46,7 +46,7 @@ def login_technicians():
             db.session.commit()
 
         role = getattr(tech, "role", "technician")
-        token = create_access_token(tech.id, role)
+        token = token_string(create_access_token(tech.id, role))
 
         return jsonify({
             "id": tech.id,

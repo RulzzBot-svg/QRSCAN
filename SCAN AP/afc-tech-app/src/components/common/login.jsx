@@ -57,10 +57,16 @@ export default function Login() {
       }
 
       const res = await loginTech(username, pin);
-      const { token, id, name, role } = res.data;
+      const data = res.data || {};
+      const token = data.token ?? data.access_token;
+      const { id, name, role } = data;
 
       if (!token) {
-        throw new Error("Login succeeded but no session token was returned");
+        throw new Error(
+          "The server accepted your login but did not return a session token. " +
+            "The deployed API is likely still on the old version — redeploy the backend on Render " +
+            "and set the JWT_SECRET environment variable, then try again."
+        );
       }
 
       localStorage.setItem("auth_token", token);
