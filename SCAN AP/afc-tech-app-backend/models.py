@@ -116,7 +116,7 @@ class Technician(db.Model):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(150), nullable=False)
-    pin = Column(String(20), nullable=False)
+    pin = Column(String(128), nullable=False)
     active = Column(Boolean, default=True)
     role = Column(String(20), default="technician", nullable=False)  # 'technician' or 'admin'
 

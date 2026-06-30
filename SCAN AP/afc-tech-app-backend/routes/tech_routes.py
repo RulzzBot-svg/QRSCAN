@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models import Technician
 from db import db
+import logging
 from extensions import limiter
 from middleware.jwt_utils import create_access_token, token_string
 from middleware.pin_utils import hash_pin, is_hashed, verify_pin
@@ -8,6 +9,7 @@ from middleware.auth import require_admin, require_auth
 from utility.http import internal_error
 
 tech_bp = Blueprint("technicians", __name__)
+logger = logging.getLogger(__name__)
 
 
 @tech_bp.route("/technicians", methods=["GET"])
@@ -42,8 +44,15 @@ def login_technicians():
             return jsonify({"error": "Invalid credentials"}), 401
 
         if not is_hashed(tech.pin):
-            tech.pin = hash_pin(str(pin))
-            db.session.commit()
+            try:
+                tech.pin = hash_pin(str(pin))
+                db.session.commit()
+            except Exception as hash_err:
+                db.session.rollback()
+                logger.warning(
+                    "Could not persist hashed PIN (run migrations/2026_06_30_widen_technician_pin.py): %s",
+                    hash_err,
+                )
 
         role = getattr(tech, "role", "technician")
         token = token_string(create_access_token(tech.id, role))
