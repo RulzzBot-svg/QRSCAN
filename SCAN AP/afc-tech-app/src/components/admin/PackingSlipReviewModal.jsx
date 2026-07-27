@@ -46,17 +46,27 @@ export default function PackingSlipReviewModal({
       alert(
         "QB Listener is not running.\n\n" +
           "On your Windows PC, open PowerShell in afc-tech-app-backend and run:\n" +
-          "  python qb_listener.py\n\n" +
-          "Then click in QuickBooks and try again."
+          "  start_qb_tools.bat\n" +
+          "  (or: python qb_listener.py)\n\n" +
+          "Then try Auto-Paste again."
       );
       return;
     }
-    const result = await pasteToQbListener(pastePreview);
-    onSuccess?.("pasted");
-    alert(
-      (result.message || "Data sent to QuickBooks.") +
-        "\n\nSwitch to QuickBooks now — paste should run automatically (Ctrl+Shift+V)."
-    );
+    try {
+      const pastePreview = buildQbPasteString(filtersByAhu);
+      const result = await pasteToQbListener(pastePreview);
+      onSuccess?.("pasted");
+      alert(
+        (result.message || "Pasting soon.") +
+          "\n\n1. Switch to QuickBooks NOW\n" +
+          "2. Click the first line cell\n" +
+          "3. Wait ~3 seconds — typing starts automatically\n\n" +
+          "Manual fallback: Copy for QB, then Ctrl+Shift+V\n" +
+          "(only if SpecialPaste.exe is running in the background)"
+      );
+    } catch (e) {
+      alert(e.message || "Auto-paste failed");
+    }
   };
 
   return (

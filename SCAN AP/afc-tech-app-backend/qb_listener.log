@@ -9,3 +9,18 @@
 2026-02-18 10:43:04,897 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://localhost:5000
 2026-02-18 10:43:04,898 - INFO - [33mPress CTRL+C to quit[0m
+2026-07-27 13:10:38,584 - INFO - ============================================================
+2026-07-27 13:10:38,584 - INFO - QB Auto-Paste Listener Service Starting
+2026-07-27 13:10:38,585 - INFO - ============================================================
+2026-07-27 13:10:38,585 - INFO - Script directory: C:\Users\AFC5admin\Documents\QRSCAN\QRSCAN\SCAN AP\afc-tech-app-backend
+2026-07-27 13:10:38,585 - INFO - SpecialPaste.exe: C:\Users\AFC5admin\Documents\QRSCAN\QRSCAN\SCAN AP\afc-tech-app-backend\SpecialPaste.exe (FOUND)
+2026-07-27 13:10:38,585 - INFO - qb_sections.au3: C:\Users\AFC5admin\Documents\QRSCAN\QRSCAN\SCAN AP\afc-tech-app-backend\qb_sections.au3 (FOUND)
+2026-07-27 13:10:38,586 - INFO - Listening on http://localhost:5001
+2026-07-27 13:10:38,586 - INFO - ============================================================
+2026-07-27 13:10:38,598 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://localhost:5001
+2026-07-27 13:10:38,598 - INFO - [33mPress CTRL+C to quit[0m
+2026-07-27 13:10:51,950 - INFO - 127.0.0.1 - - [27/Jul/2026 13:10:51] "GET /health HTTP/1.1" 200 -
+2026-07-27 13:10:59,442 - INFO - 127.0.0.1 - - [27/Jul/2026 13:10:59] "GET /health HTTP/1.1" 200 -
+2026-07-27 13:11:38,747 - INFO - 127.0.0.1 - - [27/Jul/2026 13:11:38] "GET /health HTTP/1.1" 200 -
+2026-07-27 13:11:38,810 - INFO - 127.0.0.1 - - [27/Jul/2026 13:11:38] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
