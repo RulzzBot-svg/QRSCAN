@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
+import PackingSlipPanel from "./PackingSlipPanel";
+import PackingSlipReviewModal from "./PackingSlipReviewModal";
 
 const naturalAhuSort = (a, b) => {
   const A = String(a ?? "");
@@ -43,8 +45,8 @@ function AdminAHUs() {
   const [newAhuName, setNewAhuName] = useState("");
   const [newAhuLocation, setNewAhuLocation] = useState("");
   const [newAhuNotes, setNewAhuNotes] = useState("");
-  const [qbMacroLoading, setQbMacroLoading] = useState(false);
-  const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({}); // { [ahuId]: array of filter objects }
+  const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({});
+  const [manualReviewData, setManualReviewData] = useState(null);
   const [buildingFilter, setBuildingFilter] = useState("");
 
   // NEW: Global (page-level) filter bar state (independent of tables)
@@ -176,108 +178,14 @@ function AdminAHUs() {
     }));
   };
 
-  const generatePackingSlip = async () => {
-    // Collect all selected filters GROUPED BY AHU
-    const filtersByAhu = {};
-    let hasAnyFilters = false;
-
-    for (const [ahuId, filterObjects] of Object.entries(selectedFiltersForQB)) {
-      if (filterObjects && Array.isArray(filterObjects) && filterObjects.length > 0) {
-        hasAnyFilters = true;
-        const ahu = ahus.find((a) => a.id == ahuId);
-        if (ahu) {
-          filtersByAhu[ahuId] = {
-            ahu_name: ahu.name || ahu.id,
-            filters: filterObjects
-          };
-        }
-      }
-    }
-
-    if (!hasAnyFilters) {
-      alert("Please select at least one filter to generate packing slip");
-      return;
-    }
-
-    setQbMacroLoading(true);
-
-    try {
-      // Format data for QB SpecialPaste.exe
-      // QB columns after 13 initial tabs: [skip 2] | Description | [skip 6] | Qty | Part | [skip 6] | ...
-      // Pattern: |||| = 2 tabs, then description, then |||||||||||| = 6 tabs, then qty||part||||||||||
-      
-      const sanitize = (s) => {
-        if (s == null) return "";
-        return String(s).replace(/\r?\n/g, " ").replace(/\|\|/g, " ").trim();
-      };
-
-      const allParts = [];
-
-      // For each AHU, add AHU name (as a description-only header), then items
-      for (const [ahuId, ahuData] of Object.entries(filtersByAhu)) {
-        const ahuName = sanitize(ahuData.ahu_name);
-
-        // Description-only header: put AHU name into the Description column
-        // Pattern: ||||<description>||  (user requested this format)
-        allParts.push(`||||${ahuName}||`);
-
-        // Items: if filter has its own description, include it after part number
-        // Otherwise provide qty||part and spacing to the next item
-        ahuData.filters.forEach((f) => {
-          const part = sanitize(f.part_number || "");
-          const qty = sanitize(f.quantity != null ? f.quantity : "1");
-          const fdesc = sanitize(f.description || "");
-
-          if (fdesc) {
-            // qty || item || description ||||||||||  (then next item)
-            allParts.push(`${qty}||${part}||${fdesc}||||||||||`);
-          } else {
-            // qty || item |||||||||| (no item-level description)
-            allParts.push(`${qty}||${part}||||||||||`);
-          }
-        });
-      }
-
-      // ONE continuous line: all parts joined
-      const data = allParts.join("");
-
-      // Copy to clipboard
-      try {
-        await navigator.clipboard.writeText(data);
-        
-        const totalItems = Object.values(filtersByAhu).reduce((sum, a) => sum + a.filters.length, 0);
-        const preview = data.slice(0, 200) + (data.length > 200 ? "..." : "");
-        
-        alert(
-          `✓ ${Object.keys(filtersByAhu).length} AHU(s), ${totalItems} filter(s) copied!\n\n` +
-          "Preview (one continuous line):\n" +
-          preview +
-          "\n\n━━━ QUICKBOOKS AUTO-PASTE ━━━\n" +
-          "1. Open QuickBooks packing slip\n" +
-          "2. Click in the FIRST cell (top-left)\n" +
-          "3. Press Ctrl+Shift+V to auto-paste\n" +
-          "4. AHU names appear as section headers\n" +
-          "5. Items fill across horizontally\n" +
-          "6. Press Ctrl+Q to stop if needed"
-        );
-        
-        // Clear selections after success
-        setSelectedFiltersForQB({});
-      } catch (clipboardErr) {
-        console.error("Clipboard copy failed:", clipboardErr);
-        alert(
-          "Failed to copy to clipboard.\n\n" +
-          "This might be a browser permission issue.\n" +
-          "Try clicking somewhere on the page first, then try again."
-        );
-      }
-    } catch (err) {
-      console.error("Unexpected error in generatePackingSlip:", err);
-      alert("Unexpected error. Check browser console for details.");
-    } finally {
-      setQbMacroLoading(false);
-    }
+  const handleManualReviewOpen = (filtersByAhu) => {
+    setManualReviewData(filtersByAhu);
   };
+
+  const manualSelectionCount = Object.values(selectedFiltersForQB).reduce(
+    (n, arr) => n + (arr?.length || 0),
+    0
+  );
 
   if (loading) {
     return (
@@ -302,29 +210,37 @@ function AdminAHUs() {
             Add AHU
           </button>
           <button
-            className={`btn btn-xs ${
-              Object.values(selectedFiltersForQB).some(arr => arr && arr.length > 0)
-                ? 'btn-accent'
-                : 'btn-disabled'
-            }`}
-            onClick={generatePackingSlip}
-            disabled={qbMacroLoading || !Object.values(selectedFiltersForQB).some(arr => arr && arr.length > 0)}
+            className={`btn btn-xs ${manualSelectionCount ? "btn-accent" : "btn-disabled"}`}
+            onClick={() => {
+              const filtersByAhu = {};
+              for (const [ahuId, filterObjects] of Object.entries(selectedFiltersForQB)) {
+                if (!filterObjects?.length) continue;
+                const ahu = ahus.find((a) => a.id == ahuId);
+                filtersByAhu[ahuId] = {
+                  ahu_name: ahu?.name || ahuId,
+                  filters: filterObjects,
+                };
+              }
+              handleManualReviewOpen(filtersByAhu);
+            }}
+            disabled={!manualSelectionCount}
             type="button"
           >
-            {qbMacroLoading ? (
-              <>
-                <span className="loading loading-spinner loading-xs"></span>
-                Copying...
-              </>
-            ) : (
-              "📋 Copy for QB"
-            )}
+            📋 Review &amp; paste to QB
           </button>
           <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">
             Sign-off
           </button>
         </div>
       </div>
+
+      <PackingSlipPanel
+        hospitals={hospitals}
+        selectedHospitalKey={selectedHospitalKey}
+        selectedFiltersForQB={selectedFiltersForQB}
+        ahus={ahus}
+        onOpenManualReview={handleManualReviewOpen}
+      />
 
       <div className="flex gap-4 px-4 pb-4">
         {/* Left: Hospital tree (UNCHANGED) */}
@@ -635,6 +551,17 @@ function AdminAHUs() {
       )}
 
       <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} ahus={ahus} />
+
+      <PackingSlipReviewModal
+        open={!!manualReviewData}
+        onClose={() => setManualReviewData(null)}
+        filtersByAhu={manualReviewData || {}}
+        sourceLabel="manual checkbox selection"
+        onSuccess={() => {
+          setManualReviewData(null);
+          setSelectedFiltersForQB({});
+        }}
+      />
     </div>
   );
 }

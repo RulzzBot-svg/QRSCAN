@@ -10,12 +10,14 @@ Then in web app, click "Auto-Paste to QB" and data will be pasted automatically.
 """
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import pyperclip
 import subprocess
 import time
 import sys
 from pathlib import Path
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +31,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+LISTENER_PORT = int(os.getenv("QB_LISTENER_PORT", "5001"))
 
 # Get the directory where this script lives
 SCRIPT_DIR = Path(__file__).parent
@@ -161,8 +166,7 @@ if __name__ == '__main__':
     logger.info(f"Script directory: {SCRIPT_DIR}")
     logger.info(f"SpecialPaste.exe: {SPECIAL_PASTE_EXE} ({'FOUND' if SPECIAL_PASTE_EXE.exists() else 'NOT FOUND'})")
     logger.info(f"qb_sections.au3: {QB_SECTIONS_AU3} ({'FOUND' if QB_SECTIONS_AU3.exists() else 'NOT FOUND'})")
-    logger.info("Listening on http://localhost:5000")
+    logger.info(f"Listening on http://localhost:{LISTENER_PORT}")
     logger.info("=" * 60)
-    
-    # Run on localhost:5000
-    app.run(host='localhost', port=5000, debug=False)
+
+    app.run(host='localhost', port=LISTENER_PORT, debug=False)

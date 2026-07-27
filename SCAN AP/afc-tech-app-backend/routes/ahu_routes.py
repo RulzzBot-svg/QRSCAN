@@ -612,7 +612,7 @@ def admin_update_ahu(ahu_id):
                 for k, v in (filter_invoices or {}).items():
                     # keys may be numeric in payload; normalize to str
                     ks = str(k)
-                    if v is None or (isinstance(v, str) and v.trim() == ""):
+                    if v is None or (isinstance(v, str) and v.strip() == ""):
                         # remove entry when empty
                         if ks in fi_existing:
                             del fi_existing[ks]

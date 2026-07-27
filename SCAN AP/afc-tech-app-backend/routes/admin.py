@@ -5,7 +5,7 @@ from db import db
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 import re
-from datetime import datetime
+from datetime import datetime, date
 from middleware.auth import require_admin
 from utility.http import internal_error, validate_signature_payload
 import subprocess
@@ -485,4 +485,84 @@ def backfill_filter_dates():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error in backfill_filter_dates: {e}")
+        return internal_error(e)
+
+
+@admin_bp.route("/packing-slip/lines", methods=["GET"])
+@require_admin
+def packing_slip_lines_from_jobs():
+    """
+    Lines for QB packing slip from filters marked Replaced on completed jobs.
+    Query: hospital_id (required), from=YYYY-MM-DD, to=YYYY-MM-DD
+    """
+    try:
+        hospital_id = request.args.get("hospital_id")
+        from_str = request.args.get("from")
+        to_str = request.args.get("to")
+
+        if not hospital_id:
+            return jsonify({"error": "hospital_id is required"}), 400
+
+        try:
+            hospital_id = int(hospital_id)
+        except ValueError:
+            return jsonify({"error": "Invalid hospital_id"}), 400
+
+        if from_str:
+            start = datetime.strptime(from_str, "%Y-%m-%d").date()
+        else:
+            start = date.today().replace(day=1)
+
+        if to_str:
+            end = datetime.strptime(to_str, "%Y-%m-%d").date()
+        else:
+            end = date.today()
+
+        rows = (
+            db.session.query(JobFilter, Job, Filter, AHU)
+            .join(Job, Job.id == JobFilter.job_id)
+            .join(Filter, Filter.id == JobFilter.filter_id)
+            .join(AHU, AHU.id == Job.ahu_id)
+            .filter(
+                AHU.hospital_id == hospital_id,
+                JobFilter.is_completed.is_(True),
+                db.func.date(Job.completed_at) >= start,
+                db.func.date(Job.completed_at) <= end,
+            )
+            .order_by(Job.completed_at.desc(), AHU.id.asc(), Filter.id.asc())
+            .all()
+        )
+
+        seen = set()
+        lines = []
+        job_ids = set()
+
+        for jf, job, filt, ahu in rows:
+            dedupe_key = (ahu.id, filt.id)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            job_ids.add(job.id)
+            lines.append({
+                "job_id": job.id,
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                "ahu_id": ahu.id,
+                "ahu_name": ahu.name,
+                "filter_id": filt.id,
+                "part_number": filt.part_number,
+                "quantity": filt.quantity if filt.quantity is not None else 1,
+                "size": filt.size,
+                "phase": filt.phase,
+            })
+
+        return jsonify({
+            "hospital_id": hospital_id,
+            "from": start.isoformat(),
+            "to": end.isoformat(),
+            "job_count": len(job_ids),
+            "line_count": len(lines),
+            "lines": lines,
+        }), 200
+    except Exception as e:
+        logger.error("packing_slip_lines_from_jobs: %s", e)
         return internal_error(e)

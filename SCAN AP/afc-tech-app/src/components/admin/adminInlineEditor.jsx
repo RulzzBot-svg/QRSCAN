@@ -523,7 +523,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
             id: f.id,
             part_number: f.part_number,
             size: f.size,
-            quantity: f.quantity
+            quantity: f.quantity,
+            phase: f.phase,
           }));
         onSelectionChange(selectedFilterObjs);
       }
