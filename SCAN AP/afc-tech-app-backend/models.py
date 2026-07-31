@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Integer, Text, Float, Date, DateTime, Boolean, ForeignKey
+    Column, String, Integer, Text, Float, Date, DateTime, Boolean, ForeignKey, Text
 )
 from sqlalchemy.orm import relationship
 from db import db
@@ -16,6 +16,16 @@ class Hospital(db.Model):
     address = Column(String(300))
     city = Column(String(200))
     active = Column(Boolean, default=True)
+
+    # Contract / QB settings (admin-only; blank until filled)
+    estimate_number = Column(String(50))
+    po_number = Column(String(100))
+    pricing_notes = Column(Text)
+    changeout_interval_days = Column(Integer, default=90)
+    changeouts_per_year = Column(Integer, default=4)
+    changeouts_completed = Column(Integer, default=0)
+    contract_year_start = Column(Date)
+    contract_notes = Column(Text)
 
     ahus = relationship("AHU", back_populates="hospital", cascade="all, delete-orphan")
 

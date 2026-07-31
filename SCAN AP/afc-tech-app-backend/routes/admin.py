@@ -105,24 +105,127 @@ def get_supervisor_signoffs():
         print(f"Error fetching supervisor signoffs: {e}")
         return internal_error(e)
 
+def _hospital_settings_dict(h):
+    """Serialize hospital including contract / changeout settings."""
+    year_start = getattr(h, "contract_year_start", None)
+    return {
+        "id": h.id,
+        "name": h.name,
+        "address": h.address,
+        "city": h.city,
+        "active": getattr(h, "active", True),
+        "estimate_number": getattr(h, "estimate_number", None) or "",
+        "po_number": getattr(h, "po_number", None) or "",
+        "pricing_notes": getattr(h, "pricing_notes", None) or "",
+        "changeout_interval_days": getattr(h, "changeout_interval_days", None) or 90,
+        "changeouts_per_year": getattr(h, "changeouts_per_year", None) or 4,
+        "changeouts_completed": getattr(h, "changeouts_completed", None) or 0,
+        "contract_year_start": year_start.isoformat() if year_start else None,
+        "contract_notes": getattr(h, "contract_notes", None) or "",
+    }
+
+
 @admin_bp.route("/hospitals", methods=["GET"])
 @require_admin
 def get_hospitals():
-    """Get all hospitals for dropdown selections."""
+    """Get all hospitals with contract / changeout settings."""
     try:
-        hospitals = Hospital.query.all()
-        result = [
-            {
-                "id": h.id,
-                "name": h.name,
-                "active": getattr(h, "active", True)
-            }
-            for h in hospitals
-        ]
-        return jsonify(result), 200
+        hospitals = Hospital.query.order_by(Hospital.name).all()
+        return jsonify([_hospital_settings_dict(h) for h in hospitals]), 200
     except Exception as e:
         print(f"Error fetching hospitals: {e}")
         return internal_error(e)
+
+
+@admin_bp.route("/hospitals/<int:hospital_id>", methods=["GET"])
+@require_admin
+def get_hospital(hospital_id):
+    """Get one hospital's settings."""
+    try:
+        h = Hospital.query.get(hospital_id)
+        if not h:
+            return jsonify({"error": "Hospital not found"}), 404
+        return jsonify(_hospital_settings_dict(h)), 200
+    except Exception as e:
+        print(f"Error fetching hospital {hospital_id}: {e}")
+        return internal_error(e)
+
+
+@admin_bp.route("/hospitals/<int:hospital_id>", methods=["PATCH"])
+@require_admin
+def update_hospital(hospital_id):
+    """Update hospital contract / changeout settings (admin-only fields)."""
+    try:
+        h = Hospital.query.get(hospital_id)
+        if not h:
+            return jsonify({"error": "Hospital not found"}), 404
+
+        data = request.get_json() or {}
+
+        if "name" in data and data["name"] is not None:
+            name = str(data["name"]).strip()
+            if name:
+                h.name = name
+        if "address" in data:
+            h.address = (str(data["address"]).strip() or None)
+        if "city" in data:
+            h.city = (str(data["city"]).strip() or None)
+        if "active" in data:
+            h.active = bool(data["active"])
+
+        if "estimate_number" in data:
+            h.estimate_number = (str(data["estimate_number"]).strip() or None)
+        if "po_number" in data:
+            h.po_number = (str(data["po_number"]).strip() or None)
+        if "pricing_notes" in data:
+            h.pricing_notes = (str(data["pricing_notes"]).strip() or None)
+        if "contract_notes" in data:
+            h.contract_notes = (str(data["contract_notes"]).strip() or None)
+
+        if "changeout_interval_days" in data and data["changeout_interval_days"] is not None:
+            try:
+                days = int(data["changeout_interval_days"])
+                if days < 1:
+                    return jsonify({"error": "changeout_interval_days must be >= 1"}), 400
+                h.changeout_interval_days = days
+            except (TypeError, ValueError):
+                return jsonify({"error": "changeout_interval_days must be an integer"}), 400
+
+        if "changeouts_per_year" in data and data["changeouts_per_year"] is not None:
+            try:
+                per = int(data["changeouts_per_year"])
+                if per < 1:
+                    return jsonify({"error": "changeouts_per_year must be >= 1"}), 400
+                h.changeouts_per_year = per
+            except (TypeError, ValueError):
+                return jsonify({"error": "changeouts_per_year must be an integer"}), 400
+
+        if "changeouts_completed" in data and data["changeouts_completed"] is not None:
+            try:
+                done = int(data["changeouts_completed"])
+                if done < 0:
+                    return jsonify({"error": "changeouts_completed must be >= 0"}), 400
+                h.changeouts_completed = done
+            except (TypeError, ValueError):
+                return jsonify({"error": "changeouts_completed must be an integer"}), 400
+
+        if "contract_year_start" in data:
+            raw = data["contract_year_start"]
+            if not raw:
+                h.contract_year_start = None
+            else:
+                try:
+                    h.contract_year_start = date.fromisoformat(str(raw)[:10])
+                except ValueError:
+                    return jsonify({"error": "contract_year_start must be YYYY-MM-DD"}), 400
+
+        db.session.commit()
+        return jsonify(_hospital_settings_dict(h)), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating hospital {hospital_id}: {e}")
+        return internal_error(e)
+
 
 @admin_bp.route("/overview", methods=["GET"])
 @require_admin
