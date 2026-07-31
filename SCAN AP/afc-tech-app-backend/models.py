@@ -25,6 +25,7 @@ class Hospital(db.Model):
     changeouts_per_year = Column(Integer, default=4)
     changeouts_completed = Column(Integer, default=0)
     contract_year_start = Column(Date)
+    contract_year_end = Column(Date)
     contract_notes = Column(Text)
 
     ahus = relationship("AHU", back_populates="hospital", cascade="all, delete-orphan")

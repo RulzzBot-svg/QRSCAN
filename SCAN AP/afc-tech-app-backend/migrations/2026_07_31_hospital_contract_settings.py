@@ -13,6 +13,7 @@ COLUMNS = [
     ("changeouts_per_year", "INTEGER DEFAULT 4"),
     ("changeouts_completed", "INTEGER DEFAULT 0"),
     ("contract_year_start", "DATE"),
+    ("contract_year_end", "DATE"),
     ("contract_notes", "TEXT"),
 ]
 

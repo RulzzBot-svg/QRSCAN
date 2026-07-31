@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { API } from "../../api/api";
 import { getAdminHospitals } from "../../api/admin";
 import KpiCard from "./kpiCard";
 import AdminCharts from "./AdminCharts";
 import HospitalSettingsModal from "./HospitalSettingsModal";
+
+const HOSPITAL_PREVIEW_LIMIT = 8;
 
 function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -19,6 +21,7 @@ function AdminDashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [settingsHospital, setSettingsHospital] = useState(null);
+  const [showAllHospitals, setShowAllHospitals] = useState(false);
 
   useEffect(() => {
     loadDashboard();
@@ -51,14 +54,11 @@ function AdminDashboard() {
             compliant: 0,
             estimate_number: settings.estimate_number || "",
             po_number: settings.po_number || "",
-            pricing_notes: settings.pricing_notes || "",
-            changeout_interval_days: settings.changeout_interval_days ?? 90,
             changeouts_per_year: settings.changeouts_per_year ?? 4,
             changeouts_completed: settings.changeouts_completed ?? 0,
             contract_year_start: settings.contract_year_start || null,
+            contract_year_end: settings.contract_year_end || null,
             contract_notes: settings.contract_notes || "",
-            city: settings.city || "",
-            address: settings.address || "",
           });
         }
         const row = hospitalMap.get(hKey);
@@ -68,7 +68,6 @@ function AdminDashboard() {
         else if (a.status === "Completed") row.compliant += 1;
       }
 
-      // Include hospitals that have settings but no AHUs yet
       for (const s of settingsList) {
         const key = String(s.id);
         if (!hospitalMap.has(key)) {
@@ -81,14 +80,11 @@ function AdminDashboard() {
             compliant: 0,
             estimate_number: s.estimate_number || "",
             po_number: s.po_number || "",
-            pricing_notes: s.pricing_notes || "",
-            changeout_interval_days: s.changeout_interval_days ?? 90,
             changeouts_per_year: s.changeouts_per_year ?? 4,
             changeouts_completed: s.changeouts_completed ?? 0,
             contract_year_start: s.contract_year_start || null,
+            contract_year_end: s.contract_year_end || null,
             contract_notes: s.contract_notes || "",
-            city: s.city || "",
-            address: s.address || "",
           });
         }
       }
@@ -103,7 +99,13 @@ function AdminDashboard() {
             : "Compliant",
       }));
 
-      rows.sort((a, b) => a.name.localeCompare(b.name));
+      // Overdue first, then due soon, then name
+      const statusRank = { Overdue: 0, "Due Soon": 1, Compliant: 2 };
+      rows.sort((a, b) => {
+        const r = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9);
+        if (r !== 0) return r;
+        return a.name.localeCompare(b.name);
+      });
 
       const totalOverdue = rows.reduce((s, r) => s + r.overdue, 0);
       const totalDueSoon = rows.reduce((s, r) => s + r.dueSoon, 0);
@@ -124,6 +126,11 @@ function AdminDashboard() {
       setLoading(false);
     }
   };
+
+  const visibleRows = useMemo(() => {
+    if (showAllHospitals) return hospitalRows;
+    return hospitalRows.slice(0, HOSPITAL_PREVIEW_LIMIT);
+  }, [hospitalRows, showAllHospitals]);
 
   const syncFilterDates = async () => {
     setSyncing(true);
@@ -156,12 +163,6 @@ function AdminDashboard() {
           : row
       )
     );
-  };
-
-  const changeoutLabel = (row) => {
-    const done = row.changeouts_completed ?? 0;
-    const total = row.changeouts_per_year ?? 4;
-    return `${done}/${total}`;
   };
 
   return (
@@ -208,7 +209,20 @@ function AdminDashboard() {
         <AdminCharts hospitalRows={hospitalRows} stats={stats} />
 
         <div className="mt-6 bg-base-100 border border-base-300 rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-3">Hospital Details</h2>
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <h2 className="text-lg font-semibold">Hospital Details</h2>
+            {!loading && hospitalRows.length > HOSPITAL_PREVIEW_LIMIT && (
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                onClick={() => setShowAllHospitals((v) => !v)}
+              >
+                {showAllHospitals
+                  ? "Show less"
+                  : `Display all (${hospitalRows.length})`}
+              </button>
+            )}
+          </div>
 
           {loading ? (
             <div className="p-6 text-center">
@@ -220,7 +234,6 @@ function AdminDashboard() {
                 <thead>
                   <tr>
                     <th>Hospital</th>
-                    <th className="text-center">Changeouts</th>
                     <th className="text-center">AHUs</th>
                     <th className="text-center">Overdue</th>
                     <th className="text-center">Due Soon</th>
@@ -230,30 +243,9 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {hospitalRows.map((row) => (
+                  {visibleRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="font-medium">
-                        <div>{row.name}</div>
-                        {(row.estimate_number || row.po_number) && (
-                          <div className="text-xs text-base-content/50 mt-0.5">
-                            {row.estimate_number ? `Est ${row.estimate_number}` : ""}
-                            {row.estimate_number && row.po_number ? " · " : ""}
-                            {row.po_number ? `PO ${row.po_number}` : ""}
-                          </div>
-                        )}
-                      </td>
-                      <td className="text-center">
-                        <span
-                          className={`font-semibold tabular-nums ${
-                            (row.changeouts_completed ?? 0) >= (row.changeouts_per_year ?? 4)
-                              ? "text-success"
-                              : "text-slate-700"
-                          }`}
-                          title={`${row.changeout_interval_days || 90}-day interval`}
-                        >
-                          {changeoutLabel(row)}
-                        </span>
-                      </td>
+                      <td className="font-medium">{row.name}</td>
                       <td className="text-center">{row.ahus}</td>
                       <td className="text-center">
                         {row.overdue > 0 ? (
@@ -303,6 +295,11 @@ function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+              {!showAllHospitals && hospitalRows.length > HOSPITAL_PREVIEW_LIMIT && (
+                <div className="pt-3 text-center text-xs text-base-content/50">
+                  Showing {HOSPITAL_PREVIEW_LIMIT} of {hospitalRows.length}
+                </div>
+              )}
             </div>
           )}
         </div>

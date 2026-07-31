@@ -108,6 +108,7 @@ def get_supervisor_signoffs():
 def _hospital_settings_dict(h):
     """Serialize hospital including contract / changeout settings."""
     year_start = getattr(h, "contract_year_start", None)
+    year_end = getattr(h, "contract_year_end", None)
     return {
         "id": h.id,
         "name": h.name,
@@ -121,6 +122,7 @@ def _hospital_settings_dict(h):
         "changeouts_per_year": getattr(h, "changeouts_per_year", None) or 4,
         "changeouts_completed": getattr(h, "changeouts_completed", None) or 0,
         "contract_year_start": year_start.isoformat() if year_start else None,
+        "contract_year_end": year_end.isoformat() if year_end else None,
         "contract_notes": getattr(h, "contract_notes", None) or "",
     }
 
@@ -218,6 +220,16 @@ def update_hospital(hospital_id):
                     h.contract_year_start = date.fromisoformat(str(raw)[:10])
                 except ValueError:
                     return jsonify({"error": "contract_year_start must be YYYY-MM-DD"}), 400
+
+        if "contract_year_end" in data:
+            raw = data["contract_year_end"]
+            if not raw:
+                h.contract_year_end = None
+            else:
+                try:
+                    h.contract_year_end = date.fromisoformat(str(raw)[:10])
+                except ValueError:
+                    return jsonify({"error": "contract_year_end must be YYYY-MM-DD"}), 400
 
         db.session.commit()
         return jsonify(_hospital_settings_dict(h)), 200

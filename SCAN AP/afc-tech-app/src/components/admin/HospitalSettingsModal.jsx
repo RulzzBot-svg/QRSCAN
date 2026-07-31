@@ -4,14 +4,11 @@ import { updateHospitalSettings } from "../../api/admin";
 const emptyForm = {
   estimate_number: "",
   po_number: "",
-  pricing_notes: "",
-  changeout_interval_days: 90,
+  contract_year_start: "",
+  contract_year_end: "",
+  contract_notes: "",
   changeouts_per_year: 4,
   changeouts_completed: 0,
-  contract_year_start: "",
-  contract_notes: "",
-  city: "",
-  address: "",
 };
 
 function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
@@ -25,16 +22,15 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
     setForm({
       estimate_number: hospital.estimate_number || "",
       po_number: hospital.po_number || "",
-      pricing_notes: hospital.pricing_notes || "",
-      changeout_interval_days: hospital.changeout_interval_days ?? 90,
-      changeouts_per_year: hospital.changeouts_per_year ?? 4,
-      changeouts_completed: hospital.changeouts_completed ?? 0,
       contract_year_start: hospital.contract_year_start
         ? String(hospital.contract_year_start).slice(0, 10)
         : "",
+      contract_year_end: hospital.contract_year_end
+        ? String(hospital.contract_year_end).slice(0, 10)
+        : "",
       contract_notes: hospital.contract_notes || "",
-      city: hospital.city || "",
-      address: hospital.address || "",
+      changeouts_per_year: hospital.changeouts_per_year ?? 4,
+      changeouts_completed: hospital.changeouts_completed ?? 0,
     });
   }, [hospital, open]);
 
@@ -48,11 +44,13 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
     setError(null);
     try {
       const payload = {
-        ...form,
-        changeout_interval_days: Number(form.changeout_interval_days) || 90,
+        estimate_number: form.estimate_number,
+        po_number: form.po_number,
+        contract_notes: form.contract_notes,
+        contract_year_start: form.contract_year_start || null,
+        contract_year_end: form.contract_year_end || null,
         changeouts_per_year: Number(form.changeouts_per_year) || 4,
         changeouts_completed: Math.max(0, Number(form.changeouts_completed) || 0),
-        contract_year_start: form.contract_year_start || null,
       };
       const res = await updateHospitalSettings(hospital.id, payload);
       onSaved?.(res.data);
@@ -66,11 +64,11 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
 
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box max-w-lg">
+      <div className="modal-box max-w-md">
         <h3 className="font-bold text-lg text-slate-800">{hospital.name}</h3>
-        <p className="text-sm text-base-content/60 mb-4">Contract & changeout settings</p>
+        <p className="text-sm text-base-content/60 mb-4">Contract settings</p>
 
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="form-control">
               <span className="label-text text-xs">Estimate #</span>
@@ -92,29 +90,30 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
             </label>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <label className="form-control">
-              <span className="label-text text-xs">Interval (days)</span>
+              <span className="label-text text-xs">Start date</span>
               <input
-                type="number"
-                min={1}
+                type="date"
                 className="input input-sm input-bordered"
-                value={form.changeout_interval_days}
-                onChange={(e) => setField("changeout_interval_days", e.target.value)}
+                value={form.contract_year_start}
+                onChange={(e) => setField("contract_year_start", e.target.value)}
               />
             </label>
             <label className="form-control">
-              <span className="label-text text-xs">Per year</span>
+              <span className="label-text text-xs">End date</span>
               <input
-                type="number"
-                min={1}
+                type="date"
                 className="input input-sm input-bordered"
-                value={form.changeouts_per_year}
-                onChange={(e) => setField("changeouts_per_year", e.target.value)}
+                value={form.contract_year_end}
+                onChange={(e) => setField("contract_year_end", e.target.value)}
               />
             </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <label className="form-control">
-              <span className="label-text text-xs">Completed</span>
+              <span className="label-text text-xs">Changeouts done</span>
               <input
                 type="number"
                 min={0}
@@ -123,58 +122,28 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
                 onChange={(e) => setField("changeouts_completed", e.target.value)}
               />
             </label>
+            <label className="form-control">
+              <span className="label-text text-xs">Planned / year</span>
+              <input
+                type="number"
+                min={1}
+                className="input input-sm input-bordered"
+                value={form.changeouts_per_year}
+                onChange={(e) => setField("changeouts_per_year", e.target.value)}
+              />
+            </label>
           </div>
-
-          <label className="form-control">
-            <span className="label-text text-xs">Contract year start</span>
-            <input
-              type="date"
-              className="input input-sm input-bordered"
-              value={form.contract_year_start}
-              onChange={(e) => setField("contract_year_start", e.target.value)}
-            />
-          </label>
-
-          <label className="form-control">
-            <span className="label-text text-xs">Pricing (admin only)</span>
-            <textarea
-              className="textarea textarea-sm textarea-bordered"
-              rows={2}
-              value={form.pricing_notes}
-              onChange={(e) => setField("pricing_notes", e.target.value)}
-              placeholder="Rates / line pricing — not shown on main table"
-            />
-          </label>
 
           <label className="form-control">
             <span className="label-text text-xs">Notes</span>
             <textarea
               className="textarea textarea-sm textarea-bordered"
-              rows={2}
+              rows={3}
               value={form.contract_notes}
               onChange={(e) => setField("contract_notes", e.target.value)}
-              placeholder="Optional contract notes"
+              placeholder="Optional notes"
             />
           </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="form-control">
-              <span className="label-text text-xs">City</span>
-              <input
-                className="input input-sm input-bordered"
-                value={form.city}
-                onChange={(e) => setField("city", e.target.value)}
-              />
-            </label>
-            <label className="form-control">
-              <span className="label-text text-xs">Address</span>
-              <input
-                className="input input-sm input-bordered"
-                value={form.address}
-                onChange={(e) => setField("address", e.target.value)}
-              />
-            </label>
-          </div>
 
           {error && (
             <div className="alert alert-error text-sm py-2">

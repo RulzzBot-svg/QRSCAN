@@ -48,6 +48,9 @@ function AdminAHUs() {
   const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({});
   const [manualReviewData, setManualReviewData] = useState(null);
   const [buildingFilter, setBuildingFilter] = useState("");
+  const [showAllHospitals, setShowAllHospitals] = useState(false);
+
+  const HOSPITAL_PREVIEW_LIMIT = 10;
 
   // NEW: Global (page-level) filter bar state (independent of tables)
   const [globalFilters, setGlobalFilters] = useState({
@@ -112,6 +115,22 @@ function AdminAHUs() {
     }
     return groups;
   }, [ahus]);
+
+  const hospitalSettingsById = useMemo(() => {
+    const map = new Map();
+    for (const h of hospitals) {
+      map.set(String(h.id), h);
+    }
+    return map;
+  }, [hospitals]);
+
+  const changeoutsLeftLabel = (hospitalKey) => {
+    const s = hospitalSettingsById.get(String(hospitalKey));
+    const total = s?.changeouts_per_year ?? 4;
+    const done = s?.changeouts_completed ?? 0;
+    const left = Math.max(0, total - done);
+    return `${left}/${total} left`;
+  };
 
   // NOTE: This is your existing "Search ALL AHUs..." behavior (searches through all AHUs)
   const filtered = useMemo(() => {
@@ -259,15 +278,21 @@ function AdminAHUs() {
               value={buildingFilter}
             />
           <div className="space-y-2">
-                {grouped.filter(g => {
+                {(() => {
+                  const filteredHospitals = grouped.filter(g => {
                   if (hospitalQuery && !g.hospitalName.toLowerCase().includes(hospitalQuery.toLowerCase())) return false;
                   if (buildingFilter) {
-                    // check whether any building matches
                     const has = g.buildings.some(b => b.buildingName.toLowerCase().includes(buildingFilter.toLowerCase()));
                     if (!has) return false;
                   }
                   return true;
-                }).map((g) => {
+                });
+                  const visible = (showAllHospitals || hospitalQuery || buildingFilter)
+                    ? filteredHospitals
+                    : filteredHospitals.slice(0, HOSPITAL_PREVIEW_LIMIT);
+                  return (
+                    <>
+                      {visible.map((g) => {
               const total = g.items.length;
               const overdue = g.items.reduce((s, x) => s + (x.overdue_count || 0), 0);
               return (
@@ -278,16 +303,43 @@ function AdminAHUs() {
                     selectedHospitalKey === g.hospitalKey ? "bg-primary/10" : ""
                   }`}
                 >
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-1">
                     <div className="truncate font-semibold">{g.hospitalName}</div>
-                    <div className="text-xs opacity-70">{total}</div>
+                    <div className="text-xs opacity-70 shrink-0">{total}</div>
                   </div>
-                  <div className="text-xs mt-1 flex gap-2">
+                  <div className="text-xs mt-1 flex flex-wrap gap-1.5 items-center">
                     <span className="badge badge-sm badge-error">{overdue} overdue</span>
+                    <span
+                      className="badge badge-sm badge-ghost tabular-nums"
+                      title="Changeouts remaining this contract year"
+                    >
+                      {changeoutsLeftLabel(g.hospitalKey)}
+                    </span>
                   </div>
                 </div>
               );
             })}
+                      {!showAllHospitals && !hospitalQuery && !buildingFilter && filteredHospitals.length > HOSPITAL_PREVIEW_LIMIT && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs w-full"
+                          onClick={() => setShowAllHospitals(true)}
+                        >
+                          Display all ({filteredHospitals.length})
+                        </button>
+                      )}
+                      {showAllHospitals && filteredHospitals.length > HOSPITAL_PREVIEW_LIMIT && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs w-full"
+                          onClick={() => setShowAllHospitals(false)}
+                        >
+                          Show less
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
           </div>
         </aside>
 
