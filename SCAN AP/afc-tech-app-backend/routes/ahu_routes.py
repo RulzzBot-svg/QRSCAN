@@ -1,15 +1,41 @@
 from flask import Blueprint, jsonify, request
-from models import AHU, Filter, Technician
+from models import AHU, Filter, Technician, Job, JobFilter, Hospital
 from db import db
 import traceback
 from dateutil.parser import isoparse
 from middleware.auth import require_admin, require_auth
 from utility.http import internal_error
+from datetime import date, datetime
 
 from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import func
 from utility.status import compute_filter_status
 
 ahu_bp = Blueprint("ahu", __name__)
+
+
+def yearly_changeouts_for_frequency(frequency_days):
+    """Map filter frequency to expected changeouts per year (90→4, 30→12, …)."""
+    try:
+        days = int(frequency_days or 0)
+    except (TypeError, ValueError):
+        days = 0
+    if days <= 0:
+        return 4
+    return max(1, int(round(365 / days)))
+
+
+def changeout_window_for_hospital(hospital):
+    """Return (start, end) dates for counting completed changeouts."""
+    today = date.today()
+    start = getattr(hospital, "contract_year_start", None) if hospital else None
+    end = getattr(hospital, "contract_year_end", None) if hospital else None
+    if start and end:
+        return start, end
+    if start and not end:
+        return start, today
+    # Default: calendar year
+    return date(today.year, 1, 1), date(today.year, 12, 31)
 
 
 # ---------------------------------------------------
@@ -192,9 +218,38 @@ def get_filters_for_admin(ahu_id):
         if active_only and not include_inactive:
             filters = [f for f in filters if getattr(f, "is_active", True)]
 
+        # Count completed replacements this contract/calendar year per filter
+        completed_by_filter = {}
+        filter_ids = [f.id for f in filters]
+        if filter_ids:
+            hospital = db.session.get(Hospital, ahu.hospital_id) if ahu.hospital_id else None
+            window_start, window_end = changeout_window_for_hospital(hospital)
+            rows = (
+                db.session.query(JobFilter.filter_id, func.count(JobFilter.id))
+                .join(Job, Job.id == JobFilter.job_id)
+                .filter(
+                    JobFilter.filter_id.in_(filter_ids),
+                    JobFilter.is_completed.is_(True),
+                    Job.completed_at.isnot(None),
+                    func.date(Job.completed_at) >= window_start,
+                    func.date(Job.completed_at) <= window_end,
+                )
+                .group_by(JobFilter.filter_id)
+                .all()
+            )
+            completed_by_filter = {fid: int(cnt) for fid, cnt in rows}
 
-        return jsonify([
-            {
+        result = []
+        for f in filters:
+            per_year = yearly_changeouts_for_frequency(f.frequency_days)
+            completed = completed_by_filter.get(f.id, 0) if getattr(f, "is_active", True) else 0
+            # Inactive filters stay visible but are excluded from remaining counts
+            if not getattr(f, "is_active", True):
+                left = None
+            else:
+                left = max(0, per_year - completed)
+
+            result.append({
                 "id": f.id,
                 "phase": f.phase,
                 "part_number": f.part_number,
@@ -206,9 +261,12 @@ def get_filters_for_admin(ahu_id):
                     if getattr(f, "last_service_date", None) else None
                 ),
                 "is_active": f.is_active,
-            }
-            for f in filters
-        ]), 200
+                "changeouts_per_year": per_year,
+                "changeouts_completed": completed_by_filter.get(f.id, 0),
+                "changeouts_left": left,
+            })
+
+        return jsonify(result), 200
 
     except Exception as e:
         traceback.print_exc()

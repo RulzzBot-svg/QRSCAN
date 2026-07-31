@@ -92,6 +92,21 @@ const getFrequencyColor = (freqDays) => {
   return map[m] || null;
 };
 
+/** Expected changeouts per year from frequency (90→4, 30→12, 60→6, …). */
+const yearlyChangeouts = (freqDays) => {
+  const days = Number(freqDays);
+  if (!days || days <= 0) return 4;
+  return Math.max(1, Math.round(365 / days));
+};
+
+const changeoutsLeftLabel = (f) => {
+  if (f?._inactive || f?.is_active === false) return "—";
+  const perYear = yearlyChangeouts(f.frequency_days);
+  const completed = Number(f.changeouts_completed) || 0;
+  const left = Math.max(0, perYear - completed);
+  return `${left}/${perYear} left`;
+};
+
 function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange, ahuNotes = null }) {
   const [filters, setFilters] = useState([]);
   const [filterInvoices, setFilterInvoices] = useState({});
@@ -628,6 +643,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                 <th className="px-1">Size (inches)</th>
                 <th className="px-1">Quantity</th>
                 <th className="px-1">Frequency</th>
+                <th className="px-1">Changeouts</th>
                 <th className="px-1">Last</th>
                 <th className="px-1">Next</th>
                 <th className="px-1">Status</th>
@@ -742,6 +758,21 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                           </option>
                         ))}
                       </select>
+                    </td>
+
+                    <td className="px-1 py-0.5">
+                      <span
+                        className={`text-xs tabular-nums whitespace-nowrap ${
+                          f._inactive ? "opacity-50" : "font-medium"
+                        }`}
+                        title={
+                          f._inactive
+                            ? "Inactive — excluded from changeout count"
+                            : `${f.changeouts_completed || 0} completed this contract year`
+                        }
+                      >
+                        {changeoutsLeftLabel(f)}
+                      </span>
                     </td>
 
                     <td className="px-1 py-0.5 text-xs">
@@ -859,7 +890,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
               {filteredFilters.length === 0 && filters.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="text-center py-3 opacity-70 text-xs">
+                  <td colSpan={13} className="text-center py-3 opacity-70 text-xs">
                     No filters for this AHU.
                   </td>
                 </tr>
@@ -867,7 +898,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
               {filteredFilters.length === 0 && filters.length > 0 && (
                 <tr>
-                  <td colSpan={12} className="text-center py-3 opacity-70 text-xs">
+                  <td colSpan={13} className="text-center py-3 opacity-70 text-xs">
                     No filters match the current filters. Clear filters to see all{" "}
                     {filters.length} filter(s).
                   </td>

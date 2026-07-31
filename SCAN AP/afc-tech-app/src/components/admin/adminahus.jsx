@@ -116,22 +116,6 @@ function AdminAHUs() {
     return groups;
   }, [ahus]);
 
-  const hospitalSettingsById = useMemo(() => {
-    const map = new Map();
-    for (const h of hospitals) {
-      map.set(String(h.id), h);
-    }
-    return map;
-  }, [hospitals]);
-
-  const changeoutsLeftLabel = (hospitalKey) => {
-    const s = hospitalSettingsById.get(String(hospitalKey));
-    const total = s?.changeouts_per_year ?? 4;
-    const done = s?.changeouts_completed ?? 0;
-    const left = Math.max(0, total - done);
-    return `${left}/${total} left`;
-  };
-
   // NOTE: This is your existing "Search ALL AHUs..." behavior (searches through all AHUs)
   const filtered = useMemo(() => {
     const q = (ahuQuery || "").toLowerCase();
@@ -309,12 +293,6 @@ function AdminAHUs() {
                   </div>
                   <div className="text-xs mt-1 flex flex-wrap gap-1.5 items-center">
                     <span className="badge badge-sm badge-error">{overdue} overdue</span>
-                    <span
-                      className="badge badge-sm badge-ghost tabular-nums"
-                      title="Changeouts remaining this contract year"
-                    >
-                      {changeoutsLeftLabel(g.hospitalKey)}
-                    </span>
                   </div>
                 </div>
               );

@@ -7,8 +7,6 @@ const emptyForm = {
   contract_year_start: "",
   contract_year_end: "",
   contract_notes: "",
-  changeouts_per_year: 4,
-  changeouts_completed: 0,
 };
 
 function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
@@ -29,8 +27,6 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
         ? String(hospital.contract_year_end).slice(0, 10)
         : "",
       contract_notes: hospital.contract_notes || "",
-      changeouts_per_year: hospital.changeouts_per_year ?? 4,
-      changeouts_completed: hospital.changeouts_completed ?? 0,
     });
   }, [hospital, open]);
 
@@ -49,8 +45,6 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
         contract_notes: form.contract_notes,
         contract_year_start: form.contract_year_start || null,
         contract_year_end: form.contract_year_end || null,
-        changeouts_per_year: Number(form.changeouts_per_year) || 4,
-        changeouts_completed: Math.max(0, Number(form.changeouts_completed) || 0),
       };
       const res = await updateHospitalSettings(hospital.id, payload);
       onSaved?.(res.data);
@@ -107,29 +101,6 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
                 className="input input-sm input-bordered"
                 value={form.contract_year_end}
                 onChange={(e) => setField("contract_year_end", e.target.value)}
-              />
-            </label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="form-control">
-              <span className="label-text text-xs">Changeouts done</span>
-              <input
-                type="number"
-                min={0}
-                className="input input-sm input-bordered"
-                value={form.changeouts_completed}
-                onChange={(e) => setField("changeouts_completed", e.target.value)}
-              />
-            </label>
-            <label className="form-control">
-              <span className="label-text text-xs">Planned / year</span>
-              <input
-                type="number"
-                min={1}
-                className="input input-sm input-bordered"
-                value={form.changeouts_per_year}
-                onChange={(e) => setField("changeouts_per_year", e.target.value)}
               />
             </label>
           </div>
