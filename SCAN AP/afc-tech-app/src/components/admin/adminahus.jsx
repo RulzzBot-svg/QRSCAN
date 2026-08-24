@@ -6,6 +6,8 @@ import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
 import PackingSlipPanel from "./PackingSlipPanel";
 import PackingSlipReviewModal from "./PackingSlipReviewModal";
+import QrLabelPrintModal from "./QrLabelPrintModal";
+import { buildQrLabels } from "../../utils/qrLabels";
 
 const naturalAhuSort = (a, b) => {
   const A = String(a ?? "");
@@ -49,6 +51,13 @@ function AdminAHUs() {
   const [manualReviewData, setManualReviewData] = useState(null);
   const [buildingFilter, setBuildingFilter] = useState("");
   const [showAllHospitals, setShowAllHospitals] = useState(false);
+  const [qrPrint, setQrPrint] = useState({
+    open: false,
+    loading: false,
+    labels: [],
+    title: "AHU QR Labels",
+    error: "",
+  });
 
   const HOSPITAL_PREVIEW_LIMIT = 10;
 
@@ -141,6 +150,47 @@ function AdminAHUs() {
     const ids = Object.keys(selected).filter((k) => selected[k]);
     if (!ids.length) return alert("No rows selected");
     alert(`${action} on ${ids.length} AHU(s)`);
+  };
+
+  const handlePrintQr = async (ahusOverride) => {
+    const selectedAhus = ahus.filter((a) => selected[a.id] || selected[String(a.id)]);
+    const selectedIds = selectedAhus.map((a) => a.id);
+    const ahusToPrint = Array.isArray(ahusOverride) && ahusOverride.length
+      ? ahusOverride
+      : (selectedAhus.length ? selectedAhus : filtered);
+
+    if (!ahusToPrint.length) {
+      alert("Select AHUs or a hospital first, then click QR.");
+      return;
+    }
+
+    if (!selectedIds.length && !ahusOverride?.length && ahusToPrint.length > 20) {
+      const ok = window.confirm(
+        `No rows selected. Print QR labels for all ${ahusToPrint.length} AHUs currently shown?`
+      );
+      if (!ok) return;
+    }
+
+    const hospitalNames = [...new Set(ahusToPrint.map((a) => a.hospital).filter(Boolean))];
+    const title =
+      hospitalNames.length === 1
+        ? `QR Codes — ${hospitalNames[0]}`
+        : "AHU QR Labels";
+
+    setQrPrint({ open: true, loading: true, labels: [], title, error: "" });
+    try {
+      const labels = await buildQrLabels(ahusToPrint);
+      setQrPrint({ open: true, loading: false, labels, title, error: "" });
+    } catch (err) {
+      console.error("QR label generation failed", err);
+      setQrPrint({
+        open: true,
+        loading: false,
+        labels: [],
+        title,
+        error: "Failed to generate QR labels.",
+      });
+    }
   };
 
   // CSV import preview: group by blank lines into blocks (simple)
@@ -344,7 +394,7 @@ function AdminAHUs() {
                 <button className="btn btn-xs" onClick={() => handleBulkAction("Export CSV")} type="button">
                   Export
                 </button>
-                <button className="btn btn-xs btn-warning" onClick={() => handleBulkAction("QR")} type="button">
+                <button className="btn btn-xs btn-warning" onClick={() => handlePrintQr()} type="button">
                   QR
                 </button>
                 <button className="btn btn-xs btn-ghost" onClick={() => setSelected({})} type="button">
@@ -435,9 +485,18 @@ function AdminAHUs() {
                           <div className="text-xs opacity-70 truncate">{a.location || ""}</div>
                         </div>
                       </div>
-                      <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/FilterInfo/${a.id}`, "_blank")} type="button">
-                        Open
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          className="btn btn-xs btn-warning"
+                          onClick={() => handlePrintQr([a])}
+                          type="button"
+                        >
+                          QR
+                        </button>
+                        <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/FilterInfo/${a.id}`, "_blank")} type="button">
+                          Open
+                        </button>
+                      </div>
                     </div>
 
                     {/* Always visible filters table */}
@@ -591,6 +650,15 @@ function AdminAHUs() {
           setManualReviewData(null);
           setSelectedFiltersForQB({});
         }}
+      />
+
+      <QrLabelPrintModal
+        open={qrPrint.open}
+        labels={qrPrint.labels}
+        title={qrPrint.title}
+        loading={qrPrint.loading}
+        error={qrPrint.error}
+        onClose={() => setQrPrint((s) => ({ ...s, open: false }))}
       />
     </div>
   );
