@@ -134,9 +134,6 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels") {
       .toolbar { display: none !important; }
       .grid { padding: 0; gap: 10px; }
     }
-    @media (max-width: 800px) {
-      .grid { grid-template-columns: repeat(2, 1fr); }
-    }
   </style>
 </head>
 <body>
@@ -159,10 +156,10 @@ export function printQrLabels(labels, title) {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "8.5in";
+  iframe.style.height = "11in";
   iframe.style.border = "0";
   document.body.appendChild(iframe);
 

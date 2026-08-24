@@ -32,7 +32,8 @@ assert(html.includes("QR Codes — Foothill"), "title should render");
 assert(html.includes("AHU-01 &lt;test&gt;"), "AHU name should be escaped");
 assert(html.includes("Roof &amp; penthouse"), "location should be escaped");
 assert(html.includes("data:image/png;base64,AAA"), "QR image should be embedded");
-assert(html.includes("window.print()"), "print control should be present");
+assert(html.includes("grid-template-columns: repeat(3, 1fr)"), "print sheet should stay 3-up");
+assert(!html.includes("max-width: 800px"), "print sheet should not collapse on a hidden iframe");
 assert(html.includes("Foothill · Main"), "hospital and building should show");
 
 console.log("qrLabels tests passed");

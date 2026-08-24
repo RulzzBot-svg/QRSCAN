@@ -20,6 +20,7 @@ import AdminLayout from "./components/admin/AdminLayout";
 import Login from "./components/common/login";
 import JobSignature from "./components/common/jobSignatures";
 import SummaryExample from "./pages/SummaryExample";
+import QrPrintExample from "./pages/QrPrintExample";
 import TechSignoff from "./pages/TechSignoff";
 import { registerSW } from "virtual:pwa-register";
 
@@ -54,7 +55,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         </Route>
 
         {import.meta.env.DEV ? (
-          <Route path="/dev/summary" element={<SummaryExample />} />
+          <>
+            <Route path="/dev/summary" element={<SummaryExample />} />
+            <Route path="/dev/qr-print" element={<QrPrintExample />} />
+          </>
         ) : null}
 
         <Route path="/tech/signoff" element={<TechSignoff />} />
