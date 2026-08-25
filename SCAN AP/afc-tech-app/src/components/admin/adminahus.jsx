@@ -1,6 +1,6 @@
 // AdminAHUs.jsx
 // Redesigned Admin AHU UI: two-pane layout
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { API } from "../../api/api";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
@@ -58,6 +58,8 @@ function AdminAHUs() {
     title: "AHU QR Labels",
     error: "",
   });
+  const [ahuPartial, setAhuPartial] = useState({});
+  const filterEditorRefs = useRef(new Map());
 
   const HOSPITAL_PREVIEW_LIMIT = 10;
 
@@ -140,8 +142,22 @@ function AdminAHUs() {
     });
   }, [ahus, ahuQuery, selectedHospitalKey]);
 
-  // multi-select
-  const toggleSelect = (id) => setSelected((s) => ({ ...s, [id]: !s[id] }));
+  const setEditorRef = (ahuId) => (el) => {
+    if (el) filterEditorRefs.current.set(ahuId, el);
+    else filterEditorRefs.current.delete(ahuId);
+  };
+
+  // multi-select: AHU checkbox also selects/clears every active filter in that AHU
+  const toggleSelect = (id) => {
+    setSelected((s) => {
+      const nextChecked = !s[id];
+      const editor = filterEditorRefs.current.get(id);
+      if (nextChecked) editor?.selectAllActive?.();
+      else editor?.clearAll?.();
+      return { ...s, [id]: nextChecked };
+    });
+    setAhuPartial((p) => ({ ...p, [id]: false }));
+  };
 
   // Limit how many AHU filter editors mount at once to avoid too many concurrent requests
   const [visibleAhus, setVisibleAhus] = useState(50);
@@ -224,11 +240,14 @@ function AdminAHUs() {
     setGlobalFilters({ frequency: "all", status: "all", nextFrom: "", nextTo: "" });
   };
 
-  const handleFilterSelection = (ahuId, selectedFilterObjects) => {
+  const handleFilterSelection = (ahuId, selectedFilterObjects, meta) => {
     setSelectedFiltersForQB((prev) => ({
       ...prev,
       [ahuId]: selectedFilterObjects || [],
     }));
+    if (!meta) return;
+    setSelected((s) => ({ ...s, [ahuId]: !!meta.allSelected }));
+    setAhuPartial((p) => ({ ...p, [ahuId]: !!meta.someSelected }));
   };
 
   const handleManualReviewOpen = (filtersByAhu) => {
@@ -475,8 +494,12 @@ function AdminAHUs() {
                         <input
                           type="checkbox"
                           checked={!!selected[a.id]}
+                          ref={(el) => {
+                            if (el) el.indeterminate = !!ahuPartial[a.id] && !selected[a.id];
+                          }}
                           onChange={() => toggleSelect(a.id)}
                           className="checkbox checkbox-xs"
+                          title="Select all filters in this AHU"
                         />
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="text-xs font-semibold truncate">
@@ -503,11 +526,12 @@ function AdminAHUs() {
                     <div className="p-2">
                       {/* Pass the global filters down (AdminFilterEditorInline can ignore or use it) */}
                       <AdminFilterEditorInline 
+                        ref={setEditorRef(a.id)}
                         ahuId={a.id} 
                         isOpen={true} 
                         globalFilters={globalFilters}
                         ahuNotes={a.notes}
-                        onSelectionChange={(selectedIds) => handleFilterSelection(a.id, selectedIds)}
+                        onSelectionChange={(selectedObjs, meta) => handleFilterSelection(a.id, selectedObjs, meta)}
                       />
                     </div>
                   </div>

@@ -1,4 +1,5 @@
 # seed_from_excel.py
+import argparse
 import os
 import re
 import sys
@@ -178,6 +179,26 @@ def upsert_building(hospital_id: int, name: str, floor_area: str = None):
     return b
 
 
+def find_existing_ahu(hospital_id, name, building_id=None):
+    """Match an AHU already in the DB so re-seeding updates instead of duplicating."""
+    name = clean_str(name)
+    if not name:
+        return None
+
+    matches = (
+        AHU.query.filter_by(hospital_id=hospital_id, name=name)
+        .order_by(AHU.id.asc())
+        .all()
+    )
+    if not matches:
+        return None
+    if building_id is not None:
+        for a in matches:
+            if a.building_id == building_id:
+                return a
+    return matches[0]
+
+
 def upsert_ahu(
     ahu_id: str,
     hospital_id: int,
@@ -305,7 +326,7 @@ def upsert_filter(
 # -----------------------------
 # Main seed
 # -----------------------------
-def seed_from_excel(path, selected_sheet=None):
+def seed_from_excel(path, selected_sheet=None, dry_run=False):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Excel file not found: {path}")
 
@@ -330,6 +351,8 @@ def seed_from_excel(path, selected_sheet=None):
         "sheets_processed": 0,
         "rows_seen": 0,
         "ahus": set(),
+        "ahus_created": 0,
+        "ahus_updated": 0,
         "filters_upserted": 0,
         "filters_skipped": 0,
     }
@@ -459,21 +482,35 @@ def seed_from_excel(path, selected_sheet=None):
                 building_id = building_obj.id if building_obj else None
 
             if ahu_key not in ahu_key_to_id:
-                display_label = make_sequential_ahu_id(next_seq)
-                a = AHU(
-                    hospital_id=hospital.id,
-                    building_id=building_id,
-                    name=display_name or display_label,
-                    location=location,
-                    notes=None,
-                    excel_order=next_seq,
-                )
-                db.session.add(a)
-                db.session.flush()
-                ahu_id = a.id
-                ahu_key_to_id[ahu_key] = ahu_id
-                excel_order = next_seq
-                next_seq += 1
+                existing = find_existing_ahu(hospital.id, display_name, building_id)
+                if existing:
+                    ahu_id = existing.id
+                    ahu_key_to_id[ahu_key] = ahu_id
+                    excel_order = next_seq
+                    next_seq += 1
+                    stats["ahus_updated"] += 1
+                    if building_id and getattr(existing, "building_id", None) != building_id:
+                        existing.building_id = building_id
+                    loc = clean_str(location)
+                    if loc:
+                        existing.location = loc
+                else:
+                    display_label = make_sequential_ahu_id(next_seq)
+                    a = AHU(
+                        hospital_id=hospital.id,
+                        building_id=building_id,
+                        name=display_name or display_label,
+                        location=location,
+                        notes=None,
+                        excel_order=next_seq,
+                    )
+                    db.session.add(a)
+                    db.session.flush()
+                    ahu_id = a.id
+                    ahu_key_to_id[ahu_key] = ahu_id
+                    excel_order = next_seq
+                    next_seq += 1
+                    stats["ahus_created"] += 1
             else:
                 ahu_id = ahu_key_to_id[ahu_key]
                 existing_ahu = db.session.get(AHU, ahu_id)
@@ -536,13 +573,19 @@ def seed_from_excel(path, selected_sheet=None):
                 )
                 stats["filters_upserted"] += 1
 
-    db.session.commit()
+    if dry_run:
+        db.session.rollback()
+        print("\nDRY RUN — no changes committed")
+    else:
+        db.session.commit()
 
-    print("\n✅ Seed complete")
+    print("\n✅ Seed complete" if not dry_run else "\n✅ Dry run complete")
     print(f"Hospital: {stats['hospital']} (ID {hospital.id})")
     print(f"Sheets processed: {stats['sheets_processed']}")
     print(f"Rows seen: {stats['rows_seen']}")
-    print(f"AHUs upserted: {len(stats['ahus'])}")
+    print(f"AHUs matched/updated: {stats['ahus_updated']}")
+    print(f"AHUs created: {stats['ahus_created']}")
+    print(f"AHUs touched: {len(stats['ahus'])}")
     print(f"Filters upserted: {stats['filters_upserted']}")
     print(f"Filters skipped (missing size): {stats['filters_skipped']}")
 
@@ -553,19 +596,48 @@ def seed_from_excel(path, selected_sheet=None):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python seed_from_excel.py <sheet_name>|all")
-        print("Available sheets:")
-        xls = pd.ExcelFile(EXCEL_PATH)
-        for sheet in xls.sheet_names:
-            print(f"  - {sheet}")
-        print("  - all   (seed every sheet except 'FILTER')")
+    parser = argparse.ArgumentParser(
+        description="Seed or update AHUs and filters from a hospital survey workbook."
+    )
+    parser.add_argument(
+        "sheet",
+        nargs="?",
+        help="Sheet name, or 'all' for every sheet except FILTER",
+    )
+    parser.add_argument(
+        "--path",
+        "-p",
+        default=EXCEL_PATH,
+        help=f"Path to the .xlsx/.xlsm workbook (default: {EXCEL_PATH})",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse and match records but do not commit database changes",
+    )
+    args = parser.parse_args()
+    workbook = args.path
+
+    if not args.sheet:
+        print("Usage: python seed_from_excel.py <sheet_name>|all [--path FILE] [--dry-run]")
+        if os.path.exists(workbook):
+            print("Available sheets:")
+            xls = pd.ExcelFile(workbook)
+            for sheet in xls.sheet_names:
+                print(f"  - {sheet}")
+            print("  - all   (seed every sheet except 'FILTER')")
+        else:
+            print(f"(Workbook not found at {workbook}; pass --path to list sheets)")
         sys.exit(1)
 
-    selected = sys.argv[1]
+    if not os.path.exists(workbook):
+        print(f"Excel file not found: {workbook}")
+        sys.exit(1)
+
+    selected = args.sheet
     with app.app_context():
         if str(selected).strip().lower() == "all":
-            xls = pd.ExcelFile(EXCEL_PATH)
+            xls = pd.ExcelFile(workbook)
             sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
             if not sheets:
                 print("No data sheets found to seed.")
@@ -573,10 +645,9 @@ if __name__ == "__main__":
             for sheet in sheets:
                 try:
                     print(f"\n--- Seeding sheet: {sheet} ---")
-                    seed_from_excel(EXCEL_PATH, sheet)
+                    seed_from_excel(workbook, sheet, dry_run=args.dry_run)
                 except Exception as e:
                     print(f"Error seeding sheet '{sheet}': {e}")
             print("\nAll requested sheets processed.")
         else:
-            selected_sheet = selected
-            seed_from_excel(EXCEL_PATH, selected_sheet)
+            seed_from_excel(workbook, selected, dry_run=args.dry_run)
