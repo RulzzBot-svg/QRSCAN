@@ -35,5 +35,24 @@ assert(html.includes("data:image/png;base64,AAA"), "QR image should be embedded"
 assert(html.includes("grid-template-columns: repeat(3, 1fr)"), "print sheet should stay 3-up");
 assert(!html.includes("max-width: 800px"), "print sheet should not collapse on a hidden iframe");
 assert(html.includes("Foothill · Main"), "hospital and building should show");
+assert(html.includes("layout-sheet"), "default layout should be 3-up sheet");
+
+const single = buildQrPrintDocument(
+  [
+    {
+      id: 7,
+      name: "AHU-01",
+      location: "Roof",
+      hospital: "Foothill",
+      building: "Main",
+      url: "https://qrscan-lyart.vercel.app/FilterInfo/7",
+      qrDataUrl: "data:image/png;base64,AAA",
+    },
+  ],
+  "AHU-01",
+  { layout: "single" }
+);
+assert(single.includes("layout-single"), "single layout should print one AHU per page");
+assert(single.includes("page-break-after: always"), "one-per-page layout should break after each label");
 
 console.log("qrLabels tests passed");

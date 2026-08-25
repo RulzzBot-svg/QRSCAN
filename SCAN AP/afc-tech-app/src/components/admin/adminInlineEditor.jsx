@@ -1,7 +1,8 @@
 // adminInlineEditor.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useImperativeHandle, forwardRef, useCallback } from "react";
 import { API } from "../../api/api";
 import { parseIsoToDate, formatDate } from "../../utils/dates";
+import { selectableFilters, selectionMeta } from "../../utils/filterSelection";
 
 const FREQUENCY_OPTIONS = [
   { label: "30 Days", value: 30 },
@@ -107,7 +108,7 @@ const changeoutsLeftLabel = (f) => {
   return `${left}/${perYear} left`;
 };
 
-function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange, ahuNotes = null }) {
+function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange, ahuNotes = null }, ref) {
   const [filters, setFilters] = useState([]);
   const [filterInvoices, setFilterInvoices] = useState({});
 
@@ -119,6 +120,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   const [selectedFilters, setSelectedFilters] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null);
   const [toast, setToast] = useState(null);
+  const filtersRef = useRef([]);
+  const pendingSelectAll = useRef(null);
   // QuickBooks Pull modal state (mocked integration)
   const [qbOpen, setQbOpen] = useState(false);
   const [qbRef, setQbRef] = useState("");
@@ -237,7 +240,49 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     setLoading(false);
     setConfirmAction(null);
     setSelectedFilters(new Set());
+    pendingSelectAll.current = null;
   }, [ahuId]);
+
+  filtersRef.current = filters;
+
+  const reportSelection = useCallback((newSet, sourceFilters = filtersRef.current) => {
+    if (!onSelectionChange) return;
+    const meta = selectionMeta(sourceFilters, newSet);
+    onSelectionChange(meta.selected, meta);
+  }, [onSelectionChange]);
+
+  const applySelection = useCallback((selectAll) => {
+    const source = filtersRef.current;
+    const nextSet = selectAll
+      ? new Set(selectableFilters(source).map((f) => f.id))
+      : new Set();
+    setSelectedFilters(nextSet);
+    reportSelection(nextSet, source);
+  }, [reportSelection]);
+
+  useImperativeHandle(ref, () => ({
+    selectAllActive() {
+      if (!loaded) {
+        pendingSelectAll.current = true;
+        return;
+      }
+      applySelection(true);
+    },
+    clearAll() {
+      if (!loaded) {
+        pendingSelectAll.current = false;
+        return;
+      }
+      applySelection(false);
+    },
+  }), [loaded, applySelection]);
+
+  useEffect(() => {
+    if (!loaded || pendingSelectAll.current == null) return;
+    const want = pendingSelectAll.current;
+    pendingSelectAll.current = null;
+    applySelection(want);
+  }, [loaded, applySelection]);
 
   useEffect(() => {
     if (!isOpen || loaded) return;
@@ -521,7 +566,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     showToast("Filter reactivated.", "success");
   };
 
-  const toggleFilterSelection = (filterId, filterData) => {
+  const toggleFilterSelection = (filterId) => {
     setSelectedFilters((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(filterId)) {
@@ -529,20 +574,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       } else {
         newSet.add(filterId);
       }
-      // Report selection change to parent with full filter data
-      if (onSelectionChange) {
-        // Build array of selected filter objects
-        const selectedFilterObjs = filters
-          .filter(f => newSet.has(f.id))
-          .map(f => ({
-            id: f.id,
-            part_number: f.part_number,
-            size: f.size,
-            quantity: f.quantity,
-            phase: f.phase,
-          }));
-        onSelectionChange(selectedFilterObjs);
-      }
+      reportSelection(newSet);
       return newSet;
     });
   };
@@ -1084,4 +1116,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   );
 }
 
-export default AdminFilterEditorInline;
+AdminFilterEditorInline.displayName = "AdminFilterEditorInline";
+
+export default forwardRef(AdminFilterEditorInline);
