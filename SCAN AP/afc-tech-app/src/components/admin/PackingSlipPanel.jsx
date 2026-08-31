@@ -129,6 +129,9 @@ export default function PackingSlipPanel({
           >
             Load replaced filters from jobs
           </button>
+          {!selectedHospitalKey && (
+            <span className="text-xs text-warning">← Pick a hospital first to load from jobs</span>
+          )}
           <button
             type="button"
             className="btn btn-sm btn-accent"
@@ -145,9 +148,6 @@ export default function PackingSlipPanel({
           >
             Review first
           </button>
-          {!selectedHospitalKey && (
-            <span className="text-xs text-warning">← Pick a hospital first</span>
-          )}
         </div>
         <p className="text-xs opacity-60 mt-2">
           Check an AHU to select every filter in it, then Copy for QuickBooks. In QB, click the
