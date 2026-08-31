@@ -89,4 +89,9 @@ const noBuilding = buildQbPasteString({
 assert(noBuilding.includes(qbAhuRow("AH-Solo")), "AHU-only paste still works without a building");
 assert(noBuilding.includes(qbItemRow("Z", 1)), "AHU-only item is present");
 
+const tabbed = buildQbPasteString(grouped, { delim: "\t" });
+assert(!tabbed.includes(QB_FIELD_DELIM), "tab mode has no ∟ markers");
+assert(tabbed.includes("\t"), "tab mode uses real tabs");
+assert(tabbed.split("\t").length === paste.split(QB_FIELD_DELIM).length, "tab mode keeps the same field count");
+
 console.log("qbPackingSlip tests passed");

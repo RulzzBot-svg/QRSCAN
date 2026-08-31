@@ -22,6 +22,7 @@ export function sanitizeQbField(value) {
     .replace(/\u00a0/g, " ")
     .replace(new RegExp(QB_FIELD_DELIM, "g"), " ")
     .replace(/\|\|/g, " ")
+    .replace(/\t/g, " ")
     .trim();
 }
 
@@ -93,7 +94,7 @@ export function flattenPackingRows(filtersByAhu) {
  * ahu change     → ahu + item
  * same ahu       → item
  */
-export function buildQbPasteString(filtersByAhu) {
+export function buildQbPasteString(filtersByAhu, { delim = QB_FIELD_DELIM } = {}) {
   const rows = flattenPackingRows(filtersByAhu);
   let out = "";
   let prevBuilding = "";
@@ -120,7 +121,9 @@ export function buildQbPasteString(filtersByAhu) {
     }
   }
 
-  return out.replace(/[\r\n]/g, "");
+  const cedars = out.replace(/[\r\n]/g, "");
+  if (!delim || delim === QB_FIELD_DELIM) return cedars;
+  return cedars.split(QB_FIELD_DELIM).join(delim);
 }
 
 /** @param {Array<object>} lines from API */
@@ -157,19 +160,19 @@ export function countPackingSlipItems(filtersByAhu) {
   );
 }
 
-export async function copyPackingSlipToClipboard(filtersByAhu) {
-  const text = buildQbPasteString(filtersByAhu);
+export async function copyPackingSlipToClipboard(filtersByAhu, { mode = "special" } = {}) {
+  const delim = mode === "tabs" ? "\t" : QB_FIELD_DELIM;
+  const text = buildQbPasteString(filtersByAhu, { delim });
   if (!text) throw new Error("Nothing to copy");
   await navigator.clipboard.writeText(text);
   return text;
 }
 
-export function qbPasteInstructions(itemCount, ahuCount) {
-  return (
-    `Copied ${itemCount} line(s) for ${ahuCount} AHU(s) in QuickBooks packing-slip format.\n\n` +
-    "1. Open the packing slip in QuickBooks\n" +
-    "2. Click the first QTY cell\n" +
-    "3. Press Ctrl+Alt+V (Special Paste)\n\n" +
-    "Stop paste: Esc or Ctrl+Q"
-  );
+export function qbCopySummary(filtersByAhu, mode = "special") {
+  return {
+    itemCount: countPackingSlipItems(filtersByAhu),
+    ahuCount: Object.keys(filtersByAhu || {}).length,
+    mode,
+    filtersByAhu,
+  };
 }

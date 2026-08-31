@@ -8,10 +8,11 @@ import PackingSlipPanel from "./PackingSlipPanel";
 import PackingSlipReviewModal from "./PackingSlipReviewModal";
 import QrLabelPrintModal from "./QrLabelPrintModal";
 import { buildQrLabels } from "../../utils/qrLabels";
+import QbCopyResultModal from "./QbCopyResultModal";
 import {
   copyPackingSlipToClipboard,
   countPackingSlipItems,
-  qbPasteInstructions,
+  qbCopySummary,
   selectionToFiltersByAhu,
 } from "../../utils/qbPackingSlip";
 
@@ -55,6 +56,7 @@ function AdminAHUs() {
   const [newAhuNotes, setNewAhuNotes] = useState("");
   const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({});
   const [manualReviewData, setManualReviewData] = useState(null);
+  const [qbCopyResult, setQbCopyResult] = useState(null);
   const [buildingFilter, setBuildingFilter] = useState("");
   const [showAllHospitals, setShowAllHospitals] = useState(false);
   const [qrPrint, setQrPrint] = useState({
@@ -271,8 +273,8 @@ function AdminAHUs() {
       return;
     }
     try {
-      await copyPackingSlipToClipboard(filtersByAhu);
-      alert(qbPasteInstructions(itemCount, Object.keys(filtersByAhu).length));
+      await copyPackingSlipToClipboard(filtersByAhu, { mode: "special" });
+      setQbCopyResult(qbCopySummary(filtersByAhu, "special"));
     } catch (err) {
       console.error(err);
       alert("Could not copy. Allow clipboard access for this site, then try again.");
@@ -334,6 +336,7 @@ function AdminAHUs() {
         selectedFiltersForQB={selectedFiltersForQB}
         ahus={ahus}
         onOpenManualReview={handleManualReviewOpen}
+        onCopied={setQbCopyResult}
       />
 
       <div className="flex gap-4 px-4 pb-4">
@@ -711,10 +714,13 @@ function AdminAHUs() {
         onClose={() => setManualReviewData(null)}
         filtersByAhu={manualReviewData || {}}
         sourceLabel="manual checkbox selection"
+        onCopied={setQbCopyResult}
         onSuccess={() => {
           setManualReviewData(null);
         }}
       />
+
+      <QbCopyResultModal result={qbCopyResult} onClose={setQbCopyResult} />
 
       <QrLabelPrintModal
         open={qrPrint.open}

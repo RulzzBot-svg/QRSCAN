@@ -3,7 +3,7 @@ import {
   buildQbPasteString,
   copyPackingSlipToClipboard,
   countPackingSlipItems,
-  qbPasteInstructions,
+  qbCopySummary,
 } from "../../utils/qbPackingSlip";
 import { checkQbListenerHealth, pasteToQbListener } from "../../api/qb";
 
@@ -12,6 +12,7 @@ export default function PackingSlipReviewModal({
   onClose,
   filtersByAhu,
   sourceLabel = "manual selection",
+  onCopied,
   onSuccess,
 }) {
   const [copying, setCopying] = useState(false);
@@ -41,9 +42,9 @@ export default function PackingSlipReviewModal({
     if (!itemCount) return;
     setCopying(true);
     try {
-      await copyPackingSlipToClipboard(filtersByAhu);
+      await copyPackingSlipToClipboard(filtersByAhu, { mode: "special" });
+      onCopied?.(qbCopySummary(filtersByAhu, "special"));
       onSuccess?.("copied");
-      alert(qbPasteInstructions(itemCount, ahuCount));
     } catch (err) {
       console.error(err);
       alert("Could not copy. Allow clipboard access for this site, then try again.");
@@ -84,8 +85,8 @@ export default function PackingSlipReviewModal({
           <div>
             <h2 className="text-lg font-bold">Copy packing slip for QuickBooks</h2>
             <p className="text-sm opacity-70 mt-1">
-              Source: {sourceLabel} — {ahuCount} AHU(s), {itemCount} line(s). This matches the
-              Excel Special Paste format (building → AHU → qty/part).
+              Source: {sourceLabel} — {ahuCount} AHU(s), {itemCount} line(s). Copy, then in
+              QuickBooks press Ctrl+Alt+V. Ctrl+V pastes one blob into a single cell.
             </p>
           </div>
           <button type="button" className="btn btn-sm btn-ghost" onClick={onClose}>

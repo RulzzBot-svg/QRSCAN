@@ -27,7 +27,12 @@ pyautogui.PAUSE = 0.02
 
 def paste_data(data: str) -> None:
     text = str(data).replace("\r", "").replace("\n", "")
-    delim = "\u221f" if "\u221f" in text else "||"
+    if "\u221f" in text:
+        delim = "\u221f"
+    elif "\t" in text:
+        delim = "\t"
+    else:
+        delim = "||"
     parts = text.split(delim)
     for i, part in enumerate(parts):
         if part:
