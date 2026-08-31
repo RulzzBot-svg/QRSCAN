@@ -1,4 +1,10 @@
-import { buildQbPasteString, countPackingSlipItems } from "../../utils/qbPackingSlip";
+import { useState } from "react";
+import {
+  buildQbPasteString,
+  copyPackingSlipToClipboard,
+  countPackingSlipItems,
+  qbPasteInstructions,
+} from "../../utils/qbPackingSlip";
 import { checkQbListenerHealth, pasteToQbListener } from "../../api/qb";
 
 export default function PackingSlipReviewModal({
@@ -8,6 +14,7 @@ export default function PackingSlipReviewModal({
   sourceLabel = "manual selection",
   onSuccess,
 }) {
+  const [copying, setCopying] = useState(false);
   if (!open) return null;
 
   const ahuCount = Object.keys(filtersByAhu || {}).length;
@@ -19,6 +26,7 @@ export default function PackingSlipReviewModal({
     for (const f of ahuData.filters || []) {
       flatLines.push({
         key: `${ahuId}-${f.id || f.part_number}-${f.job_id || ""}`,
+        building: ahuData.building,
         ahu_name: ahuData.ahu_name,
         part_number: f.part_number,
         quantity: f.quantity ?? 1,
@@ -31,12 +39,17 @@ export default function PackingSlipReviewModal({
 
   const copyToClipboard = async () => {
     if (!itemCount) return;
-    await navigator.clipboard.writeText(pastePreview);
-    onSuccess?.("copied");
-    alert(
-      `Copied ${itemCount} line(s) for ${ahuCount} AHU(s).\n\n` +
-        "In QuickBooks: click the first packing slip cell, then Ctrl+Shift+V."
-    );
+    setCopying(true);
+    try {
+      await copyPackingSlipToClipboard(filtersByAhu);
+      onSuccess?.("copied");
+      alert(qbPasteInstructions(itemCount, ahuCount));
+    } catch (err) {
+      console.error(err);
+      alert("Could not copy. Allow clipboard access for this site, then try again.");
+    } finally {
+      setCopying(false);
+    }
   };
 
   const autoPaste = async () => {
@@ -44,25 +57,20 @@ export default function PackingSlipReviewModal({
     const health = await checkQbListenerHealth();
     if (!health.running) {
       alert(
-        "QB Listener is not running.\n\n" +
-          "On your Windows PC, open PowerShell in afc-tech-app-backend and run:\n" +
-          "  start_qb_tools.bat\n" +
-          "  (or: python qb_listener.py)\n\n" +
-          "Then try Auto-Paste again."
+        "QB Listener is not running on this PC.\n\n" +
+          "Easiest path: click Copy for QuickBooks, then in QuickBooks click the first QTY cell and press Ctrl+Alt+V (Special Paste must be running)."
       );
       return;
     }
     try {
-      const pastePreview = buildQbPasteString(filtersByAhu);
       const result = await pasteToQbListener(pastePreview);
       onSuccess?.("pasted");
       alert(
         (result.message || "Pasting soon.") +
           "\n\n1. Switch to QuickBooks NOW\n" +
-          "2. Click the first line cell\n" +
+          "2. Click the first QTY cell\n" +
           "3. Wait ~3 seconds — typing starts automatically\n\n" +
-          "Manual fallback: Copy for QB, then Ctrl+Shift+V\n" +
-          "(only if SpecialPaste.exe is running in the background)"
+          "Manual fallback: Copy for QuickBooks, then Ctrl+Alt+V"
       );
     } catch (e) {
       alert(e.message || "Auto-paste failed");
@@ -74,10 +82,10 @@ export default function PackingSlipReviewModal({
       <div className="bg-base-100 border border-base-300 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="p-4 border-b flex justify-between items-start gap-4">
           <div>
-            <h2 className="text-lg font-bold">Review packing slip (before QuickBooks)</h2>
+            <h2 className="text-lg font-bold">Copy packing slip for QuickBooks</h2>
             <p className="text-sm opacity-70 mt-1">
-              Source: {sourceLabel} — {ahuCount} AHU(s), {itemCount} line(s). Fix mistakes here;
-              QuickBooks is hard to undo after OK.
+              Source: {sourceLabel} — {ahuCount} AHU(s), {itemCount} line(s). This matches the
+              Excel Special Paste format (building → AHU → qty/part).
             </p>
           </div>
           <button type="button" className="btn btn-sm btn-ghost" onClick={onClose}>
@@ -89,34 +97,44 @@ export default function PackingSlipReviewModal({
           {itemCount === 0 ? (
             <p className="text-center opacity-70 py-8">No lines to show.</p>
           ) : (
-            <table className="table table-sm table-zebra w-full">
-              <thead>
-                <tr>
-                  <th>AHU</th>
-                  <th>Part #</th>
-                  <th className="text-right">Qty</th>
-                  <th>Size</th>
-                  <th>Phase</th>
-                  <th>Completed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {flatLines.map((row) => (
-                  <tr key={row.key}>
-                    <td className="font-medium">{row.ahu_name}</td>
-                    <td>{row.part_number || "—"}</td>
-                    <td className="text-right">{row.quantity}</td>
-                    <td>{row.size || "—"}</td>
-                    <td>{row.phase || "—"}</td>
-                    <td className="text-xs whitespace-nowrap">
-                      {row.completed_at
-                        ? new Date(row.completed_at).toLocaleDateString()
-                        : "—"}
-                    </td>
+            <>
+              <table className="table table-sm table-zebra w-full">
+                <thead>
+                  <tr>
+                    <th>Building</th>
+                    <th>AHU</th>
+                    <th>Part #</th>
+                    <th className="text-right">Qty</th>
+                    <th>Size</th>
+                    <th>Phase</th>
+                    <th>Completed</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {flatLines.map((row) => (
+                    <tr key={row.key}>
+                      <td>{row.building || "—"}</td>
+                      <td className="font-medium">{row.ahu_name}</td>
+                      <td>{row.part_number || "—"}</td>
+                      <td className="text-right">{row.quantity}</td>
+                      <td>{row.size || "—"}</td>
+                      <td>{row.phase || "—"}</td>
+                      <td className="text-xs whitespace-nowrap">
+                        {row.completed_at
+                          ? new Date(row.completed_at).toLocaleDateString()
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <details className="mt-3">
+                <summary className="text-xs opacity-70 cursor-pointer">Clipboard preview</summary>
+                <pre className="mt-2 text-[10px] bg-base-200 p-2 rounded overflow-auto max-h-32 whitespace-pre-wrap break-all">
+                  {pastePreview}
+                </pre>
+              </details>
+            </>
           )}
         </div>
 
@@ -128,17 +146,17 @@ export default function PackingSlipReviewModal({
             type="button"
             className="btn btn-outline"
             disabled={!itemCount}
-            onClick={copyToClipboard}
+            onClick={autoPaste}
           >
-            📋 Copy for QB
+            Auto-Paste to QB
           </button>
           <button
             type="button"
-            className="btn btn-accent"
-            disabled={!itemCount}
-            onClick={autoPaste}
+            className={`btn btn-accent ${copying ? "loading" : ""}`}
+            disabled={!itemCount || copying}
+            onClick={copyToClipboard}
           >
-            ⚡ Auto-Paste to QB
+            Copy for QuickBooks
           </button>
         </div>
       </div>

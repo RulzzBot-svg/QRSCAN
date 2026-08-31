@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Type QB packing-slip clipboard data (||-delimited fields with TAB between them).
+Type QB packing-slip clipboard data (Cedars ∟ or legacy || fields, TAB between them).
 
 Usage:
   python qb_paste_now.py              # read from clipboard, 3s delay
   python qb_paste_now.py --delay 5    # longer delay to focus QuickBooks
-  python qb_paste_now.py --data "4||HVP12242||||||||||"
+  python qb_paste_now.py --data "4∟HVP12242∟∟∟∟∟"
 
 Requires: pip install pyautogui pyperclip
 """
@@ -26,7 +26,9 @@ pyautogui.PAUSE = 0.02
 
 
 def paste_data(data: str) -> None:
-    parts = data.split("||")
+    text = str(data).replace("\r", "").replace("\n", "")
+    delim = "\u221f" if "\u221f" in text else "||"
+    parts = text.split(delim)
     for i, part in enumerate(parts):
         if part:
             pyautogui.write(part, interval=0.005)

@@ -8,6 +8,12 @@ import PackingSlipPanel from "./PackingSlipPanel";
 import PackingSlipReviewModal from "./PackingSlipReviewModal";
 import QrLabelPrintModal from "./QrLabelPrintModal";
 import { buildQrLabels } from "../../utils/qrLabels";
+import {
+  copyPackingSlipToClipboard,
+  countPackingSlipItems,
+  qbPasteInstructions,
+  selectionToFiltersByAhu,
+} from "../../utils/qbPackingSlip";
 
 const naturalAhuSort = (a, b) => {
   const A = String(a ?? "");
@@ -254,6 +260,25 @@ function AdminAHUs() {
     setManualReviewData(filtersByAhu);
   };
 
+  const filtersByAhuFromChecks = () =>
+    selectionToFiltersByAhu(selectedFiltersForQB, ahus);
+
+  const copySelectionForQb = async () => {
+    const filtersByAhu = filtersByAhuFromChecks();
+    const itemCount = countPackingSlipItems(filtersByAhu);
+    if (!itemCount) {
+      alert("Check AHUs or filters first, then copy.");
+      return;
+    }
+    try {
+      await copyPackingSlipToClipboard(filtersByAhu);
+      alert(qbPasteInstructions(itemCount, Object.keys(filtersByAhu).length));
+    } catch (err) {
+      console.error(err);
+      alert("Could not copy. Allow clipboard access for this site, then try again.");
+    }
+  };
+
   const manualSelectionCount = Object.values(selectedFiltersForQB).reduce(
     (n, arr) => n + (arr?.length || 0),
     0
@@ -283,22 +308,19 @@ function AdminAHUs() {
           </button>
           <button
             className={`btn btn-xs ${manualSelectionCount ? "btn-accent" : "btn-disabled"}`}
-            onClick={() => {
-              const filtersByAhu = {};
-              for (const [ahuId, filterObjects] of Object.entries(selectedFiltersForQB)) {
-                if (!filterObjects?.length) continue;
-                const ahu = ahus.find((a) => a.id == ahuId);
-                filtersByAhu[ahuId] = {
-                  ahu_name: ahu?.name || ahuId,
-                  filters: filterObjects,
-                };
-              }
-              handleManualReviewOpen(filtersByAhu);
-            }}
+            onClick={copySelectionForQb}
             disabled={!manualSelectionCount}
             type="button"
           >
-            📋 Review &amp; paste to QB
+            Copy for QuickBooks
+          </button>
+          <button
+            className={`btn btn-xs ${manualSelectionCount ? "btn-outline" : "btn-disabled"}`}
+            onClick={() => handleManualReviewOpen(filtersByAhuFromChecks())}
+            disabled={!manualSelectionCount}
+            type="button"
+          >
+            Review first
           </button>
           <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">
             Sign-off
@@ -663,6 +685,25 @@ function AdminAHUs() {
         </div>
       )}
 
+      {manualSelectionCount > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-base-100 border border-base-300 shadow-lg rounded-lg px-4 py-2 flex items-center gap-3">
+          <div className="text-sm">
+            <span className="font-semibold">{manualSelectionCount}</span> filter
+            {manualSelectionCount === 1 ? "" : "s"} selected
+          </div>
+          <button className="btn btn-sm btn-accent" type="button" onClick={copySelectionForQb}>
+            Copy for QuickBooks
+          </button>
+          <button
+            className="btn btn-sm btn-outline"
+            type="button"
+            onClick={() => handleManualReviewOpen(filtersByAhuFromChecks())}
+          >
+            Review
+          </button>
+        </div>
+      )}
+
       <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} ahus={ahus} />
 
       <PackingSlipReviewModal
@@ -672,7 +713,6 @@ function AdminAHUs() {
         sourceLabel="manual checkbox selection"
         onSuccess={() => {
           setManualReviewData(null);
-          setSelectedFiltersForQB({});
         }}
       />
 
