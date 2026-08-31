@@ -638,6 +638,7 @@ def packing_slip_lines_from_jobs():
             .join(Job, Job.id == JobFilter.job_id)
             .join(Filter, Filter.id == JobFilter.filter_id)
             .join(AHU, AHU.id == Job.ahu_id)
+            .options(joinedload(AHU.building))
             .filter(
                 AHU.hospital_id == hospital_id,
                 JobFilter.is_completed.is_(True),
@@ -663,6 +664,7 @@ def packing_slip_lines_from_jobs():
                 "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                 "ahu_id": ahu.id,
                 "ahu_name": ahu.name,
+                "building": ahu.building.name if ahu.building and getattr(ahu.building, "name", None) else None,
                 "filter_id": filt.id,
                 "part_number": filt.part_number,
                 "quantity": filt.quantity if filt.quantity is not None else 1,
