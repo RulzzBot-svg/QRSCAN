@@ -4,7 +4,7 @@
  * SpecialPaste.au3 splits on ∟ and types TAB between fields, starting on QTY.
  *
  *   Building/AHU header:  ∟∟Text∟∟
- *   Item:                 qty∟partnumber∟∟∟∟∟
+ *   Item:                 qty∟partnumber∟desc∟price∟total∟tax∟
  *   Spacer:               ∟∟∟∟∟∟∟   (exactly 7 markers)
  */
 
@@ -34,10 +34,21 @@ export function qbAhuRow(ahu) {
   return `${QB_FIELD_DELIM}${QB_FIELD_DELIM}${sanitizeQbField(ahu)}${QB_FIELD_DELIM}${QB_FIELD_DELIM}`;
 }
 
-export function qbItemRow(part, qty) {
+export function formatQbPrice(value) {
+  if (value == null || value === "") return "";
+  const s = String(value).replace(/[$,]/g, "").trim();
+  if (!s) return "";
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) return "";
+  return String(n);
+}
+
+export function qbItemRow(part, qty, price) {
   const q = sanitizeQbField(qty != null && qty !== "" ? qty : "1");
   const p = sanitizeQbField(part);
-  return `${q}${QB_FIELD_DELIM}${p}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}`;
+  const rate = formatQbPrice(price);
+  // qty | item | desc | price/rate | total | tax | extra tab into next row
+  return `${q}${QB_FIELD_DELIM}${p}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${rate}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}`;
 }
 
 export function qbAppendRow(existing, rowText) {
@@ -74,6 +85,7 @@ export function flattenPackingRows(filtersByAhu) {
         ahu: ahuName,
         part: sanitizeQbField(f.part_number || ""),
         qty: sanitizeQbField(f.quantity != null && f.quantity !== "" ? f.quantity : "1"),
+        price: formatQbPrice(f.unit_price ?? f.price),
       });
     }
   }
@@ -107,17 +119,17 @@ export function buildQbPasteString(filtersByAhu, { delim = QB_FIELD_DELIM } = {}
       out = qbAppendRow(out, QB_SPACER_ROW);
       out = qbAppendRow(out, qbBuildingRow(row.building));
       out = qbAppendRow(out, qbAhuRow(row.ahu));
-      out = qbAppendRow(out, qbItemRow(row.part, row.qty));
+      out = qbAppendRow(out, qbItemRow(row.part, row.qty, row.price));
       prevBuilding = row.building;
       prevAhu = row.ahu;
     } else if (row.ahu !== prevAhu) {
       if (!out) out = qbAppendRow(out, QB_SPACER_ROW);
       out = qbAppendRow(out, qbAhuRow(row.ahu));
-      out = qbAppendRow(out, qbItemRow(row.part, row.qty));
+      out = qbAppendRow(out, qbItemRow(row.part, row.qty, row.price));
       prevAhu = row.ahu;
       if (row.building) prevBuilding = row.building;
     } else {
-      out = qbAppendRow(out, qbItemRow(row.part, row.qty));
+      out = qbAppendRow(out, qbItemRow(row.part, row.qty, row.price));
     }
   }
 
@@ -143,6 +155,7 @@ export function groupLinesByAhu(lines) {
       id: line.filter_id,
       part_number: line.part_number,
       quantity: line.quantity,
+      unit_price: line.unit_price,
       size: line.size,
       phase: line.phase,
       description: line.phase,

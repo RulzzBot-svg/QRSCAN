@@ -669,6 +669,7 @@ def packing_slip_lines_from_jobs():
                 "filter_id": filt.id,
                 "part_number": filt.part_number,
                 "quantity": filt.quantity if filt.quantity is not None else 1,
+                "unit_price": float(filt.unit_price) if getattr(filt, "unit_price", None) is not None else None,
                 "size": filt.size,
                 "phase": filt.phase,
             })

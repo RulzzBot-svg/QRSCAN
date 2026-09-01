@@ -25,5 +25,6 @@ assert(all.allSelected && all.selectedCount === 2, "inactive and unsaved filters
 
 const objs = filterObjectsForSelection(filters, new Set([2]));
 assert(objs.length === 1 && objs[0].part_number === "B", "selected objects include part number");
+assert(Object.prototype.hasOwnProperty.call(objs[0], "unit_price"), "selected objects include unit_price for QB");
 
 console.log("filterSelection tests passed");
