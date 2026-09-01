@@ -2,7 +2,9 @@ from flask import Flask, jsonify
 from db import db
 from flask_cors import CORS
 from dotenv import load_dotenv
+import logging
 import os
+from sqlalchemy import text
 
 from extensions import limiter
 from routes.hospital_routes import hospital_bp
@@ -15,6 +17,8 @@ from routes.qbd_conductor import qbd_bp
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 _DEFAULT_CORS = (
     "https://qrscan-lyart.vercel.app,"
     "https://qrscan-8ql2.onrender.com,"
@@ -23,6 +27,20 @@ _DEFAULT_CORS = (
     "http://127.0.0.1:5173,"
     "http://127.0.0.1:5174"
 )
+
+
+def ensure_schema():
+    """Add columns the running code expects. Safe to run on every boot."""
+    statements = (
+        "ALTER TABLE filters ADD COLUMN IF NOT EXISTS unit_price NUMERIC(10, 2)",
+    )
+    for sql in statements:
+        try:
+            db.session.execute(text(sql))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.exception("Could not apply schema update: %s", sql)
 
 
 def create_app():
@@ -58,6 +76,8 @@ def create_app():
 
     limiter.init_app(app)
     db.init_app(app)
+    with app.app_context():
+        ensure_schema()
 
     app.register_blueprint(ahu_bp, url_prefix="/api")
     app.register_blueprint(job_bp, url_prefix="/api")
