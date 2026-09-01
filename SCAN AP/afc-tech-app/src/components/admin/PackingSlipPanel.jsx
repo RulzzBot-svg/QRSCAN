@@ -2,9 +2,8 @@ import { useState } from "react";
 import { fetchPackingSlipFromJobs } from "../../api/qb";
 import {
   copyPackingSlipToClipboard,
-  countPackingSlipItems,
   groupLinesByAhu,
-  qbPasteInstructions,
+  qbCopySummary,
   selectionToFiltersByAhu,
 } from "../../utils/qbPackingSlip";
 import PackingSlipReviewModal from "./PackingSlipReviewModal";
@@ -25,6 +24,7 @@ export default function PackingSlipPanel({
   selectedFiltersForQB,
   ahus,
   onOpenManualReview,
+  onCopied,
 }) {
   const defaults = defaultDateRange();
   const [fromDate, setFromDate] = useState(defaults.from);
@@ -90,8 +90,8 @@ export default function PackingSlipPanel({
     }
     const filtersByAhu = selectionToFiltersByAhu(selectedFiltersForQB, ahus);
     try {
-      await copyPackingSlipToClipboard(filtersByAhu);
-      alert(qbPasteInstructions(countPackingSlipItems(filtersByAhu), Object.keys(filtersByAhu).length));
+      await copyPackingSlipToClipboard(filtersByAhu, { mode: "special" });
+      onCopied?.(qbCopySummary(filtersByAhu, "special"));
     } catch (err) {
       console.error(err);
       alert("Could not copy. Allow clipboard access for this site, then try again.");
@@ -150,8 +150,8 @@ export default function PackingSlipPanel({
           </button>
         </div>
         <p className="text-xs opacity-60 mt-2">
-          Check an AHU to select every filter in it, then Copy for QuickBooks. In QB, click the
-          first QTY cell and press Ctrl+Alt+V (Special Paste).
+          Check an AHU to select every filter in it, then Copy for QuickBooks. In QB click QTY
+          and press Ctrl+Alt+V — not Ctrl+V.
         </p>
       </div>
 
@@ -164,6 +164,7 @@ export default function PackingSlipPanel({
             ? `${loadMeta.count} replaced filter(s) from ${loadMeta.jobs} job(s)`
             : "completed jobs"
         }
+        onCopied={onCopied}
         onSuccess={() => {
           setShowJobReview(false);
           setJobFiltersByAhu(null);
