@@ -40,7 +40,7 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET"] = jwt_secret
     app.config["JWT_EXPIRY_HOURS"] = os.getenv("JWT_EXPIRY_HOURS", "12")
-    app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024  # 2 MB request bodies
+    app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # survey workbooks
 
     cors_origins = [
         o.strip()
@@ -74,6 +74,10 @@ def create_app():
     @app.route("/health")
     def health():
         return jsonify({"status": "ok"}), 200
+
+    @app.errorhandler(413)
+    def request_entity_too_large(_e):
+        return jsonify({"error": "File is too large (max 25 MB)"}), 413
 
     @app.after_request
     def add_security_headers(response):

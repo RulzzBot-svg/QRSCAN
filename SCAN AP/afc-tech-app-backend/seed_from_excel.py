@@ -7,8 +7,8 @@ from datetime import datetime, date
 
 import pandas as pd
 import openpyxl
+from sqlalchemy import func
 
-from app import app
 from db import db
 from models import Hospital, AHU, Filter, Building
 
@@ -130,6 +130,14 @@ def has_attr(obj, attr: str) -> bool:
     return hasattr(obj, attr)
 
 
+def _norm_name(s):
+    """Case-insensitive, collapsed-whitespace name for matching existing records."""
+    s = clean_str(s)
+    if not s:
+        return None
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
 def normalize_ahu_key(display_name: str, building: str = None) -> str:
     """
     Logical grouping key so multiple filter rows map to the same AHU.
@@ -142,6 +150,31 @@ def normalize_ahu_key(display_name: str, building: str = None) -> str:
     return raw or "unnamed"
 
 
+def serialize_seed_stats(stats, dry_run=False):
+    """JSON-safe import summary for the admin upload UI and CLI."""
+    ahu_ids = stats.get("ahus") or set()
+    try:
+        touched = len(ahu_ids)
+    except TypeError:
+        touched = 0
+    return {
+        "dry_run": bool(dry_run),
+        "hospital": stats.get("hospital"),
+        "hospital_id": stats.get("hospital_id"),
+        "excel_hospital_name": stats.get("excel_hospital_name"),
+        "hospital_created": bool(stats.get("hospital_created")),
+        "sheets_processed": int(stats.get("sheets_processed") or 0),
+        "sheets_skipped": list(stats.get("sheets_skipped") or []),
+        "rows_seen": int(stats.get("rows_seen") or 0),
+        "ahus_created": int(stats.get("ahus_created") or 0),
+        "ahus_updated": int(stats.get("ahus_updated") or 0),
+        "ahus_touched": touched,
+        "filters_upserted": int(stats.get("filters_upserted") or 0),
+        "filters_skipped": int(stats.get("filters_skipped") or 0),
+        "warnings": list(stats.get("warnings") or []),
+    }
+
+
 def make_sequential_ahu_id(seq: int) -> str:
     return f"AHU-{seq:03d}"
 
@@ -149,17 +182,36 @@ def make_sequential_ahu_id(seq: int) -> str:
 # -----------------------------
 # Upserts
 # -----------------------------
-def upsert_hospital(name: str):
-    h = Hospital.query.filter_by(name=name).first()
+def upsert_hospital(name: str, hospital_id=None):
+    """
+    Return (hospital, created).
+    If hospital_id is set, use that hospital (do not create a duplicate from cell B2).
+    Otherwise match by name, case-insensitively.
+    """
+    if hospital_id is not None:
+        try:
+            hid = int(hospital_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("hospital_id must be an integer") from exc
+        h = db.session.get(Hospital, hid)
+        if not h:
+            raise ValueError(f"Hospital id {hid} was not found")
+        return h, False
+
+    name = clean_str(name)
+    if not name:
+        raise ValueError("Hospital name is missing (Excel cell B2)")
+
+    h = Hospital.query.filter(func.lower(Hospital.name) == name.lower()).first()
     if h:
         if hasattr(h, "active") and h.active is None:
             h.active = True
-        return h
+        return h, False
 
     h = Hospital(name=name, active=True)
     db.session.add(h)
     db.session.flush()
-    return h
+    return h, True
 
 
 def upsert_building(hospital_id: int, name: str, floor_area: str = None):
@@ -167,7 +219,10 @@ def upsert_building(hospital_id: int, name: str, floor_area: str = None):
     if not name:
         return None
 
-    b = Building.query.filter_by(hospital_id=hospital_id, name=name).first()
+    b = Building.query.filter(
+        Building.hospital_id == hospital_id,
+        func.lower(Building.name) == name.lower(),
+    ).first()
     if b:
         if floor_area and has_attr(b, "floor_area") and not b.floor_area:
             b.floor_area = floor_area
@@ -181,15 +236,16 @@ def upsert_building(hospital_id: int, name: str, floor_area: str = None):
 
 def find_existing_ahu(hospital_id, name, building_id=None):
     """Match an AHU already in the DB so re-seeding updates instead of duplicating."""
-    name = clean_str(name)
-    if not name:
+    name_norm = _norm_name(name)
+    if not name_norm:
         return None
 
-    matches = (
-        AHU.query.filter_by(hospital_id=hospital_id, name=name)
+    candidates = (
+        AHU.query.filter_by(hospital_id=hospital_id)
         .order_by(AHU.id.asc())
         .all()
     )
+    matches = [a for a in candidates if _norm_name(a.name) == name_norm]
     if not matches:
         return None
     if building_id is not None:
@@ -326,7 +382,7 @@ def upsert_filter(
 # -----------------------------
 # Main seed
 # -----------------------------
-def seed_from_excel(path, selected_sheet=None, dry_run=False):
+def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Excel file not found: {path}")
 
@@ -343,19 +399,37 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False):
             raise RuntimeError("No data sheets found.")
         preferred_sheet = "MAIN BUILDING" if "MAIN BUILDING" in data_sheets else data_sheets[0]
 
-    hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or preferred_sheet.upper().replace("_", " ")
-    hospital = upsert_hospital(hospital_name)
+    excel_hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or preferred_sheet.upper().replace("_", " ")
+    hospital, hospital_created = upsert_hospital(excel_hospital_name, hospital_id=hospital_id)
 
     stats = {
-        "hospital": hospital_name,
+        "hospital": hospital.name,
+        "hospital_id": hospital.id,
+        "excel_hospital_name": excel_hospital_name,
+        "hospital_created": hospital_created,
         "sheets_processed": 0,
+        "sheets_skipped": [],
         "rows_seen": 0,
         "ahus": set(),
         "ahus_created": 0,
         "ahus_updated": 0,
         "filters_upserted": 0,
         "filters_skipped": 0,
+        "warnings": [],
     }
+
+    if (
+        hospital_id is not None
+        and _norm_name(excel_hospital_name)
+        and _norm_name(hospital.name) != _norm_name(excel_hospital_name)
+    ):
+        stats["warnings"].append(
+            f"Workbook cell B2 says '{excel_hospital_name}' but records were applied to '{hospital.name}'."
+        )
+    if hospital_created:
+        stats["warnings"].append(
+            f"Created a new hospital named '{hospital.name}'. Pick an existing hospital in Import if this should have updated one."
+        )
 
     # logical key -> sequential id
     ahu_key_to_id = {}
@@ -389,6 +463,10 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False):
         required = [col_ahu, col_loc, col_stage, col_size, col_qty, col_freq]
         if any(x is None for x in required):
             print(f"Skipping sheet '{sheet}' (missing required columns). Found columns: {list(df.columns)}")
+            stats["sheets_skipped"].append({
+                "sheet": sheet,
+                "reason": "missing required columns",
+            })
             continue
 
         stats["sheets_processed"] += 1
@@ -454,11 +532,18 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False):
                     display_name = raw_stage
                     break
 
-            # fallback: use first row's location/building if no AHU number provided
-            first = block[0]
+            # fallback: use first row's location if no AHU number provided
             if display_name is None:
+                first = block[0]
                 location = clean_str(first.get(col_loc)) if col_loc else None
                 display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
+
+            if location is None and col_loc:
+                for r in block:
+                    loc = clean_str(r.get(col_loc))
+                    if loc:
+                        location = loc
+                        break
 
             # building/floor area from first row where present
             for r in block:
@@ -579,20 +664,26 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False):
     else:
         db.session.commit()
 
+    result = serialize_seed_stats(stats, dry_run=dry_run)
+
     print("\n✅ Seed complete" if not dry_run else "\n✅ Dry run complete")
-    print(f"Hospital: {stats['hospital']} (ID {hospital.id})")
-    print(f"Sheets processed: {stats['sheets_processed']}")
-    print(f"Rows seen: {stats['rows_seen']}")
-    print(f"AHUs matched/updated: {stats['ahus_updated']}")
-    print(f"AHUs created: {stats['ahus_created']}")
-    print(f"AHUs touched: {len(stats['ahus'])}")
-    print(f"Filters upserted: {stats['filters_upserted']}")
-    print(f"Filters skipped (missing size): {stats['filters_skipped']}")
+    print(f"Hospital: {result['hospital']} (ID {result['hospital_id']})")
+    print(f"Sheets processed: {result['sheets_processed']}")
+    print(f"Rows seen: {result['rows_seen']}")
+    print(f"AHUs matched/updated: {result['ahus_updated']}")
+    print(f"AHUs created: {result['ahus_created']}")
+    print(f"AHUs touched: {result['ahus_touched']}")
+    print(f"Filters upserted: {result['filters_upserted']}")
+    print(f"Filters skipped (missing size): {result['filters_skipped']}")
+    for warning in result["warnings"]:
+        print(f"Warning: {warning}")
 
     ordered = sorted(list(stats["ahus"]))
     print("\nExample AHU IDs (first 15):")
     for i, x in enumerate(ordered[:15], start=1):
         print(f"  {i}. AHU-{int(x):03d} (db id: {x})")
+
+    return result
 
 
 if __name__ == "__main__":
@@ -615,8 +706,15 @@ if __name__ == "__main__":
         action="store_true",
         help="Parse and match records but do not commit database changes",
     )
+    parser.add_argument(
+        "--hospital-id",
+        type=int,
+        default=None,
+        help="Apply to this hospital id instead of creating one from cell B2",
+    )
     args = parser.parse_args()
     workbook = args.path
+    from app import app
 
     if not args.sheet:
         print("Usage: python seed_from_excel.py <sheet_name>|all [--path FILE] [--dry-run]")
@@ -645,9 +743,13 @@ if __name__ == "__main__":
             for sheet in sheets:
                 try:
                     print(f"\n--- Seeding sheet: {sheet} ---")
-                    seed_from_excel(workbook, sheet, dry_run=args.dry_run)
+                    seed_from_excel(
+                        workbook, sheet, dry_run=args.dry_run, hospital_id=args.hospital_id
+                    )
                 except Exception as e:
                     print(f"Error seeding sheet '{sheet}': {e}")
             print("\nAll requested sheets processed.")
         else:
-            seed_from_excel(workbook, selected, dry_run=args.dry_run)
+            seed_from_excel(
+                workbook, selected, dry_run=args.dry_run, hospital_id=args.hospital_id
+            )
