@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Integer, Text, Float, Date, DateTime, Boolean, ForeignKey, Text
+    Column, String, Integer, Text, Float, Numeric, Date, DateTime, Boolean, ForeignKey, Text
 )
 from sqlalchemy.orm import relationship
 from db import db
@@ -104,6 +104,7 @@ class Filter(db.Model):
     part_number = Column(String(100))
     size = Column(String(50))
     quantity = Column(Integer)
+    unit_price = Column(Numeric(10, 2), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
     # ✅ SERVICE LOGIC BELONGS HERE

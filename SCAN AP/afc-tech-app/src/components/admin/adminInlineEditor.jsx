@@ -13,6 +13,16 @@ const FREQUENCY_OPTIONS = [
   { label: "18 Months", value: 540 },
 ];
 
+const QB_PRICE_VISIBLE_KEY = "adminShowQbPrice";
+
+function readShowQbPrice() {
+  try {
+    return localStorage.getItem(QB_PRICE_VISIBLE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 const parseSize = (size) => {
   if (!size) return { h: "", w: "", d: "" };
   const [h, w, d] = String(size).split("x");
@@ -128,6 +138,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   const [qbLoading, setQbLoading] = useState(false);
   const [qbSo, setQbSo] = useState(null);
   const [qbSelected, setQbSelected] = useState({});
+  const [showQbPrice, setShowQbPrice] = useState(readShowQbPrice);
 
   const showToast = (message, type = "info") => {
     setToast({ message, type });
@@ -250,6 +261,13 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     const meta = selectionMeta(sourceFilters, newSet);
     onSelectionChange(meta.selected, meta);
   }, [onSelectionChange]);
+
+  useEffect(() => {
+    if (!selectedFilters.size) return;
+    reportSelection(selectedFilters, filters);
+    // Only re-run when filter fields change so parent state updates do not loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const applySelection = useCallback((selectAll) => {
     const source = filtersRef.current;
@@ -465,6 +483,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       part_number: filter.part_number,
       size: filter.size,
       quantity: Number(filter.quantity),
+      unit_price: filter.unit_price === "" || filter.unit_price == null ? null : filter.unit_price,
       frequency_days: Number(filter.frequency_days),
       last_service_date: filter.last_service_date ? toLocalIsoDate(filter.last_service_date) : null,
     };
@@ -491,6 +510,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       part_number: filter.part_number,
       size: filter.size,
       quantity: Number(filter.quantity),
+      unit_price: filter.unit_price === "" || filter.unit_price == null ? null : filter.unit_price,
       frequency_days: Number(filter.frequency_days),
       last_service_date: filter.last_service_date ? toLocalIsoDate(filter.last_service_date) : null,
     };
@@ -535,6 +555,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
         size: "",
         sizeParts: { h: "", w: "", d: "" },
         quantity: 1,
+        unit_price: "",
         frequency_days: 90,
         is_active: true,
         _inactive: false,
@@ -645,6 +666,22 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
         <div className="flex gap-1">
           <button
             type="button"
+            className={`btn btn-xs ${showQbPrice ? "btn-accent" : "btn-ghost"}`}
+            title="Show the QuickBooks price column. It stays hidden from technician screens."
+            onClick={() => {
+              const next = !showQbPrice;
+              setShowQbPrice(next);
+              try {
+                localStorage.setItem(QB_PRICE_VISIBLE_KEY, next ? "1" : "0");
+              } catch {
+                /* ignore */
+              }
+            }}
+          >
+            {showQbPrice ? "Hide price" : "Price (QB)"}
+          </button>
+          <button
+            type="button"
             className="btn btn-xs btn-ghost"
             onClick={addFilter}
           >
@@ -674,6 +711,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                 <th className="px-1">Part #</th>
                 <th className="px-1">Size (inches)</th>
                 <th className="px-1">Quantity</th>
+                {showQbPrice ? <th className="px-1">Price</th> : null}
                 <th className="px-1">Frequency</th>
                 <th className="px-1">Changeouts</th>
                 <th className="px-1">Last</th>
@@ -774,6 +812,24 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         }
                       />
                     </td>
+
+                    {showQbPrice ? (
+                      <td className="px-1 py-0.5">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="$"
+                          className="input input-xs input-bordered w-16"
+                          value={f.unit_price ?? ""}
+                          disabled={f._inactive}
+                          title="Copied into QuickBooks Rate when this row is selected"
+                          onChange={(e) =>
+                            updateFilter(f.id, "unit_price", e.target.value)
+                          }
+                        />
+                      </td>
+                    ) : null}
 
                     <td className="px-1 py-0.5">
                       <select

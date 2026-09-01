@@ -31,6 +31,7 @@ export default function PackingSlipReviewModal({
         ahu_name: ahuData.ahu_name,
         part_number: f.part_number,
         quantity: f.quantity ?? 1,
+        unit_price: f.unit_price,
         size: f.size,
         phase: f.phase,
         completed_at: f.completed_at,
@@ -106,6 +107,7 @@ export default function PackingSlipReviewModal({
                     <th>AHU</th>
                     <th>Part #</th>
                     <th className="text-right">Qty</th>
+                    <th className="text-right">Price</th>
                     <th>Size</th>
                     <th>Phase</th>
                     <th>Completed</th>
@@ -118,6 +120,11 @@ export default function PackingSlipReviewModal({
                       <td className="font-medium">{row.ahu_name}</td>
                       <td>{row.part_number || "—"}</td>
                       <td className="text-right">{row.quantity}</td>
+                      <td className="text-right">
+                        {row.unit_price != null && row.unit_price !== ""
+                          ? row.unit_price
+                          : "—"}
+                      </td>
                       <td>{row.size || "—"}</td>
                       <td>{row.phase || "—"}</td>
                       <td className="text-xs whitespace-nowrap">

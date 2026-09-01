@@ -26,6 +26,14 @@ assert(
   qbItemRow("P1", 4) === `4${QB_FIELD_DELIM}P1${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}`,
   "item row is qty, part, empty desc/price/total/tax + extra tab"
 );
+assert(
+  qbItemRow("P1", 4, 12.5) === `4${QB_FIELD_DELIM}P1${QB_FIELD_DELIM}${QB_FIELD_DELIM}12.5${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}${QB_FIELD_DELIM}`,
+  "price fills the QuickBooks Rate column (4th field)"
+);
+assert(
+  qbItemRow("P1", 4, "$12.50") === qbItemRow("P1", 4, 12.5),
+  "price strips $ and trailing zeros"
+);
 
 let out = "";
 out = qbAppendRow(out, QB_SPACER_ROW);
@@ -37,7 +45,7 @@ const grouped = {
     ahu_name: "AH-1",
     building: "Main",
     filters: [
-      { part_number: "HVP12242", quantity: 4 },
+      { part_number: "HVP12242", quantity: 4, unit_price: 9.75 },
       { part_number: "HVP20202", quantity: 2 },
     ],
   },
@@ -64,7 +72,7 @@ assert(paste.includes(QB_SPACER_ROW), "includes spacers between buildings");
 assert(paste.includes(qbBuildingRow("Main")), "includes building header");
 assert(paste.includes(qbBuildingRow("East")), "includes second building");
 assert(paste.includes(qbAhuRow("AH-1")), "includes AHU header");
-assert(paste.includes(qbItemRow("HVP12242", 4)), "includes first item");
+assert(paste.includes(qbItemRow("HVP12242", 4, 9.75)), "includes first item with price in Rate column");
 assert(paste.includes(qbItemRow("HVP20202", 2)), "same-AHU items have no extra AHU header between them");
 
 // Same building, new AHU: AH-2 header then item, no extra building header
