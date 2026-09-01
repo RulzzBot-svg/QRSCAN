@@ -9,6 +9,7 @@ import PackingSlipReviewModal from "./PackingSlipReviewModal";
 import QrLabelPrintModal from "./QrLabelPrintModal";
 import { buildQrLabels } from "../../utils/qrLabels";
 import QbCopyResultModal from "./QbCopyResultModal";
+import SurveyImportModal from "./SurveyImportModal";
 import {
   copyPackingSlipToClipboard,
   countPackingSlipItems,
@@ -46,7 +47,6 @@ function AdminAHUs() {
   const [selected, setSelected] = useState({}); // { [ahuId]: true }
   const [selectedHospitalKey, setSelectedHospitalKey] = useState(null);
   const [showImport, setShowImport] = useState(false);
-  const [importPreview, setImportPreview] = useState([]);
   const [showSignoff, setShowSignoff] = useState(false);
   const [showAddAhu, setShowAddAhu] = useState(false);
   const [newAhuHospital, setNewAhuHospital] = useState(null);
@@ -215,33 +215,6 @@ function AdminAHUs() {
         error: "Failed to generate QR labels.",
       });
     }
-  };
-
-  // CSV import preview: group by blank lines into blocks (simple)
-  const parseCsvBlocks = (text) => {
-    const lines = text.split(/\r?\n/);
-    const blocks = [];
-    let cur = [];
-    for (const line of lines) {
-      if (line.trim() === "") {
-        if (cur.length) {
-          blocks.push(cur);
-          cur = [];
-        }
-      } else cur.push(line);
-    }
-    if (cur.length) blocks.push(cur);
-    return blocks.map((b, i) => ({ id: i + 1, rows: b, group: b[0]?.split(",")[0] || `Block ${i + 1}` }));
-  };
-
-  const handleImportFile = (file) => {
-    const r = new FileReader();
-    r.onload = (e) => {
-      const txt = e.target.result;
-      const blocks = parseCsvBlocks(txt);
-      setImportPreview(blocks);
-    };
-    r.readAsText(file);
   };
 
   const clearGlobalFilters = () => {
@@ -580,47 +553,13 @@ function AdminAHUs() {
         </section>
       </div>
 
-      {/* Import preview modal */}
-      {showImport && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-          <div className="bg-base-100 border p-4 rounded-lg w-3/4 max-h-[80vh] overflow-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold">Import Preview</div>
-              <div className="flex gap-2">
-                <label className="btn btn-sm btn-ghost">
-                  Choose CSV
-                  <input
-                    type="file"
-                    accept="text/csv,text/plain"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleImportFile(e.target.files[0])}
-                  />
-                </label>
-                <button className="btn btn-sm" onClick={() => { setShowImport(false); setImportPreview([]); }} type="button">
-                  Close
-                </button>
-              </div>
-            </div>
-
-            {importPreview.length === 0 ? (
-              <div className="text-center opacity-70">No preview loaded. Choose a CSV to preview grouping by blank line separators.</div>
-            ) : (
-              <div className="space-y-2">
-                {importPreview.map((b) => (
-                  <div key={b.id} className="p-2 border rounded">
-                    <div className="font-medium">
-                      {b.group} — {b.rows.length} rows
-                    </div>
-                    <div className="text-xs mt-1 overflow-auto">
-                      <pre className="whitespace-pre-wrap">{b.rows.join("\n")}</pre>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <SurveyImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        hospitals={hospitals}
+        selectedHospitalKey={selectedHospitalKey}
+        onImported={refreshData}
+      />
 
       {/* Add AHU modal */}
       {showAddAhu && (

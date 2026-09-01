@@ -15,3 +15,14 @@ export const getHospitalSettings = (hospitalId) => {
 export const updateHospitalSettings = (hospitalId, payload) => {
   return API.patch(`/admin/hospitals/${hospitalId}`, payload);
 };
+
+export const importSurveyWorkbook = (file, { dryRun = true, hospitalId, sheet } = {}) => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("dry_run", dryRun ? "true" : "false");
+  if (hospitalId != null && hospitalId !== "") {
+    form.append("hospital_id", String(hospitalId));
+  }
+  if (sheet) form.append("sheet", sheet);
+  return API.post("/admin/surveys/import", form, { timeout: 180000 });
+};
