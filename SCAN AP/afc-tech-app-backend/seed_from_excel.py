@@ -441,8 +441,11 @@ def apply_ahu_label(ahu, display_name, building):
     if ahu is None:
         return None
     label = format_ahu_label(display_name, building)
-    if label:
-        ahu.name = label
+    if not label:
+        return None
+    if ahu.name and _norm_name(ahu.name) == _norm_name(label):
+        return ahu.name
+    ahu.name = label
     return label
 
 

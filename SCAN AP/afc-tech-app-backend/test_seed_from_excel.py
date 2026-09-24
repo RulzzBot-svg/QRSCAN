@@ -203,6 +203,7 @@ def main():
             assert_eq(Hospital.query.count(), 1, "one hospital")
             assert_eq(AHU.query.count(), 1, "one AHU")
             assert_eq(Filter.query.count(), 2, "two filters")
+            assert_eq(AHU.query.first().name, "AH-1 — Main", "building appended on first import")
             hid = first["hospital_id"]
             ahu_id = AHU.query.first().id
             assert_eq(Filter.query.filter_by(part_number="PN-1").first().quantity, 2, "initial qty")
