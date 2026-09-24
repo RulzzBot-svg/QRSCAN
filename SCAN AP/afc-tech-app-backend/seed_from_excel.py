@@ -120,10 +120,27 @@ def parse_frequency_to_days(raw):
     return None
 
 
-def get_sheet_title_cell(path, sheet_name="MAIN BUILDING", cell="B2"):
-    wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb[wb.sheetnames[0]]
-    return clean_str(ws[cell].value)
+def open_survey_workbook(path):
+    return openpyxl.load_workbook(path, data_only=True)
+
+
+def workbook_sheet(wb, sheet_name=None):
+    if sheet_name and sheet_name in wb.sheetnames:
+        return wb[sheet_name]
+    return wb[wb.sheetnames[0]]
+
+
+def get_sheet_title_cell(path, sheet_name="MAIN BUILDING", cell="B2", wb=None):
+    close = False
+    if wb is None:
+        wb = open_survey_workbook(path)
+        close = True
+    try:
+        ws = workbook_sheet(wb, sheet_name)
+        return clean_str(ws[cell].value)
+    finally:
+        if close:
+            wb.close()
 
 
 def has_attr(obj, attr: str) -> bool:
@@ -245,14 +262,21 @@ def _survey_filter_row(vals):
     return False
 
 
-def sheet_uses_survey_letters(path, sheet_name):
-    wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb[wb.sheetnames[0]]
-    last = min(ws.max_row or 1, 20)
-    for r in range(1, last + 1):
-        if _survey_header_row(_survey_cells(ws, r)):
-            return True
-    return False
+def sheet_uses_survey_letters(path, sheet_name, wb=None):
+    close = False
+    if wb is None:
+        wb = open_survey_workbook(path)
+        close = True
+    try:
+        ws = workbook_sheet(wb, sheet_name)
+        last = min(ws.max_row or 1, 20)
+        for r in range(1, last + 1):
+            if _survey_header_row(_survey_cells(ws, r)):
+                return True
+        return False
+    finally:
+        if close:
+            wb.close()
 
 
 def _first_filled(rows, letter):
@@ -314,7 +338,7 @@ def assign_block_instances(blocks):
     return blocks
 
 
-def read_survey_letter_blocks(path, sheet_name):
+def read_survey_letter_blocks(path, sheet_name, wb=None):
     """
     One block per physical AHU. Split when:
     - column B building changes (East Building vs MOB vs HDH)
@@ -323,8 +347,18 @@ def read_survey_letter_blocks(path, sheet_name):
     A blank / building-only row does not split PRE from FINAL of the same unit.
     A blank before a new PRE does split (next unit).
     """
-    wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb[wb.sheetnames[0]]
+    close = False
+    if wb is None:
+        wb = open_survey_workbook(path)
+        close = True
+    try:
+        return _read_survey_letter_blocks_ws(workbook_sheet(wb, sheet_name))
+    finally:
+        if close:
+            wb.close()
+
+
+def _read_survey_letter_blocks_ws(ws):
     start = 1
     last = ws.max_row or 1
     for r in range(1, min(last, 25) + 1):
@@ -534,10 +568,16 @@ def clear_hospital_survey_records(hospital_id):
         db.session.query(Job).filter(Job.id.in_(job_ids)).delete(synchronize_session=False)
 
     if ahu_ids:
-        db.session.query(JobFilter).filter(
-            JobFilter.filter_id.in_(db.session.query(Filter.id).filter(Filter.ahu_id.in_(ahu_ids)))
-        ).delete(synchronize_session=False)
-        db.session.query(Filter).filter(Filter.ahu_id.in_(ahu_ids)).delete(synchronize_session=False)
+        filter_ids = [
+            r[0] for r in db.session.query(Filter.id).filter(Filter.ahu_id.in_(ahu_ids)).all()
+        ]
+        if filter_ids:
+            db.session.query(JobFilter).filter(JobFilter.filter_id.in_(filter_ids)).delete(
+                synchronize_session=False
+            )
+            db.session.query(Filter).filter(Filter.id.in_(filter_ids)).delete(
+                synchronize_session=False
+            )
         db.session.query(AHU).filter(AHU.id.in_(ahu_ids)).delete(synchronize_session=False)
 
     if building_ids:
@@ -1036,11 +1076,28 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None, 
     if replace_existing and hospital_id is None:
         raise ValueError("Pick the hospital in Import before starting fresh.")
 
-    xls = pd.ExcelFile(path)
-    data_sheets = select_data_sheets(xls.sheet_names, selected_sheet)
+    wb = open_survey_workbook(path)
+    try:
+        return _seed_from_open_workbook(
+            path,
+            wb,
+            selected_sheet=selected_sheet,
+            dry_run=dry_run,
+            hospital_id=hospital_id,
+            replace_existing=replace_existing,
+        )
+    finally:
+        try:
+            wb.close()
+        except Exception:
+            pass
+
+
+def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospital_id=None, replace_existing=False):
+    data_sheets = select_data_sheets(wb.sheetnames, selected_sheet)
     preferred_sheet = "MAIN BUILDING" if "MAIN BUILDING" in data_sheets else data_sheets[0]
 
-    excel_hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or preferred_sheet.upper().replace("_", " ")
+    excel_hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2", wb=wb) or preferred_sheet.upper().replace("_", " ")
     hospital, hospital_created = upsert_hospital(excel_hospital_name, hospital_id=hospital_id)
 
     stats = {
@@ -1101,8 +1158,20 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None, 
             stats["sheets_skipped"].append({"sheet": sheet, "reason": "skip list"})
             continue
 
-        if sheet_uses_survey_letters(path, sheet):
-            letter_blocks = read_survey_letter_blocks(path, sheet)
+        try:
+            uses_letters = sheet_uses_survey_letters(path, sheet, wb=wb)
+        except Exception as exc:
+            stats["sheets_skipped"].append({"sheet": sheet, "reason": str(exc)})
+            stats["warnings"].append(f"Skipped tab '{sheet}': {exc}")
+            continue
+
+        if uses_letters:
+            try:
+                letter_blocks = read_survey_letter_blocks(path, sheet, wb=wb)
+            except Exception as exc:
+                stats["sheets_skipped"].append({"sheet": sheet, "reason": str(exc)})
+                stats["warnings"].append(f"Skipped tab '{sheet}': {exc}")
+                continue
             if letter_blocks:
                 stats["sheets_processed"] += 1
                 stats["sheets"].append(sheet)

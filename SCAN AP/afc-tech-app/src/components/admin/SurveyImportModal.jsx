@@ -7,7 +7,10 @@ const ACCEPT =
 function importErrorMessage(err) {
   const data = err?.response?.data;
   if (typeof data?.error === "string" && data.error) return data.error;
-  if (err?.code === "ECONNABORTED") return "Import timed out. Try one sheet or a smaller workbook.";
+  if (err?.code === "ECONNABORTED") return "Import timed out. Try again — a large workbook can take a minute.";
+  if (err?.code === "ERR_NETWORK" || /cors|network error/i.test(err?.message || "")) {
+    return "The server dropped the import (timeout or crash). Wait for the latest deploy, then try Start fresh again.";
+  }
   if (err?.message) return err.message;
   return "Import failed.";
 }

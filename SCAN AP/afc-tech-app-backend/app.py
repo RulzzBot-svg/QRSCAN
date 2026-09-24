@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from db import db
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -74,6 +74,16 @@ def create_app():
         expose_headers=["Content-Disposition"],
     )
 
+    def _ensure_cors(response):
+        origin = (request.headers.get("Origin") or "").strip()
+        if origin and origin in cors_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            vary = response.headers.get("Vary", "")
+            if "Origin" not in vary:
+                response.headers["Vary"] = ", ".join(p for p in (vary, "Origin") if p)
+        return response
+
     limiter.init_app(app)
     db.init_app(app)
     with app.app_context():
@@ -97,14 +107,23 @@ def create_app():
 
     @app.errorhandler(413)
     def request_entity_too_large(_e):
-        return jsonify({"error": "File is too large (max 25 MB)"}), 413
+        return _ensure_cors(jsonify({"error": "File is too large (max 25 MB)"})), 413
+
+    @app.errorhandler(429)
+    def rate_limited(_e):
+        return _ensure_cors(jsonify({"error": "Too many requests. Wait a minute and try again."})), 429
+
+    @app.errorhandler(500)
+    def unhandled_500(e):
+        logger.exception("Unhandled server error")
+        return _ensure_cors(jsonify({"error": "Import or server error. Try again."})), 500
 
     @app.after_request
     def add_security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        return response
+        return _ensure_cors(response)
 
     return app
 

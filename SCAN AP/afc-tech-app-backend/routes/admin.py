@@ -757,10 +757,16 @@ def import_surveys():
         return jsonify({"error": str(e)}), 400
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except MemoryError:
+        db.session.rollback()
+        logger.exception("Survey import ran out of memory")
+        return jsonify({
+            "error": "Workbook is too large for the server. Close extra tabs or try again."
+        }), 500
     except Exception as e:
         db.session.rollback()
         logger.exception("Survey import failed")
-        return internal_error(e)
+        return jsonify({"error": f"Import failed: {e}"}), 500
     finally:
         try:
             os.unlink(tmp_path)
