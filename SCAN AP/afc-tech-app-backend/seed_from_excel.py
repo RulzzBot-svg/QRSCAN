@@ -138,6 +138,132 @@ def _norm_name(s):
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+def _looks_like_ahu_label(val):
+    """AH-1, AHU-2, RTU-1, MAU-3, etc."""
+    s = clean_str(val)
+    if not s:
+        return False
+    s2 = s.upper()
+    if re.search(r"\b(AHU|AH|RTU|MAU|ACU|DOAS)\b", s2):
+        return True
+    if re.search(r"(AHU|AH|RTU|MAU)[-_ ]?\d+", s2):
+        return True
+    return False
+
+
+# Hospital survey workbooks: blank row = next AHU. Columns from the printed sheet.
+SURVEY_LETTERS = ("B", "C", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P")
+
+
+def _survey_cells(ws, row):
+    return {letter: ws[f"{letter}{row}"].value for letter in SURVEY_LETTERS}
+
+
+def _survey_header_row(vals):
+    blob = " ".join(str(v).upper() for v in vals.values() if v is not None)
+    if "STAGE" in blob and ("AHU" in blob or "PART" in blob):
+        return True
+    e = clean_str(vals.get("E"))
+    f = clean_str(vals.get("F"))
+    if e and f and "STAGE" in e.upper() and "AHU" in f.upper():
+        return True
+    return False
+
+
+def _survey_filter_row(vals):
+    """True when this row has filter data. Building/location alone is still a blank separator."""
+    for letter in ("E", "F", "G", "H", "J", "K", "L"):
+        v = clean_str(vals.get(letter))
+        if not v or is_placeholder(v):
+            continue
+        if _survey_header_row({letter: v}):
+            continue
+        return True
+    return False
+
+
+def sheet_uses_survey_letters(path, sheet_name):
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb[wb.sheetnames[0]]
+    last = min(ws.max_row or 1, 20)
+    for r in range(1, last + 1):
+        if _survey_header_row(_survey_cells(ws, r)):
+            return True
+    return False
+
+
+def read_survey_letter_blocks(path, sheet_name):
+    """
+    One block per AHU. A row with no stage/part/size/qty ends the AHU even if
+    building/location are still filled. AHU name comes from column F on the
+    first row of the block; later F cells in the same block are ignored.
+    """
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb[wb.sheetnames[0]]
+    start = 1
+    last = ws.max_row or 1
+    for r in range(1, min(last, 25) + 1):
+        if _survey_header_row(_survey_cells(ws, r)):
+            start = r + 1
+            break
+
+    blocks = []
+    current = []
+
+    def close_block():
+        if not current:
+            return
+        display_name = None
+        building = None
+        location = None
+        for vals in current:
+            if not display_name:
+                raw = clean_str(vals.get("F"))
+                if raw and not is_placeholder(raw) and not _survey_header_row({"F": raw}):
+                    display_name = raw
+            if not building:
+                building = clean_str(vals.get("B"))
+            if not location:
+                location = clean_str(vals.get("C"))
+        filters = []
+        for vals in current:
+            phase = clean_str(vals.get("E"))
+            if _looks_like_ahu_label(phase):
+                phase = None
+            size = clean_str(vals.get("J"))
+            qty = vals.get("L")
+            if qty is None or clean_str(qty) is None:
+                qty = vals.get("K")
+            part = clean_str(vals.get("H")) or clean_str(vals.get("G"))
+            filters.append({
+                "phase": phase,
+                "size": size,
+                "quantity": qty,
+                "freq_raw": vals.get("M"),
+                "part_number": part,
+                "last_service_date": to_date(vals.get("O")),
+                "invoice": clean_str(vals.get("N")),
+            })
+        blocks.append({
+            "display_name": display_name,
+            "building": building,
+            "location": location,
+            "filters": filters,
+        })
+        current.clear()
+
+    for r in range(start, last + 1):
+        vals = _survey_cells(ws, r)
+        if _survey_header_row(vals):
+            continue
+        if not _survey_filter_row(vals):
+            close_block()
+            continue
+        current.append(vals)
+    close_block()
+    return blocks
+
+
 def normalize_ahu_key(display_name: str, building: str = None) -> str:
     """
     Logical grouping key so multiple filter rows map to the same AHU.
@@ -469,6 +595,99 @@ def upsert_filter(
     return f
 
 
+def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map):
+    """Create/update one AHU and upsert the filter rows already parsed for it."""
+    display_name = block.get("display_name")
+    building = clean_str(block.get("building"))
+    location = clean_str(block.get("location"))
+    if not display_name:
+        display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
+
+    ahu_key = normalize_ahu_key(display_name, building=building)
+    building_id = None
+    if building:
+        building_obj = upsert_building(hospital.id, building)
+        building_id = building_obj.id if building_obj else None
+
+    if ahu_key not in ahu_key_to_id:
+        existing = find_existing_ahu(hospital.id, display_name, building_id)
+        if existing:
+            ahu_id = existing.id
+            ahu_key_to_id[ahu_key] = ahu_id
+            excel_order = next_seq
+            next_seq += 1
+            stats["ahus_updated"] += 1
+            if building_id and getattr(existing, "building_id", None) != building_id:
+                existing.building_id = building_id
+            if location:
+                existing.location = location
+        else:
+            display_label = make_sequential_ahu_id(next_seq)
+            a = AHU(
+                hospital_id=hospital.id,
+                building_id=building_id,
+                name=display_name or display_label,
+                location=location,
+                notes=None,
+                excel_order=next_seq,
+            )
+            db.session.add(a)
+            db.session.flush()
+            ahu_id = a.id
+            ahu_key_to_id[ahu_key] = ahu_id
+            excel_order = next_seq
+            next_seq += 1
+            stats["ahus_created"] += 1
+    else:
+        ahu_id = ahu_key_to_id[ahu_key]
+        existing_ahu = db.session.get(AHU, ahu_id)
+        excel_order = getattr(existing_ahu, "excel_order", None) if existing_ahu else None
+
+    notes_parts = [f"Excel AHU block", f"Excel Display: {display_name}"]
+    if building:
+        notes_parts.append(f"Building: {building}")
+    notes = " | ".join(notes_parts)
+    ahu_obj = db.session.get(AHU, ahu_id)
+    if ahu_obj:
+        ahu_obj.notes = notes or ahu_obj.notes
+        if excel_order is not None and hasattr(ahu_obj, "excel_order"):
+            ahu_obj.excel_order = int(excel_order)
+    stats["ahus"].add(ahu_id)
+
+    filter_order_map.setdefault(ahu_id, 1)
+    for row in block.get("filters") or []:
+        phase = row.get("phase")
+        if _looks_like_ahu_label(phase):
+            phase = None
+        size = row.get("size")
+        qty = row.get("quantity")
+        freq_raw = row.get("freq_raw")
+        freq_days = parse_frequency_to_days(freq_raw)
+        part_number = row.get("part_number")
+        last_service_date = row.get("last_service_date")
+        is_active = True
+        if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
+            is_active = False
+        if not size:
+            stats["filters_skipped"] += 1
+            continue
+        filter_excel_order = filter_order_map[ahu_id]
+        filter_order_map[ahu_id] += 1
+        upsert_filter(
+            ahu_id=ahu_id,
+            phase=phase,
+            part_number=part_number,
+            size=size,
+            quantity=qty,
+            frequency_days=freq_days,
+            last_service_date=last_service_date,
+            is_active=is_active,
+            excel_order=filter_excel_order,
+        )
+        stats["filters_upserted"] += 1
+    return next_seq
+
+
 # -----------------------------
 # Main seed
 # -----------------------------
@@ -526,6 +745,18 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
     next_seq = 1
 
     for sheet in data_sheets:
+        if sheet_uses_survey_letters(path, sheet):
+            letter_blocks = read_survey_letter_blocks(path, sheet)
+            if letter_blocks:
+                stats["sheets_processed"] += 1
+                stats["rows_seen"] += sum(len(b.get("filters") or []) for b in letter_blocks)
+                filter_order_map = {}
+                for block in letter_blocks:
+                    next_seq = seed_parsed_ahu_block(
+                        hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map
+                    )
+                continue
+
         df = pd.read_excel(path, sheet_name=sheet, header=4)
         df.columns = [str(c).strip() for c in df.columns]
 
@@ -579,17 +810,8 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
             return False
 
         def looks_like_ahu_label(val):
-            """Return True when a cell looks like an AH/AHU label (e.g. 'AH-1', 'AHU-2', 'AH1')."""
-            s = clean_str(val)
-            if not s:
-                return False
-            s2 = s.upper()
-            # common patterns: starts with AH, AHU, contains 'AH-' etc.
-            if re.search(r"\bAHU\b|\bAH\b", s2):
-                return True
-            if re.search(r"AH[-_ ]?\d+", s2):
-                return True
-            return False
+            """Return True when a cell looks like an AH/AHU/RTU label (e.g. 'AH-1', 'RTU-2')."""
+            return _looks_like_ahu_label(val)
 
         for r in rows:
             if row_has_data(r):

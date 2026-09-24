@@ -19,8 +19,10 @@ from datetime import date
 from seed_from_excel import (
     normalize_filter_size,
     part_match_keys,
+    read_survey_letter_blocks,
     seed_from_excel,
     serialize_seed_stats,
+    sheet_uses_survey_letters,
 )
 
 
@@ -50,6 +52,58 @@ def write_workbook(path, hospital, rows, sheet="MAIN BUILDING"):
         for c_i, val in enumerate(row, 1):
             ws.cell(r_i, c_i, val)
     wb.save(path)
+
+
+LETTER_HEADERS = {
+    "B": "BUILDING",
+    "C": "LOCATION",
+    "E": "STAGE",
+    "F": "AHU NO.",
+    "G": "FILTER TYPE",
+    "H": "PART NUMBER",
+    "J": "FILTER SIZE",
+    "K": "QUANTITY",
+    "L": "QUANTITY X 4",
+    "M": "FREQUENCY",
+    "N": "INVOICE NUMBER",
+    "O": "DATE OF REPLACEMENT",
+    "P": "SCHEDULED DATE OF REPLACEMENT",
+}
+
+
+def write_lettered_survey(path, hospital, blocks, sheet="EAST"):
+    """blocks: list of list of dicts with keys matching LETTER_HEADERS."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws["B2"] = hospital
+    for letter, header in LETTER_HEADERS.items():
+        ws[f"{letter}5"] = header
+    row = 6
+    for i, ahu_rows in enumerate(blocks):
+        if i:
+            # separator may still have building/location — must still split AHUs
+            ws[f"B{row}"] = ahu_rows[0].get("B")
+            ws[f"C{row}"] = ahu_rows[0].get("C")
+            row += 1
+        for r in ahu_rows:
+            for letter, val in r.items():
+                ws[f"{letter}{row}"] = val
+            row += 1
+    wb.save(path)
+
+
+def rtu_block(ahu, fill_ahu_every_row=False):
+    rows = [
+        {"B": "East Building", "C": "Roof", "E": "PRE", "F": ahu, "G": "Pleated", "H": "HVP24242", "J": "24x24x2 HV", "K": 32, "L": 32, "M": "90 Days", "O": date(2026, 8, 25)},
+        {"B": "East Building", "C": "Roof", "E": "PRE", "G": "Pleated", "H": "HVP12242", "J": "12x24x2 HV", "K": 8, "L": 8, "M": "90 Days", "O": date(2026, 8, 25)},
+        {"B": "East Building", "C": "Roof", "E": "FINAL", "G": "V-Bank", "H": "F8V424-GWBB", "J": "24x24x12 FF", "K": 16, "L": 16, "M": "365 Days", "O": date(2026, 5, 5)},
+        {"B": "East Building", "C": "Roof", "E": "FINAL", "G": "V-Bank", "H": "F8V1224-GWBB", "J": "12x24x12 FF", "K": 4, "L": 4, "M": "365 Days", "O": date(2026, 5, 5)},
+    ]
+    if fill_ahu_every_row:
+        for r in rows:
+            r["F"] = ahu
+    return rows
 
 
 def sample_rows(qty_pre=2, location="Roof"):
@@ -191,6 +245,30 @@ def main():
             assert_eq(final.last_service_date, date(2026, 5, 5), "FINAL date from survey")
             assert_eq(fourth["ahus_created"], 0, "AHU still matched")
             assert_eq(Filter.query.filter_by(ahu_id=ahu.id).count(), 2, "unused extra PRE row deleted")
+
+            letter_path = path + ".letters.xlsx"
+            write_lettered_survey(letter_path, "Foothill", [rtu_block("RTU-1"), rtu_block("RTU-2")])
+            assert sheet_uses_survey_letters(letter_path, "EAST"), "detect printed survey columns"
+            parsed = read_survey_letter_blocks(letter_path, "EAST")
+            assert_eq(len(parsed), 2, "blank row splits two AHUs even if building stays filled")
+            assert_eq(parsed[0]["display_name"], "RTU-1", "AHU name from first row of block")
+            assert_eq(parsed[1]["display_name"], "RTU-2", "second block is RTU-2")
+            assert_eq(len(parsed[0]["filters"]), 4, "four filters on RTU-1")
+            assert_eq(len(parsed[1]["filters"]), 4, "four filters on RTU-2")
+            assert_eq(parsed[0]["filters"][0]["quantity"], 32, "qty from column L")
+
+            fifth = seed_from_excel(letter_path, hospital_id=hid)
+            names = sorted(a.name for a in AHU.query.filter_by(hospital_id=hid).all())
+            assert "RTU-1" in names and "RTU-2" in names, f"created both RTUs, got {names}"
+            rtu1 = AHU.query.filter_by(hospital_id=hid, name="RTU-1").first()
+            rtu2 = AHU.query.filter_by(hospital_id=hid, name="RTU-2").first()
+            assert_eq(Filter.query.filter_by(ahu_id=rtu1.id, is_active=True).count(), 4, "RTU-1 has 4 filters")
+            assert_eq(Filter.query.filter_by(ahu_id=rtu2.id, is_active=True).count(), 4, "RTU-2 has 4 filters")
+            assert_eq(fifth["ahus_created"] >= 2, True, "two new RTUs from lettered sheet")
+            try:
+                os.unlink(letter_path)
+            except OSError:
+                pass
         finally:
             try:
                 os.unlink(path)
