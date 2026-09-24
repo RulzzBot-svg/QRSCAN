@@ -10,7 +10,7 @@ import openpyxl
 from sqlalchemy import func
 
 from db import db
-from models import Hospital, AHU, Filter, Building, JobFilter
+from models import Hospital, AHU, Filter, Building, Job, JobFilter
 
 
 EXCEL_PATH = "./excel_data_raw/filter-datasheet.xlsm"
@@ -138,23 +138,39 @@ def _norm_name(s):
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
-def format_ahu_label(ahu_name, building):
-    """Pkg Units + HDH → 'Pkg Units — HDH' so the card/QR shows the building."""
+_INSTANCE_SUFFIX = re.compile(r"\s*#\d+$")
+
+
+def _strip_instance_suffix(name):
+    s = clean_str(name)
+    if not s:
+        return None
+    return _INSTANCE_SUFFIX.sub("", s).strip() or None
+
+
+def format_ahu_label(ahu_name, building, instance=1):
+    """Pkg Units + HDH → 'Pkg Units — HDH'. Second same-name unit is '… #2'."""
     ahu_name = clean_str(ahu_name)
     building = clean_str(building)
     if not ahu_name:
-        return building
-    if not building:
-        return ahu_name
-    if _norm_name(building) in _norm_name(ahu_name):
-        return ahu_name
-    return f"{ahu_name} — {building}"
+        base = building
+    elif not building or (_norm_name(building) and _norm_name(building) in _norm_name(ahu_name)):
+        base = ahu_name
+    else:
+        base = f"{ahu_name} — {building}"
+    try:
+        n = int(instance or 1)
+    except (TypeError, ValueError):
+        n = 1
+    if base and n > 1:
+        return f"{base} #{n}"
+    return base
 
 
 def ahu_name_matches(stored_name, excel_name, building=None):
-    stored = _norm_name(stored_name)
+    stored = _norm_name(_strip_instance_suffix(stored_name))
     excel = _norm_name(excel_name)
-    labeled = _norm_name(format_ahu_label(excel_name, building))
+    labeled = _norm_name(format_ahu_label(excel_name, building, instance=1))
     if not stored:
         return False
     if excel and stored == excel:
@@ -247,14 +263,65 @@ def _first_filled(rows, letter):
     return None
 
 
+def _stage_kind(val):
+    """pre / final / other — PRE after FINAL starts the next physical AHU."""
+    s = (clean_str(val) or "").upper()
+    if not s:
+        return None
+    compact = re.sub(r"[^A-Z0-9]", "", s)
+    if compact.startswith("PRE") or compact in ("1ST", "FIRST", "PRIMARY"):
+        return "pre"
+    if compact.startswith("FINAL") or compact in ("FIN", "LAST"):
+        return "final"
+    return "other"
+
+
+def _block_has_post_pre_stage(rows):
+    for vals in rows:
+        if _stage_kind(vals.get("E")) in ("final", "other"):
+            return True
+    return False
+
+
+def _should_start_new_ahu(current, vals):
+    """
+    One physical unit is usually PRE row(s) then FINAL row(s).
+    Split on building change, AHU name change, or PRE after FINAL
+    (Huntington: two AHU-2s on 6th floor, 12/12 then 4/4).
+    """
+    if not current:
+        return False
+    row_building = clean_str(vals.get("B"))
+    row_ahu = clean_str(vals.get("F"))
+    block_building = _first_filled(current, "B")
+    block_ahu = _first_filled(current, "F")
+    if row_building and block_building and _norm_name(row_building) != _norm_name(block_building):
+        return True
+    if row_ahu and block_ahu and _norm_name(row_ahu) != _norm_name(block_ahu):
+        return True
+    if _stage_kind(vals.get("E")) == "pre" and _block_has_post_pre_stage(current):
+        return True
+    return False
+
+
+def assign_block_instances(blocks):
+    """Number repeated (building, name) units: first is 1, next same name is 2."""
+    counts = {}
+    for block in blocks:
+        key = (_norm_name(block.get("building")), _norm_name(block.get("display_name")))
+        counts[key] = counts.get(key, 0) + 1
+        block["instance"] = counts[key]
+    return blocks
+
+
 def read_survey_letter_blocks(path, sheet_name):
     """
-    One block per AHU. Split when:
-    - the row has no stage/part/size/qty (blank separator; building may still be filled)
-    - column B building changes (East Building vs MOB vs HDH is a hard split)
+    One block per physical AHU. Split when:
+    - column B building changes (East Building vs MOB vs HDH)
     - column F writes a different AHU name
-    Same name in two buildings stays two AHUs (Pkg Units @ Charitable Foundation
-    is not Pkg Units @ HDH).
+    - stage goes back to PRE after FINAL (second AHU-2 on the same floor)
+    A blank / building-only row does not split PRE from FINAL of the same unit.
+    A blank before a new PRE does split (next unit).
     """
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb[wb.sheetnames[0]]
@@ -267,6 +334,7 @@ def read_survey_letter_blocks(path, sheet_name):
 
     blocks = []
     current = []
+    pending_blank = False
 
     def close_block():
         if not current:
@@ -315,38 +383,29 @@ def read_survey_letter_blocks(path, sheet_name):
         if _survey_header_row(vals):
             continue
         if not _survey_filter_row(vals):
-            close_block()
+            pending_blank = True
             continue
-        row_building = clean_str(vals.get("B"))
-        row_ahu = clean_str(vals.get("F"))
-        if current:
-            block_building = _first_filled(current, "B")
-            block_ahu = _first_filled(current, "F")
-            building_changed = (
-                row_building
-                and block_building
-                and _norm_name(row_building) != _norm_name(block_building)
-            )
-            ahu_changed = (
-                row_ahu
-                and block_ahu
-                and _norm_name(row_ahu) != _norm_name(block_ahu)
-            )
-            if building_changed or ahu_changed:
-                close_block()
+        start_new = _should_start_new_ahu(current, vals)
+        if current and (start_new or (pending_blank and _stage_kind(vals.get("E")) == "pre")):
+            close_block()
+        pending_blank = False
         current.append(vals)
     close_block()
-    return blocks
+    return assign_block_instances(blocks)
 
 
-def normalize_ahu_key(display_name: str, building: str = None) -> str:
+def normalize_ahu_key(display_name: str, building: str = None, instance=1) -> str:
     """
     Logical grouping key so multiple filter rows map to the same AHU.
-    Include building so 'AHU-1' in different buildings won't collide.
+    Include building and instance so two AHU-2s on 21 Building stay two units.
     """
     dn = clean_str(display_name) or ""
     b = clean_str(building) or ""
-    raw = f"{b}::{dn}".strip().lower()
+    try:
+        inst = int(instance or 1)
+    except (TypeError, ValueError):
+        inst = 1
+    raw = f"{b}::{dn}::{inst}".strip().lower()
     raw = re.sub(r"\s+", " ", raw).strip()
     return raw or "unnamed"
 
@@ -436,11 +495,11 @@ def upsert_building(hospital_id: int, name: str, floor_area: str = None):
     return b
 
 
-def apply_ahu_label(ahu, display_name, building):
+def apply_ahu_label(ahu, display_name, building, instance=1):
     """Persist 'AHU — Building' so Admin/QR can tell Pkg Units at HDH from Pkg Units at MOB."""
     if ahu is None:
         return None
-    label = format_ahu_label(display_name, building)
+    label = format_ahu_label(display_name, building, instance=instance)
     if not label:
         return None
     if ahu.name and _norm_name(ahu.name) == _norm_name(label):
@@ -449,26 +508,115 @@ def apply_ahu_label(ahu, display_name, building):
     return label
 
 
-def find_existing_ahu(hospital_id, name, building_id=None, building_name=None):
+def find_existing_ahu(
+    hospital_id,
+    name,
+    building_id=None,
+    building_name=None,
+    claimed_ids=None,
+    instance=1,
+):
     """Match an AHU already in the DB so re-seeding updates instead of duplicating."""
     if not _norm_name(name):
         return None
 
+    claimed = set(claimed_ids or [])
     candidates = (
         AHU.query.filter_by(hospital_id=hospital_id)
         .order_by(AHU.id.asc())
         .all()
     )
-    matches = [a for a in candidates if ahu_name_matches(a.name, name, building_name)]
+    matches = [
+        a for a in candidates
+        if a.id not in claimed and ahu_name_matches(a.name, name, building_name)
+    ]
     if not matches:
         return None
+
     if building_id is not None:
-        for a in matches:
-            if a.building_id == building_id:
-                return a
-        # Same name in another building is a different AHU (Pkg Units, RTU-1, …).
+        usable = [a for a in matches if a.building_id in (None, building_id)]
+    else:
+        usable = matches
+    if not usable:
         return None
-    return matches[0]
+
+    def rank(a):
+        same_building = building_id is not None and a.building_id == building_id
+        return (
+            0 if same_building else 1 if a.building_id is None else 2,
+            a.excel_order is None,
+            a.excel_order or 0,
+            a.id,
+        )
+
+    labeled = format_ahu_label(name, building_name, instance=instance)
+    for a in usable:
+        if _norm_name(a.name) == _norm_name(labeled):
+            return a
+    usable.sort(key=rank)
+    idx = max(0, int(instance or 1) - 1)
+    if idx < len(usable):
+        return usable[idx]
+    # Instance 2+ with only one leftover unlabeled row — take the first unused.
+    if usable:
+        return usable[0]
+    return None
+
+
+def _excel_name_from_stored(stored_name, building_name=None):
+    """'AHU-1 — 21 Building #2' → 'AHU-1'."""
+    name = _strip_instance_suffix(stored_name)
+    building = clean_str(building_name)
+    if name and building:
+        suffix = f" — {building}"
+        if name.lower().endswith(suffix.lower()):
+            return name[: -len(suffix)].strip() or name
+    return name
+
+
+def collapse_unclaimed_ahu_duplicates(hospital_id, claimed_ids):
+    """
+    Re-import used to leave AHU-1 plus AHU-1 — 21 Building.
+    Move leftover same-name filters onto the claimed unit and drop the extra.
+    """
+    claimed = [i for i in (claimed_ids or []) if i is not None]
+    if not claimed:
+        return
+    keepers = [db.session.get(AHU, i) for i in claimed]
+    keepers = [a for a in keepers if a is not None]
+    claimed_set = {a.id for a in keepers}
+
+    for keep in keepers:
+        building_name = keep.building.name if keep.building else None
+        excel_name = _excel_name_from_stored(keep.name, building_name)
+        extras = []
+        for a in AHU.query.filter_by(hospital_id=hospital_id).all():
+            if a.id in claimed_set:
+                continue
+            if a.building_id not in (None, keep.building_id):
+                continue
+            if ahu_name_matches(a.name, excel_name, building_name):
+                extras.append(a)
+        for extra in extras:
+            for f in list(Filter.query.filter_by(ahu_id=extra.id).all()):
+                existing = find_existing_filter(keep.id, f.phase, f.part_number, f.size)
+                if existing:
+                    used = (
+                        db.session.query(JobFilter.id)
+                        .filter(JobFilter.filter_id == f.id)
+                        .first()
+                    )
+                    if used:
+                        f.is_active = False
+                    else:
+                        db.session.delete(f)
+                else:
+                    f.ahu_id = keep.id
+            leftover = Filter.query.filter_by(ahu_id=extra.id).first()
+            job = db.session.query(Job.id).filter(Job.ahu_id == extra.id).first()
+            if not leftover and not job:
+                db.session.delete(extra)
+            claimed_set.add(extra.id)
 
 
 def select_data_sheets(sheet_names, selected_sheet=None):
@@ -706,8 +854,9 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
     if not display_name:
         display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
 
-    label = format_ahu_label(display_name, building)
-    ahu_key = normalize_ahu_key(display_name, building=building)
+    instance = int(block.get("instance") or 1)
+    label = format_ahu_label(display_name, building, instance=instance)
+    ahu_key = normalize_ahu_key(display_name, building=building, instance=instance)
     building_id = None
     if building:
         building_obj = upsert_building(hospital.id, building)
@@ -715,7 +864,12 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
 
     if ahu_key not in ahu_key_to_id:
         existing = find_existing_ahu(
-            hospital.id, display_name, building_id=building_id, building_name=building
+            hospital.id,
+            display_name,
+            building_id=building_id,
+            building_name=building,
+            claimed_ids=ahu_key_to_id.values(),
+            instance=instance,
         )
         if existing:
             ahu_id = existing.id
@@ -727,7 +881,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
                 existing.building_id = building_id
             if location:
                 existing.location = location
-            apply_ahu_label(existing, display_name, building)
+            apply_ahu_label(existing, display_name, building, instance=instance)
         else:
             display_label = make_sequential_ahu_id(next_seq)
             a = AHU(
@@ -749,7 +903,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
         ahu_id = ahu_key_to_id[ahu_key]
         existing_ahu = db.session.get(AHU, ahu_id)
         excel_order = getattr(existing_ahu, "excel_order", None) if existing_ahu else None
-        apply_ahu_label(existing_ahu, display_name, building)
+        apply_ahu_label(existing_ahu, display_name, building, instance=instance)
 
     notes_parts = [f"Excel AHU block", f"Excel Display: {display_name}"]
     if building:
@@ -758,7 +912,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
     ahu_obj = db.session.get(AHU, ahu_id)
     if ahu_obj:
         ahu_obj.notes = notes or ahu_obj.notes
-        apply_ahu_label(ahu_obj, display_name, building)
+        apply_ahu_label(ahu_obj, display_name, building, instance=instance)
         if excel_order is not None and hasattr(ahu_obj, "excel_order"):
             ahu_obj.excel_order = int(excel_order)
     stats["ahus"].add(ahu_id)
@@ -863,6 +1017,7 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
                     next_seq = seed_parsed_ahu_block(
                         hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map
                     )
+                collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
                 continue
 
         df = pd.read_excel(path, sheet_name=sheet, header=4)
@@ -922,13 +1077,29 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
             """Return True when a cell looks like an AH/AHU/RTU label (e.g. 'AH-1', 'RTU-2')."""
             return _looks_like_ahu_label(val)
 
+        def pandas_as_survey(r):
+            return {
+                "B": r.get(col_building) if col_building else None,
+                "C": r.get(col_loc) if col_loc else None,
+                "E": r.get(col_stage) if col_stage else None,
+                "F": r.get(col_ahu) if col_ahu else None,
+            }
+
+        pending_blank = False
         for r in rows:
             if row_has_data(r):
-                current_block.append(r)
-            else:
-                if current_block:
+                survey_row = pandas_as_survey(r)
+                current_as_survey = [pandas_as_survey(x) for x in current_block]
+                start_new = _should_start_new_ahu(current_as_survey, survey_row)
+                if current_block and (
+                    start_new or (pending_blank and _stage_kind(survey_row.get("E")) == "pre")
+                ):
                     blocks.append(current_block)
                     current_block = []
+                pending_blank = False
+                current_block.append(r)
+            else:
+                pending_blank = True
 
         if current_block:
             blocks.append(current_block)
@@ -978,7 +1149,19 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
                     floor_area = fa
                     break
 
-            ahu_key = normalize_ahu_key(display_name, building=building)
+            instance = 1
+            for prev in blocks[: blocks.index(block)]:
+                prev_name = None
+                prev_building = None
+                for pr in prev:
+                    if prev_name is None:
+                        prev_name = clean_str(pr.get(col_ahu))
+                    if prev_building is None and col_building:
+                        prev_building = clean_str(pr.get(col_building))
+                if _norm_name(prev_name) == _norm_name(display_name) and _norm_name(prev_building) == _norm_name(building):
+                    instance += 1
+
+            ahu_key = normalize_ahu_key(display_name, building=building, instance=instance)
 
             # ensure building exists before creating AHU so we can set building_id
             building_obj = None
@@ -987,11 +1170,16 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
                 building_obj = upsert_building(hospital.id, building, floor_area=floor_area)
                 building_id = building_obj.id if building_obj else None
 
-            label = format_ahu_label(display_name, building)
+            label = format_ahu_label(display_name, building, instance=instance)
 
             if ahu_key not in ahu_key_to_id:
                 existing = find_existing_ahu(
-                    hospital.id, display_name, building_id=building_id, building_name=building
+                    hospital.id,
+                    display_name,
+                    building_id=building_id,
+                    building_name=building,
+                    claimed_ids=ahu_key_to_id.values(),
+                    instance=instance,
                 )
                 if existing:
                     ahu_id = existing.id
@@ -1004,7 +1192,7 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
                     loc = clean_str(location)
                     if loc:
                         existing.location = loc
-                    apply_ahu_label(existing, display_name, building)
+                    apply_ahu_label(existing, display_name, building, instance=instance)
                 else:
                     display_label = make_sequential_ahu_id(next_seq)
                     a = AHU(
@@ -1037,7 +1225,7 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
             ahu_obj = db.session.get(AHU, ahu_id)
             if ahu_obj:
                 ahu_obj.notes = notes or ahu_obj.notes
-                apply_ahu_label(ahu_obj, display_name, building)
+                apply_ahu_label(ahu_obj, display_name, building, instance=instance)
                 if excel_order is not None and hasattr(ahu_obj, "excel_order"):
                     ahu_obj.excel_order = int(excel_order)
             stats["ahus"].add(ahu_id)
@@ -1084,6 +1272,10 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
                     excel_order=filter_excel_order,
                 )
                 stats["filters_upserted"] += 1
+
+        collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
+
+    collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
 
     if dry_run:
         db.session.rollback()

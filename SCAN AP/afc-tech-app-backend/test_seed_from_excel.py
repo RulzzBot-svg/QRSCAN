@@ -182,8 +182,10 @@ def main():
     assert_eq(payload["sheets"], [], "sheets list is JSON-safe")
     assert_eq(format_ahu_label("Pkg Units", "HDH"), "Pkg Units — HDH", "building in AHU label")
     assert_eq(format_ahu_label("AH-1 East Building", "East Building"), "AH-1 East Building", "do not double building")
+    assert_eq(format_ahu_label("AHU-2", "21 Building", 2), "AHU-2 — 21 Building #2", "second same-name unit")
     assert ahu_name_matches("Pkg Units", "Pkg Units", "HDH"), "plain stored name still matches"
     assert ahu_name_matches("Pkg Units — HDH", "Pkg Units", "HDH"), "labeled stored name matches"
+    assert ahu_name_matches("AHU-2 — 21 Building #2", "AHU-2", "21 Building"), "#2 still matches AHU-2"
     assert not ahu_name_matches("Pkg Units — MOB", "Pkg Units", "HDH"), "other building label does not match"
     assert is_skip_sheet("FILTER") and is_skip_sheet("Legend") and not is_skip_sheet("EAST")
 
@@ -379,6 +381,106 @@ def main():
             assert_eq(tab_names, ["RTU-9 — East Building", "RTU-9 — MOB"], "each tab keeps its building in the name")
             try:
                 os.unlink(tabs_path)
+            except OSError:
+                pass
+
+            def huntington_rows():
+                return [
+                    {"B": "21 Building", "C": "6th Floor", "E": "PRE", "F": "AHU-1", "G": "HV Pleat", "H": "HVP24242", "J": "24x24x2", "K": 16, "L": 16, "M": "90 Days"},
+                    {"B": "21 Building", "C": "6th Floor", "E": "FINAL", "F": "AHU-1", "G": "F84V", "H": "F8V424-GWBB", "J": "24x24x12", "K": 16, "L": 16, "M": "2 Years"},
+                    {"B": "21 Building", "C": "6th Floor", "E": "PRE", "F": "AHU-2", "G": "HV Pleat", "H": "HVP24242", "J": "24x24x2", "K": 12, "L": 12, "M": "90 Days"},
+                    {"B": "21 Building", "C": "6th Floor", "E": "FINAL", "F": "AHU-2", "G": "F84V", "H": "F8V424-GWBB", "J": "24x24x12", "K": 12, "L": 12, "M": "2 Years"},
+                    {"B": "21 Building", "C": "6th Floor", "E": "PRE", "F": "AHU-2", "G": "HV Pleat", "H": "HVP24242", "J": "12x24x2", "K": 4, "L": 4, "M": "90 Days"},
+                    {"B": "21 Building", "C": "6th Floor", "E": "FINAL", "F": "AHU-2", "G": "F84V", "H": "F8V424-GWBB", "J": "12x24x12", "K": 4, "L": 4, "M": "2 Years"},
+                    {"B": "21 Building", "C": "6th Floor", "E": "PRE", "F": "AHU-3", "G": "HV Pleat", "H": "HVP24242", "J": "24x24x2", "K": 6, "L": 6, "M": "90 Days"},
+                    {"B": "21 Building", "C": "6th Floor", "E": "FINAL", "F": "AHU-3", "G": "F84V", "H": "F8V424-GWBB", "J": "24x24x12", "K": 6, "L": 6, "M": "2 Years"},
+                ]
+
+            hunt_path = path + ".huntington.xlsx"
+            write_lettered_flat(hunt_path, "Huntington Memorial", huntington_rows(), sheet="21 Building")
+            hunt_blocks = read_survey_letter_blocks(hunt_path, "21 Building")
+            assert_eq(len(hunt_blocks), 4, "Huntington tab 1 is 4 units, not PRE/FINAL split")
+            assert_eq(hunt_blocks[0]["display_name"], "AHU-1", "block 1 is AHU-1")
+            assert_eq(len(hunt_blocks[0]["filters"]), 2, "AHU-1 keeps 16 PRE + 16 FINAL")
+            assert_eq(hunt_blocks[1]["display_name"], "AHU-2", "block 2 is first AHU-2")
+            assert_eq([f["quantity"] for f in hunt_blocks[1]["filters"]], [12, 12], "AHU-2 12/12")
+            assert_eq(hunt_blocks[2]["display_name"], "AHU-2", "block 3 is second AHU-2")
+            assert_eq([f["quantity"] for f in hunt_blocks[2]["filters"]], [4, 4], "AHU-2 4/4 stays its own unit")
+            assert_eq(hunt_blocks[3]["display_name"], "AHU-3", "block 4 is AHU-3")
+            assert_eq(hunt_blocks[2]["instance"], 2, "second AHU-2 is instance 2")
+
+            hunt_gapped = []
+            for i, row in enumerate(huntington_rows()):
+                if i:
+                    hunt_gapped.append({"B": row["B"], "C": row["C"]})
+                hunt_gapped.append(row)
+            gapped_path = path + ".huntington-gaps.xlsx"
+            write_lettered_flat(gapped_path, "Huntington Memorial", hunt_gapped, sheet="21 Building")
+            gapped_blocks = read_survey_letter_blocks(gapped_path, "21 Building")
+            assert_eq(len(gapped_blocks), 4, "blank between PRE and FINAL does not make 6/8 blocks")
+
+            hunt_hospital = Hospital(name="Huntington Memorial", active=True)
+            db.session.add(hunt_hospital)
+            db.session.flush()
+            hunt_hid = hunt_hospital.id
+            first_hunt = seed_from_excel(hunt_path, hospital_id=hunt_hid)
+            hunt_ahus = [a for a in AHU.query.filter_by(hospital_id=hunt_hid).all() if a.building and a.building.name == "21 Building"]
+            assert_eq(len(hunt_ahus), 4, "seed creates 4 AHUs for Huntington tab 1")
+            names = sorted(a.name for a in hunt_ahus)
+            assert_eq(
+                names,
+                [
+                    "AHU-1 — 21 Building",
+                    "AHU-2 — 21 Building",
+                    "AHU-2 — 21 Building #2",
+                    "AHU-3 — 21 Building",
+                ],
+                "building on the name; second AHU-2 is #2",
+            )
+            by_name = {a.name: a for a in hunt_ahus}
+            assert_eq(Filter.query.filter_by(ahu_id=by_name["AHU-1 — 21 Building"].id, is_active=True).count(), 2, "AHU-1 has PRE+FINAL")
+            assert_eq(Filter.query.filter_by(ahu_id=by_name["AHU-2 — 21 Building"].id, is_active=True).count(), 2, "AHU-2 12/12 has 2 filters")
+            assert_eq(Filter.query.filter_by(ahu_id=by_name["AHU-2 — 21 Building #2"].id, is_active=True).count(), 2, "AHU-2 4/4 has 2 filters")
+            assert_eq(
+                sorted(f.quantity for f in Filter.query.filter_by(ahu_id=by_name["AHU-2 — 21 Building"].id).all()),
+                [12, 12],
+                "first AHU-2 keeps 12s",
+            )
+            assert_eq(
+                sorted(f.quantity for f in Filter.query.filter_by(ahu_id=by_name["AHU-2 — 21 Building #2"].id).all()),
+                [4, 4],
+                "second AHU-2 keeps 4s",
+            )
+            assert_eq(first_hunt["ahus_created"], 4, "four new Huntington AHUs")
+
+            second_hunt = seed_from_excel(hunt_path, hospital_id=hunt_hid)
+            assert_eq(AHU.query.filter_by(hospital_id=hunt_hid).count(), 4, "re-import does not duplicate to 6")
+            assert_eq(second_hunt["ahus_created"], 0, "re-import updates the 4 units")
+            assert_eq(second_hunt["ahus_updated"], 4, "all four matched")
+
+            # Pretend an older import left unlabeled + labeled copies (the 6-block case)
+            extra = AHU(
+                hospital_id=hunt_hid,
+                building_id=by_name["AHU-1 — 21 Building"].building_id,
+                name="AHU-1",
+                location="6th Floor",
+            )
+            db.session.add(extra)
+            db.session.commit()
+            assert_eq(AHU.query.filter_by(hospital_id=hunt_hid).count(), 5, "setup extra unlabeled AHU-1")
+            seed_from_excel(hunt_path, hospital_id=hunt_hid)
+            leftover = [
+                a for a in AHU.query.filter_by(hospital_id=hunt_hid).all()
+                if a.building and a.building.name == "21 Building"
+            ]
+            assert_eq(len(leftover), 4, "unlabeled extra AHU-1 is collapsed, not a 5th/6th block")
+
+            try:
+                os.unlink(hunt_path)
+            except OSError:
+                pass
+            try:
+                os.unlink(gapped_path)
             except OSError:
                 pass
         finally:
