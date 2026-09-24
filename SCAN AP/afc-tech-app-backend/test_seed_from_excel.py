@@ -93,6 +93,20 @@ def write_lettered_survey(path, hospital, blocks, sheet="EAST"):
     wb.save(path)
 
 
+def write_lettered_flat(path, hospital, rows, sheet="EAST"):
+    """Write consecutive survey rows with no blank separators."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws["B2"] = hospital
+    for letter, header in LETTER_HEADERS.items():
+        ws[f"{letter}5"] = header
+    for i, r in enumerate(rows):
+        for letter, val in r.items():
+            ws[f"{letter}{6 + i}"] = val
+    wb.save(path)
+
+
 def rtu_block(ahu, fill_ahu_every_row=False):
     rows = [
         {"B": "East Building", "C": "Roof", "E": "PRE", "F": ahu, "G": "Pleated", "H": "HVP24242", "J": "24x24x2 HV", "K": 32, "L": 32, "M": "90 Days", "O": date(2026, 8, 25)},
@@ -267,6 +281,35 @@ def main():
             assert_eq(fifth["ahus_created"] >= 2, True, "two new RTUs from lettered sheet")
             try:
                 os.unlink(letter_path)
+            except OSError:
+                pass
+
+            pkg_path = path + ".pkg.xlsx"
+            write_lettered_flat(
+                pkg_path,
+                "Foothill",
+                [
+                    {"B": "Charitable Foundation", "C": "Roof", "E": "PRE", "F": "Pkg Units", "G": "Pleated", "H": "ZLP20251", "J": "20x25x1", "K": 1, "L": 4, "M": "90 Days", "O": date(2026, 8, 25)},
+                    {"B": "Charitable Foundation", "C": "Roof", "E": "PRE", "F": "Pkg Units", "G": "Pleated", "H": "ZLP10241", "J": "10x24x1", "K": 6, "L": 24, "M": "90 Days", "O": date(2026, 8, 25)},
+                    {"B": "HDH", "C": "Roof", "E": "PRE", "F": "Pkg Units", "G": "Pleated", "H": "HVP20242", "J": "20x24x2", "K": 5, "L": 20, "M": "90 Days", "O": date(2026, 8, 25)},
+                    {"B": "12780 Hesperia rd", "C": "Roof", "E": "PRE", "F": "Pkg Units", "G": "Pleated", "H": "HVP20302", "J": "20x30x2", "K": 5, "L": 20, "M": "90 Days", "O": date(2026, 8, 25)},
+                ],
+            )
+            pkg_blocks = read_survey_letter_blocks(pkg_path, "EAST")
+            assert_eq(len(pkg_blocks), 3, "building change splits Pkg Units with no blank row")
+            assert_eq(pkg_blocks[0]["building"], "Charitable Foundation", "first building")
+            assert_eq(len(pkg_blocks[0]["filters"]), 2, "two filters stay on Charitable Foundation")
+            assert_eq(pkg_blocks[1]["building"], "HDH", "HDH is its own AHU")
+            assert_eq(pkg_blocks[2]["building"], "12780 Hesperia rd", "Hesperia is its own AHU")
+            seed_from_excel(pkg_path, hospital_id=hid)
+            pkg_ahus = [a for a in AHU.query.filter_by(hospital_id=hid).all() if a.name == "Pkg Units"]
+            assert_eq(len(pkg_ahus), 3, "three Pkg Units AHUs, one per building")
+            by_building = {a.building.name: Filter.query.filter_by(ahu_id=a.id, is_active=True).count() for a in pkg_ahus}
+            assert_eq(by_building.get("Charitable Foundation"), 2, "Charitable Foundation Pkg Units has 2 filters")
+            assert_eq(by_building.get("HDH"), 1, "HDH Pkg Units has 1 filter")
+            assert_eq(by_building.get("12780 Hesperia rd"), 1, "Hesperia Pkg Units has 1 filter")
+            try:
+                os.unlink(pkg_path)
             except OSError:
                 pass
         finally:

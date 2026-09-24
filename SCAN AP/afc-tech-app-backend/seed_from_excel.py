@@ -192,11 +192,22 @@ def sheet_uses_survey_letters(path, sheet_name):
     return False
 
 
+def _first_filled(rows, letter):
+    for vals in rows:
+        raw = clean_str(vals.get(letter))
+        if raw and not is_placeholder(raw):
+            return raw
+    return None
+
+
 def read_survey_letter_blocks(path, sheet_name):
     """
-    One block per AHU. A row with no stage/part/size/qty ends the AHU even if
-    building/location are still filled. AHU name comes from column F on the
-    first row of the block; later F cells in the same block are ignored.
+    One block per AHU. Split when:
+    - the row has no stage/part/size/qty (blank separator; building may still be filled)
+    - column B building changes (East Building vs MOB vs HDH is a hard split)
+    - column F writes a different AHU name
+    Same name in two buildings stays two AHUs (Pkg Units @ Charitable Foundation
+    is not Pkg Units @ HDH).
     """
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb[wb.sheetnames[0]]
@@ -259,6 +270,23 @@ def read_survey_letter_blocks(path, sheet_name):
         if not _survey_filter_row(vals):
             close_block()
             continue
+        row_building = clean_str(vals.get("B"))
+        row_ahu = clean_str(vals.get("F"))
+        if current:
+            block_building = _first_filled(current, "B")
+            block_ahu = _first_filled(current, "F")
+            building_changed = (
+                row_building
+                and block_building
+                and _norm_name(row_building) != _norm_name(block_building)
+            )
+            ahu_changed = (
+                row_ahu
+                and block_ahu
+                and _norm_name(row_ahu) != _norm_name(block_ahu)
+            )
+            if building_changed or ahu_changed:
+                close_block()
         current.append(vals)
     close_block()
     return blocks
@@ -378,6 +406,8 @@ def find_existing_ahu(hospital_id, name, building_id=None):
         for a in matches:
             if a.building_id == building_id:
                 return a
+        # Same name in another building is a different AHU (Pkg Units, RTU-1, …).
+        return None
     return matches[0]
 
 
