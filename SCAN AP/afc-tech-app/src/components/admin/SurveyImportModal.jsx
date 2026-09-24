@@ -22,6 +22,7 @@ export default function SurveyImportModal({
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [hospitalId, setHospitalId] = useState("");
+  const [replaceExisting, setReplaceExisting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -31,6 +32,7 @@ export default function SurveyImportModal({
     setError("");
     setResult(null);
     setBusy(false);
+    setReplaceExisting(false);
     setHospitalId(selectedHospitalKey ? String(selectedHospitalKey) : "");
   }, [open, selectedHospitalKey]);
 
@@ -56,6 +58,10 @@ export default function SurveyImportModal({
       setError("Choose an Excel file from Documents first.");
       return;
     }
+    if (replaceExisting && !hospitalId) {
+      setError("Pick Huntington Memorial (or the hospital to replace) before starting fresh.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -63,6 +69,7 @@ export default function SurveyImportModal({
         dryRun,
         hospitalId: hospitalId || undefined,
         sheet: "all",
+        replaceExisting,
       });
       setResult(res.data || null);
       if (!dryRun) {
@@ -120,6 +127,24 @@ export default function SurveyImportModal({
             </div>
           </div>
 
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm mt-0.5"
+              checked={replaceExisting}
+              disabled={busy}
+              onChange={(e) => setReplaceExisting(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Start fresh</span>
+              <span className="block text-xs opacity-70">
+                Delete this hospital&apos;s current AHUs and filters, then import the workbook as
+                the only copy. Jobs on those AHUs are removed. QR IDs change — reprint labels
+                after. Preview first.
+              </span>
+            </span>
+          </label>
+
           <div>
             <label className="label py-1">
               <span className="label-text">Workbook (.xlsx or .xlsm)</span>
@@ -157,6 +182,13 @@ export default function SurveyImportModal({
               AHUs updated {stats.ahus_updated ?? 0} · created {stats.ahus_created ?? 0} ·
               filters upserted {stats.filters_upserted ?? 0}
             </div>
+            {stats.replace_existing ? (
+              <div className="text-warning">
+                Fresh start removed {stats.ahus_cleared ?? 0} AHUs
+                {stats.filters_cleared ? ` · ${stats.filters_cleared} filters` : ""}
+                {stats.jobs_cleared ? ` · ${stats.jobs_cleared} jobs` : ""}
+              </div>
+            ) : null}
             <div className="opacity-70">
               Tabs {stats.sheets_processed ?? 0}
               {(stats.sheets || []).length
@@ -188,7 +220,7 @@ export default function SurveyImportModal({
           <button
             className="btn btn-sm"
             type="button"
-            disabled={busy || !file}
+            disabled={busy || !file || (replaceExisting && !hospitalId)}
             onClick={() => runImport(true)}
           >
             {busy ? "Working…" : "Preview"}
@@ -196,10 +228,10 @@ export default function SurveyImportModal({
           <button
             className="btn btn-sm btn-primary"
             type="button"
-            disabled={busy || !file}
+            disabled={busy || !file || (replaceExisting && !hospitalId)}
             onClick={() => runImport(false)}
           >
-            Apply import
+            {replaceExisting ? "Replace and import" : "Apply import"}
           </button>
         </div>
       </div>
