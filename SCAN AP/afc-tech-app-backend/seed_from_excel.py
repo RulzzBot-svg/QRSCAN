@@ -10,7 +10,7 @@ import openpyxl
 from sqlalchemy import func
 
 from db import db
-from models import Hospital, AHU, Filter, Building
+from models import Hospital, AHU, Filter, Building, JobFilter
 
 
 EXCEL_PATH = "./excel_data_raw/filter-datasheet.xlsm"
@@ -432,9 +432,18 @@ def upsert_filter(
             existing.excel_order = int(excel_order)
 
         # A prior import often created extras because size had "HV"/"FF" or
-        # the part number embedded the depth. Keep the oldest row.
+        # the part number embedded the depth. Keep the oldest row; delete
+        # unused copies so they disappear from Admin. Soft-disable if a job used them.
         for extra in matches[1:]:
-            extra.is_active = False
+            used = (
+                db.session.query(JobFilter.id)
+                .filter(JobFilter.filter_id == extra.id)
+                .first()
+            )
+            if used:
+                extra.is_active = False
+            else:
+                db.session.delete(extra)
 
         return existing
 
