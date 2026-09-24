@@ -190,7 +190,7 @@ def main():
             assert_eq(final.part_number, "F8V42412-GWBB", "keep original part number")
             assert_eq(final.last_service_date, date(2026, 5, 5), "FINAL date from survey")
             assert_eq(fourth["ahus_created"], 0, "AHU still matched")
-            assert Filter.query.filter_by(ahu_id=ahu.id, is_active=False).count() >= 1, "extra PRE row deactivated"
+            assert_eq(Filter.query.filter_by(ahu_id=ahu.id).count(), 2, "unused extra PRE row deleted")
         finally:
             try:
                 os.unlink(path)
