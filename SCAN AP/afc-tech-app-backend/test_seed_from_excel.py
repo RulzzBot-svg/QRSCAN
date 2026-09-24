@@ -17,6 +17,9 @@ from models import Hospital, AHU, Filter
 from datetime import date
 
 from seed_from_excel import (
+    ahu_name_matches,
+    format_ahu_label,
+    is_skip_sheet,
     normalize_filter_size,
     part_match_keys,
     read_survey_letter_blocks,
@@ -107,6 +110,26 @@ def write_lettered_flat(path, hospital, rows, sheet="EAST"):
     wb.save(path)
 
 
+def write_lettered_tabs(path, hospital, sheets):
+    """sheets: {tab_name: list of row dicts}. Adds a FILTER skip tab."""
+    wb = Workbook()
+    first = True
+    for sheet, rows in sheets.items():
+        ws = wb.active if first else wb.create_sheet(sheet)
+        if first:
+            ws.title = sheet
+            first = False
+        ws["B2"] = hospital
+        for letter, header in LETTER_HEADERS.items():
+            ws[f"{letter}5"] = header
+        for i, r in enumerate(rows):
+            for letter, val in r.items():
+                ws[f"{letter}{6 + i}"] = val
+    skip = wb.create_sheet("FILTER")
+    skip["A1"] = "legend"
+    wb.save(path)
+
+
 def rtu_block(ahu, fill_ahu_every_row=False):
     rows = [
         {"B": "East Building", "C": "Roof", "E": "PRE", "F": ahu, "G": "Pleated", "H": "HVP24242", "J": "24x24x2 HV", "K": 32, "L": 32, "M": "90 Days", "O": date(2026, 8, 25)},
@@ -156,6 +179,13 @@ def main():
     )
     assert_eq(payload["dry_run"], True, "dry_run flag")
     assert_eq(payload["ahus_touched"], 2, "set length is JSON-safe")
+    assert_eq(payload["sheets"], [], "sheets list is JSON-safe")
+    assert_eq(format_ahu_label("Pkg Units", "HDH"), "Pkg Units — HDH", "building in AHU label")
+    assert_eq(format_ahu_label("AH-1 East Building", "East Building"), "AH-1 East Building", "do not double building")
+    assert ahu_name_matches("Pkg Units", "Pkg Units", "HDH"), "plain stored name still matches"
+    assert ahu_name_matches("Pkg Units — HDH", "Pkg Units", "HDH"), "labeled stored name matches"
+    assert not ahu_name_matches("Pkg Units — MOB", "Pkg Units", "HDH"), "other building label does not match"
+    assert is_skip_sheet("FILTER") and is_skip_sheet("Legend") and not is_skip_sheet("EAST")
 
     db_fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(db_fd)
@@ -173,6 +203,7 @@ def main():
             assert_eq(Hospital.query.count(), 1, "one hospital")
             assert_eq(AHU.query.count(), 1, "one AHU")
             assert_eq(Filter.query.count(), 2, "two filters")
+            assert_eq(AHU.query.first().name, "AH-1 — Main", "building appended on first import")
             hid = first["hospital_id"]
             ahu_id = AHU.query.first().id
             assert_eq(Filter.query.filter_by(part_number="PN-1").first().quantity, 2, "initial qty")
@@ -206,6 +237,7 @@ def main():
             assert_eq(Filter.query.filter_by(part_number="PN-1").first().quantity, 5, "qty updated")
             assert_eq(AHU.query.first().id, ahu_id, "same AHU id")
             assert_eq(AHU.query.first().location, "Roof penthouse", "location updated")
+            assert_eq(AHU.query.first().name, "AH-1 — Main", "building appended to AHU name")
 
             write_workbook(path, "Wrong Name", sample_rows(qty_pre=8, location="Penthouse"))
             third = seed_from_excel(path, hospital_id=hid)
@@ -273,12 +305,15 @@ def main():
 
             fifth = seed_from_excel(letter_path, hospital_id=hid)
             names = sorted(a.name for a in AHU.query.filter_by(hospital_id=hid).all())
-            assert "RTU-1" in names and "RTU-2" in names, f"created both RTUs, got {names}"
-            rtu1 = AHU.query.filter_by(hospital_id=hid, name="RTU-1").first()
-            rtu2 = AHU.query.filter_by(hospital_id=hid, name="RTU-2").first()
+            rtu1_name = format_ahu_label("RTU-1", "East Building")
+            rtu2_name = format_ahu_label("RTU-2", "East Building")
+            assert rtu1_name in names and rtu2_name in names, f"created both RTUs, got {names}"
+            rtu1 = next(a for a in AHU.query.filter_by(hospital_id=hid).all() if ahu_name_matches(a.name, "RTU-1", "East Building"))
+            rtu2 = next(a for a in AHU.query.filter_by(hospital_id=hid).all() if ahu_name_matches(a.name, "RTU-2", "East Building"))
             assert_eq(Filter.query.filter_by(ahu_id=rtu1.id, is_active=True).count(), 4, "RTU-1 has 4 filters")
             assert_eq(Filter.query.filter_by(ahu_id=rtu2.id, is_active=True).count(), 4, "RTU-2 has 4 filters")
             assert_eq(fifth["ahus_created"] >= 2, True, "two new RTUs from lettered sheet")
+            assert_eq(rtu1.name, rtu1_name, "RTU name includes building")
             try:
                 os.unlink(letter_path)
             except OSError:
@@ -302,14 +337,48 @@ def main():
             assert_eq(pkg_blocks[1]["building"], "HDH", "HDH is its own AHU")
             assert_eq(pkg_blocks[2]["building"], "12780 Hesperia rd", "Hesperia is its own AHU")
             seed_from_excel(pkg_path, hospital_id=hid)
-            pkg_ahus = [a for a in AHU.query.filter_by(hospital_id=hid).all() if a.name == "Pkg Units"]
+            pkg_ahus = [
+                a for a in AHU.query.filter_by(hospital_id=hid).all()
+                if ahu_name_matches(a.name, "Pkg Units", getattr(a.building, "name", None))
+            ]
             assert_eq(len(pkg_ahus), 3, "three Pkg Units AHUs, one per building")
             by_building = {a.building.name: Filter.query.filter_by(ahu_id=a.id, is_active=True).count() for a in pkg_ahus}
             assert_eq(by_building.get("Charitable Foundation"), 2, "Charitable Foundation Pkg Units has 2 filters")
             assert_eq(by_building.get("HDH"), 1, "HDH Pkg Units has 1 filter")
             assert_eq(by_building.get("12780 Hesperia rd"), 1, "Hesperia Pkg Units has 1 filter")
+            hdh = next(a for a in pkg_ahus if a.building.name == "HDH")
+            assert_eq(hdh.name, "Pkg Units — HDH", "building is in the stored AHU name")
             try:
                 os.unlink(pkg_path)
+            except OSError:
+                pass
+
+            tabs_path = path + ".tabs.xlsx"
+            write_lettered_tabs(
+                tabs_path,
+                "Foothill",
+                {
+                    "EAST": [
+                        {"B": "East Building", "C": "Roof", "E": "PRE", "F": "RTU-9", "G": "Pleated", "H": "HVP24242", "J": "24x24x2", "K": 2, "L": 2, "M": "90 Days"},
+                    ],
+                    "MOB": [
+                        {"B": "MOB", "C": "Roof", "E": "PRE", "F": "RTU-9", "G": "Pleated", "H": "HVP12242", "J": "12x24x2", "K": 4, "L": 4, "M": "90 Days"},
+                    ],
+                },
+            )
+            tabs = seed_from_excel(tabs_path, selected_sheet="all", hospital_id=hid)
+            assert_eq(sorted(tabs.get("sheets") or []), ["EAST", "MOB"], "both data tabs imported")
+            assert "FILTER" not in (tabs.get("sheets") or []), "FILTER tab skipped"
+            assert_eq(tabs["sheets_processed"], 2, "two tabs processed")
+            tab_ahus = [
+                a for a in AHU.query.filter_by(hospital_id=hid).all()
+                if ahu_name_matches(a.name, "RTU-9", getattr(a.building, "name", None))
+            ]
+            assert_eq(len(tab_ahus), 2, "same AHU name on two tabs stays two AHUs")
+            tab_names = sorted(a.name for a in tab_ahus)
+            assert_eq(tab_names, ["RTU-9 — East Building", "RTU-9 — MOB"], "each tab keeps its building in the name")
+            try:
+                os.unlink(tabs_path)
             except OSError:
                 pass
         finally:

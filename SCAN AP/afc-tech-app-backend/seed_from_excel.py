@@ -138,6 +138,53 @@ def _norm_name(s):
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+def format_ahu_label(ahu_name, building):
+    """Pkg Units + HDH → 'Pkg Units — HDH' so the card/QR shows the building."""
+    ahu_name = clean_str(ahu_name)
+    building = clean_str(building)
+    if not ahu_name:
+        return building
+    if not building:
+        return ahu_name
+    if _norm_name(building) in _norm_name(ahu_name):
+        return ahu_name
+    return f"{ahu_name} — {building}"
+
+
+def ahu_name_matches(stored_name, excel_name, building=None):
+    stored = _norm_name(stored_name)
+    excel = _norm_name(excel_name)
+    labeled = _norm_name(format_ahu_label(excel_name, building))
+    if not stored:
+        return False
+    if excel and stored == excel:
+        return True
+    if labeled and stored == labeled:
+        return True
+    return False
+
+
+SKIP_SHEET_NAMES = {
+    "filter",
+    "filters",
+    "legend",
+    "instructions",
+    "readme",
+    "index",
+    "cover",
+    "toc",
+}
+
+
+def is_skip_sheet(name):
+    n = (name or "").strip().lower()
+    if n in SKIP_SHEET_NAMES:
+        return True
+    if n.startswith("chart") or n.startswith("pivot"):
+        return True
+    return False
+
+
 def _looks_like_ahu_label(val):
     """AH-1, AHU-2, RTU-1, MAU-3, etc."""
     s = clean_str(val)
@@ -319,6 +366,7 @@ def serialize_seed_stats(stats, dry_run=False):
         "hospital_created": bool(stats.get("hospital_created")),
         "sheets_processed": int(stats.get("sheets_processed") or 0),
         "sheets_skipped": list(stats.get("sheets_skipped") or []),
+        "sheets": list(stats.get("sheets") or []),
         "rows_seen": int(stats.get("rows_seen") or 0),
         "ahus_created": int(stats.get("ahus_created") or 0),
         "ahus_updated": int(stats.get("ahus_updated") or 0),
@@ -388,10 +436,22 @@ def upsert_building(hospital_id: int, name: str, floor_area: str = None):
     return b
 
 
-def find_existing_ahu(hospital_id, name, building_id=None):
+def apply_ahu_label(ahu, display_name, building):
+    """Persist 'AHU — Building' so Admin/QR can tell Pkg Units at HDH from Pkg Units at MOB."""
+    if ahu is None:
+        return None
+    label = format_ahu_label(display_name, building)
+    if not label:
+        return None
+    if ahu.name and _norm_name(ahu.name) == _norm_name(label):
+        return ahu.name
+    ahu.name = label
+    return label
+
+
+def find_existing_ahu(hospital_id, name, building_id=None, building_name=None):
     """Match an AHU already in the DB so re-seeding updates instead of duplicating."""
-    name_norm = _norm_name(name)
-    if not name_norm:
+    if not _norm_name(name):
         return None
 
     candidates = (
@@ -399,7 +459,7 @@ def find_existing_ahu(hospital_id, name, building_id=None):
         .order_by(AHU.id.asc())
         .all()
     )
-    matches = [a for a in candidates if _norm_name(a.name) == name_norm]
+    matches = [a for a in candidates if ahu_name_matches(a.name, name, building_name)]
     if not matches:
         return None
     if building_id is not None:
@@ -409,6 +469,19 @@ def find_existing_ahu(hospital_id, name, building_id=None):
         # Same name in another building is a different AHU (Pkg Units, RTU-1, …).
         return None
     return matches[0]
+
+
+def select_data_sheets(sheet_names, selected_sheet=None):
+    """Every tab unless a single sheet is requested. Skip legend/filter/chart tabs."""
+    names = list(sheet_names or [])
+    if selected_sheet and str(selected_sheet).strip().lower() not in ("", "all"):
+        if selected_sheet not in names:
+            raise ValueError(f"Sheet '{selected_sheet}' not found. Available: {names}")
+        return [selected_sheet]
+    data = [s for s in names if not is_skip_sheet(s)]
+    if not data:
+        raise RuntimeError("No data sheets found.")
+    return data
 
 
 def upsert_ahu(
@@ -633,6 +706,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
     if not display_name:
         display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
 
+    label = format_ahu_label(display_name, building)
     ahu_key = normalize_ahu_key(display_name, building=building)
     building_id = None
     if building:
@@ -640,7 +714,9 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
         building_id = building_obj.id if building_obj else None
 
     if ahu_key not in ahu_key_to_id:
-        existing = find_existing_ahu(hospital.id, display_name, building_id)
+        existing = find_existing_ahu(
+            hospital.id, display_name, building_id=building_id, building_name=building
+        )
         if existing:
             ahu_id = existing.id
             ahu_key_to_id[ahu_key] = ahu_id
@@ -651,12 +727,13 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
                 existing.building_id = building_id
             if location:
                 existing.location = location
+            apply_ahu_label(existing, display_name, building)
         else:
             display_label = make_sequential_ahu_id(next_seq)
             a = AHU(
                 hospital_id=hospital.id,
                 building_id=building_id,
-                name=display_name or display_label,
+                name=label or display_name or display_label,
                 location=location,
                 notes=None,
                 excel_order=next_seq,
@@ -672,6 +749,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
         ahu_id = ahu_key_to_id[ahu_key]
         existing_ahu = db.session.get(AHU, ahu_id)
         excel_order = getattr(existing_ahu, "excel_order", None) if existing_ahu else None
+        apply_ahu_label(existing_ahu, display_name, building)
 
     notes_parts = [f"Excel AHU block", f"Excel Display: {display_name}"]
     if building:
@@ -680,6 +758,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
     ahu_obj = db.session.get(AHU, ahu_id)
     if ahu_obj:
         ahu_obj.notes = notes or ahu_obj.notes
+        apply_ahu_label(ahu_obj, display_name, building)
         if excel_order is not None and hasattr(ahu_obj, "excel_order"):
             ahu_obj.excel_order = int(excel_order)
     stats["ahus"].add(ahu_id)
@@ -726,17 +805,8 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
         raise FileNotFoundError(f"Excel file not found: {path}")
 
     xls = pd.ExcelFile(path)
-
-    if selected_sheet:
-        if selected_sheet not in xls.sheet_names:
-            raise ValueError(f"Sheet '{selected_sheet}' not found. Available: {xls.sheet_names}")
-        data_sheets = [selected_sheet]
-        preferred_sheet = selected_sheet
-    else:
-        data_sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
-        if not data_sheets:
-            raise RuntimeError("No data sheets found.")
-        preferred_sheet = "MAIN BUILDING" if "MAIN BUILDING" in data_sheets else data_sheets[0]
+    data_sheets = select_data_sheets(xls.sheet_names, selected_sheet)
+    preferred_sheet = "MAIN BUILDING" if "MAIN BUILDING" in data_sheets else data_sheets[0]
 
     excel_hospital_name = get_sheet_title_cell(path, sheet_name=preferred_sheet, cell="B2") or preferred_sheet.upper().replace("_", " ")
     hospital, hospital_created = upsert_hospital(excel_hospital_name, hospital_id=hospital_id)
@@ -748,6 +818,7 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
         "hospital_created": hospital_created,
         "sheets_processed": 0,
         "sheets_skipped": [],
+        "sheets": [],
         "rows_seen": 0,
         "ahus": set(),
         "ahus_created": 0,
@@ -775,10 +846,17 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
     next_seq = 1
 
     for sheet in data_sheets:
+        if is_skip_sheet(sheet) and not (
+            selected_sheet and str(selected_sheet).strip().lower() not in ("", "all")
+        ):
+            stats["sheets_skipped"].append({"sheet": sheet, "reason": "skip list"})
+            continue
+
         if sheet_uses_survey_letters(path, sheet):
             letter_blocks = read_survey_letter_blocks(path, sheet)
             if letter_blocks:
                 stats["sheets_processed"] += 1
+                stats["sheets"].append(sheet)
                 stats["rows_seen"] += sum(len(b.get("filters") or []) for b in letter_blocks)
                 filter_order_map = {}
                 for block in letter_blocks:
@@ -821,6 +899,7 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
             continue
 
         stats["sheets_processed"] += 1
+        stats["sheets"].append(sheet)
         stats["rows_seen"] += len(df)
 
         filter_order_map = {}
@@ -908,8 +987,12 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
                 building_obj = upsert_building(hospital.id, building, floor_area=floor_area)
                 building_id = building_obj.id if building_obj else None
 
+            label = format_ahu_label(display_name, building)
+
             if ahu_key not in ahu_key_to_id:
-                existing = find_existing_ahu(hospital.id, display_name, building_id)
+                existing = find_existing_ahu(
+                    hospital.id, display_name, building_id=building_id, building_name=building
+                )
                 if existing:
                     ahu_id = existing.id
                     ahu_key_to_id[ahu_key] = ahu_id
@@ -921,12 +1004,13 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
                     loc = clean_str(location)
                     if loc:
                         existing.location = loc
+                    apply_ahu_label(existing, display_name, building)
                 else:
                     display_label = make_sequential_ahu_id(next_seq)
                     a = AHU(
                         hospital_id=hospital.id,
                         building_id=building_id,
-                        name=display_name or display_label,
+                        name=label or display_name or display_label,
                         location=location,
                         notes=None,
                         excel_order=next_seq,
@@ -953,6 +1037,7 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
             ahu_obj = db.session.get(AHU, ahu_id)
             if ahu_obj:
                 ahu_obj.notes = notes or ahu_obj.notes
+                apply_ahu_label(ahu_obj, display_name, building)
                 if excel_order is not None and hasattr(ahu_obj, "excel_order"):
                     ahu_obj.excel_order = int(excel_order)
             stats["ahus"].add(ahu_id)
@@ -1011,6 +1096,8 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
     print("\n✅ Seed complete" if not dry_run else "\n✅ Dry run complete")
     print(f"Hospital: {result['hospital']} (ID {result['hospital_id']})")
     print(f"Sheets processed: {result['sheets_processed']}")
+    if result.get("sheets"):
+        print(f"Tabs: {', '.join(result['sheets'])}")
     print(f"Rows seen: {result['rows_seen']}")
     print(f"AHUs matched/updated: {result['ahus_updated']}")
     print(f"AHUs created: {result['ahus_created']}")
@@ -1035,7 +1122,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "sheet",
         nargs="?",
-        help="Sheet name, or 'all' for every sheet except FILTER",
+        help="Sheet name, or 'all' for every data tab (skips FILTER/legend/chart sheets)",
     )
     parser.add_argument(
         "--path",
@@ -1065,7 +1152,7 @@ if __name__ == "__main__":
             xls = pd.ExcelFile(workbook)
             for sheet in xls.sheet_names:
                 print(f"  - {sheet}")
-            print("  - all   (seed every sheet except 'FILTER')")
+            print("  - all   (seed every data tab)")
         else:
             print(f"(Workbook not found at {workbook}; pass --path to list sheets)")
         sys.exit(1)
@@ -1076,22 +1163,13 @@ if __name__ == "__main__":
 
     selected = args.sheet
     with app.app_context():
-        if str(selected).strip().lower() == "all":
-            xls = pd.ExcelFile(workbook)
-            sheets = [s for s in xls.sheet_names if s.strip().lower() != "filter"]
-            if not sheets:
-                print("No data sheets found to seed.")
-                sys.exit(1)
-            for sheet in sheets:
-                try:
-                    print(f"\n--- Seeding sheet: {sheet} ---")
-                    seed_from_excel(
-                        workbook, sheet, dry_run=args.dry_run, hospital_id=args.hospital_id
-                    )
-                except Exception as e:
-                    print(f"Error seeding sheet '{sheet}': {e}")
-            print("\nAll requested sheets processed.")
-        else:
+        try:
             seed_from_excel(
-                workbook, selected, dry_run=args.dry_run, hospital_id=args.hospital_id
+                workbook,
+                None if str(selected).strip().lower() == "all" else selected,
+                dry_run=args.dry_run,
+                hospital_id=args.hospital_id,
             )
+        except Exception as e:
+            print(f"Error seeding workbook: {e}")
+            sys.exit(1)

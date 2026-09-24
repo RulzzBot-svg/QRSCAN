@@ -62,6 +62,7 @@ export default function SurveyImportModal({
       const res = await importSurveyWorkbook(file, {
         dryRun,
         hospitalId: hospitalId || undefined,
+        sheet: "all",
       });
       setResult(res.data || null);
       if (!dryRun) {
@@ -91,9 +92,9 @@ export default function SurveyImportModal({
         </div>
 
         <p className="text-sm opacity-80 mb-3">
-          Upload the hospital workbook from Documents. Existing AHUs are matched by name and
-          building, and filters by phase, part number, and size. Rows missing from the sheet are
-          not deleted.
+          Upload the hospital workbook from Documents. Every tab is imported (FILTER / legend /
+          chart sheets are skipped). Existing AHUs are matched by name and building, and filters
+          by phase, part number, and size. Rows missing from the sheet are not deleted.
         </p>
 
         <div className="space-y-3">
@@ -157,7 +158,10 @@ export default function SurveyImportModal({
               filters upserted {stats.filters_upserted ?? 0}
             </div>
             <div className="opacity-70">
-              Sheets {stats.sheets_processed ?? 0}
+              Tabs {stats.sheets_processed ?? 0}
+              {(stats.sheets || []).length
+                ? `: ${(stats.sheets || []).join(", ")}`
+                : ""}
               {(stats.sheets_skipped || []).length
                 ? ` · skipped ${(stats.sheets_skipped || []).map((s) => s.sheet).join(", ")}`
                 : ""}
