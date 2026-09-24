@@ -144,6 +144,7 @@ function AdminAHUs() {
       return (
         String(a.id || "").toLowerCase().includes(q) ||
         String(a.name || "").toLowerCase().includes(q) ||
+        String(a.building || "").toLowerCase().includes(q) ||
         String(a.location || "").toLowerCase().includes(q) ||
         String(a.excel_block || a.group || a.display_name || "").toLowerCase().includes(q)
       );
@@ -503,6 +504,9 @@ function AdminAHUs() {
                           <div className="text-xs font-semibold truncate">
                             {a.name || String(a.id).split("-").slice(1).join("-") || a.id}
                           </div>
+                          {a.building ? (
+                            <div className="badge badge-ghost badge-xs shrink-0">{a.building}</div>
+                          ) : null}
                           <div className="text-xs opacity-70 truncate">{a.location || ""}</div>
                         </div>
                       </div>

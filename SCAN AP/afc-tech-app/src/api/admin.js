@@ -23,6 +23,6 @@ export const importSurveyWorkbook = (file, { dryRun = true, hospitalId, sheet } 
   if (hospitalId != null && hospitalId !== "") {
     form.append("hospital_id", String(hospitalId));
   }
-  if (sheet) form.append("sheet", sheet);
+  form.append("sheet", sheet || "all");
   return API.post("/admin/surveys/import", form, { timeout: 180000 });
 };
