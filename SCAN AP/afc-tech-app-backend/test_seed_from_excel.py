@@ -14,7 +14,14 @@ from openpyxl import Workbook
 from db import db
 import models  # noqa: F401 — register tables
 from models import Hospital, AHU, Filter
-from seed_from_excel import seed_from_excel, serialize_seed_stats
+from datetime import date
+
+from seed_from_excel import (
+    normalize_filter_size,
+    part_match_keys,
+    seed_from_excel,
+    serialize_seed_stats,
+)
 
 
 HEADERS = [
@@ -139,6 +146,51 @@ def main():
             assert_eq(AHU.query.count(), 1, "still one AHU after override")
             assert_eq(Filter.query.filter_by(part_number="PN-1").first().quantity, 8, "qty updated via override")
             assert any("B2" in w for w in third["warnings"]), "warn when B2 disagrees with selected hospital"
+
+            assert_eq(normalize_filter_size("24x24x2 HV"), "24x24x2", "strip HV from size")
+            assert_eq(normalize_filter_size("24x24x12 FF"), "24x24x12", "strip FF from size")
+            assert "F8V42412GWBB" in part_match_keys("F8V424-GWBB", "24x24x12"), "part + depth"
+            assert part_match_keys("F8V424-GWBB", "24x24x12") & part_match_keys(
+                "F8V42412-GWBB", "24x24x12"
+            ), "catalog part matches stored part with depth"
+
+            write_workbook(
+                path,
+                "Foothill",
+                [
+                    ["AH-1", "Penthouse", "PRE", "24x24x2 HV", "90 days", 32, "MAIN", "Roof", "HVP24242", "Pleated", date(2026, 8, 25)],
+                    ["AH-1", "Penthouse", "FINAL", "24x24x12 FF", "365 days", 16, "MAIN", "Roof", "F8V424-GWBB", "V-Bank", date(2026, 5, 5)],
+                ],
+            )
+            # Pretend the app already had these rows under slightly different labels
+            ahu = AHU.query.first()
+            Filter.query.delete()
+            db.session.add(Filter(
+                ahu_id=ahu.id, phase="PRE", part_number="HVP24242", size="24x24x2",
+                quantity=32, frequency_days=90, last_service_date=date(2025, 10, 22), is_active=True,
+            ))
+            db.session.add(Filter(
+                ahu_id=ahu.id, phase="PRE", part_number="HVP24242", size="24x24x2 HV",
+                quantity=32, frequency_days=90, last_service_date=date(2026, 8, 25), is_active=True,
+            ))
+            db.session.add(Filter(
+                ahu_id=ahu.id, phase="FINAL", part_number="F8V42412-GWBB", size="24x24x12",
+                quantity=16, frequency_days=365, last_service_date=date(2026, 5, 5), is_active=True,
+            ))
+            db.session.commit()
+            assert_eq(Filter.query.filter_by(is_active=True).count(), 3, "setup: 3 active filters")
+
+            fourth = seed_from_excel(path, hospital_id=hid)
+            active = Filter.query.filter_by(ahu_id=ahu.id, is_active=True).all()
+            assert_eq(len(active), 2, "survey suffixes do not create extra filters")
+            pre = next(f for f in active if normalize_filter_size(f.size) == "24x24x2")
+            final = next(f for f in active if normalize_filter_size(f.size) == "24x24x12")
+            assert_eq(pre.last_service_date, date(2026, 8, 25), "PRE date updated from survey")
+            assert_eq(pre.quantity, 32, "PRE qty kept")
+            assert_eq(final.part_number, "F8V42412-GWBB", "keep original part number")
+            assert_eq(final.last_service_date, date(2026, 5, 5), "FINAL date from survey")
+            assert_eq(fourth["ahus_created"], 0, "AHU still matched")
+            assert Filter.query.filter_by(ahu_id=ahu.id, is_active=False).count() >= 1, "extra PRE row deactivated"
         finally:
             try:
                 os.unlink(path)

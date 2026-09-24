@@ -293,15 +293,89 @@ def upsert_ahu(
     return None
 
 
-def find_existing_filter(ahu_id, phase, part_number, size):
-    return (
-        Filter.query.filter_by(
-            ahu_id=ahu_id,
-            phase=phase,
-            part_number=part_number,
-            size=size,
-        ).first()
+def _fmt_dim(n):
+    try:
+        f = float(n)
+        if f.is_integer():
+            return str(int(f))
+        return str(f)
+    except (TypeError, ValueError):
+        return str(n)
+
+
+def normalize_filter_size(size):
+    """24x24x2 HV / 24x24x12 FF → 24x24x2 / 24x24x12."""
+    s = clean_str(size)
+    if not s:
+        return None
+    nums = re.findall(r"\d+(?:\.\d+)?", s)
+    if len(nums) >= 3:
+        return f"{_fmt_dim(nums[0])}x{_fmt_dim(nums[1])}x{_fmt_dim(nums[2])}"
+    return re.sub(r"\s+", "", s).lower()
+
+
+def normalize_part_key(part):
+    return re.sub(r"[^A-Z0-9]", "", (clean_str(part) or "").upper())
+
+
+def part_match_keys(part, size=None):
+    """
+    Keys so F8V424-GWBB matches F8V42412-GWBB when the size depth is 12.
+    Surveys often omit the depth from the catalog number; the app stored it inline.
+    """
+    raw = clean_str(part) or ""
+    base = normalize_part_key(raw)
+    keys = set()
+    if base:
+        keys.add(base)
+
+    size_n = normalize_filter_size(size) if size else None
+    depth = None
+    if size_n:
+        bits = size_n.split("x")
+        if len(bits) >= 3:
+            depth = bits[2]
+
+    if depth and raw:
+        if "-" in raw:
+            head, tail = raw.rsplit("-", 1)
+            keys.add(normalize_part_key(f"{head}{depth}-{tail}"))
+            keys.add(normalize_part_key(f"{head}-{tail}"))
+        stripped = re.sub(re.escape(depth) + r"(?=[A-Z]|$)", "", base, count=1)
+        if stripped:
+            keys.add(stripped)
+        keys.add(normalize_part_key(raw + depth))
+    return {k for k in keys if k}
+
+
+def find_matching_filters(ahu_id, phase, part_number, size):
+    """All filters on this AHU that are the same logical row. Oldest first."""
+    phase_n = _norm_name(phase)
+    size_n = normalize_filter_size(size)
+    part_keys = part_match_keys(part_number, size)
+    if not size_n or not part_keys:
+        return []
+
+    candidates = (
+        Filter.query.filter_by(ahu_id=ahu_id)
+        .order_by(Filter.id.asc())
+        .all()
     )
+    matches = []
+    for f in candidates:
+        if phase_n != _norm_name(f.phase):
+            continue
+        if normalize_filter_size(f.size) != size_n:
+            continue
+        f_keys = part_match_keys(f.part_number, f.size) | part_match_keys(f.part_number, size)
+        if part_keys & f_keys:
+            matches.append(f)
+    return matches
+
+
+def find_existing_filter(ahu_id, phase, part_number, size):
+    matches = find_matching_filters(ahu_id, phase, part_number, size)
+    return matches[0] if matches else None
 
 
 def upsert_filter(
@@ -330,11 +404,12 @@ def upsert_filter(
 
     phase = clean_str(phase)
     part_number = clean_str(part_number) or ""
-    size = clean_str(size)
+    size = normalize_filter_size(size) or clean_str(size)
 
     if not ahu_id_val or not size:
         return None
-    existing = find_existing_filter(ahu_id_val, phase, part_number, size)
+    matches = find_matching_filters(ahu_id_val, phase, part_number, size)
+    existing = matches[0] if matches else None
     if existing:
         try:
             existing.quantity = parse_quantity(quantity, default=getattr(existing, "quantity", 1) or 1)
@@ -351,9 +426,15 @@ def upsert_filter(
             existing.last_service_date = last_service_date
 
         existing.is_active = bool(is_active)
+        existing.size = size
 
         if excel_order is not None and has_attr(existing, "excel_order"):
             existing.excel_order = int(excel_order)
+
+        # A prior import often created extras because size had "HV"/"FF" or
+        # the part number embedded the depth. Keep the oldest row.
+        for extra in matches[1:]:
+            extra.is_active = False
 
         return existing
 
