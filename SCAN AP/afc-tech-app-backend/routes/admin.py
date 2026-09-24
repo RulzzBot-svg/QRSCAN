@@ -707,6 +707,7 @@ def import_surveys():
       dry_run: true|false (default true)
       hospital_id: optional — apply to this hospital instead of cell B2
       sheet: optional sheet name, or omit/'all' for every data sheet
+      replace_existing: true to delete this hospital's current AHUs/filters first
     """
     uploaded = request.files.get("file")
     if uploaded is None or not (uploaded.filename or "").strip():
@@ -717,6 +718,10 @@ def import_surveys():
         return jsonify({"error": "Upload an .xlsx or .xlsm survey workbook"}), 400
 
     dry_run = _form_truthy(request.form.get("dry_run"), default=True)
+    replace_existing = _form_truthy(
+        request.form.get("replace_existing") or request.form.get("replaceExisting"),
+        default=False,
+    )
     sheet_raw = (request.form.get("sheet") or "").strip()
     selected_sheet = None
     if sheet_raw and sheet_raw.lower() != "all":
@@ -731,6 +736,9 @@ def import_surveys():
         except (TypeError, ValueError):
             return jsonify({"error": "hospital_id must be an integer"}), 400
 
+    if replace_existing and hospital_id is None:
+        return jsonify({"error": "Pick the hospital before starting fresh."}), 400
+
     fd, tmp_path = tempfile.mkstemp(suffix=ext)
     os.close(fd)
     try:
@@ -742,6 +750,7 @@ def import_surveys():
             selected_sheet=selected_sheet,
             dry_run=dry_run,
             hospital_id=hospital_id,
+            replace_existing=replace_existing,
         )
         return jsonify(stats), 200
     except FileNotFoundError as e:

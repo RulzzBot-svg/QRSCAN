@@ -475,6 +475,41 @@ def main():
             ]
             assert_eq(len(leftover), 4, "unlabeled extra AHU-1 is collapsed, not a 5th/6th block")
 
+            for n in range(3):
+                db.session.add(AHU(hospital_id=hunt_hid, name=f"AHU-1 copy {n}", location="6th Floor"))
+            db.session.commit()
+            before_repeats = AHU.query.filter_by(hospital_id=hunt_hid).count()
+            assert_eq(before_repeats > 4, True, "setup leftover repeats")
+            foothill_before = AHU.query.filter_by(hospital_id=hid).count()
+
+            try:
+                seed_from_excel(hunt_path, replace_existing=True)
+                raise AssertionError("replace without hospital_id should fail")
+            except ValueError as exc:
+                assert "hospital" in str(exc).lower(), exc
+
+            dry_rep = seed_from_excel(
+                hunt_path, hospital_id=hunt_hid, replace_existing=True, dry_run=True
+            )
+            assert_eq(dry_rep["replace_existing"], True, "preview marks fresh start")
+            assert_eq(dry_rep["ahus_cleared"] >= 4, True, "preview reports AHUs that would be cleared")
+            assert_eq(
+                AHU.query.filter_by(hospital_id=hunt_hid).count(),
+                before_repeats,
+                "preview does not delete repeats",
+            )
+
+            fresh = seed_from_excel(hunt_path, hospital_id=hunt_hid, replace_existing=True)
+            assert_eq(Hospital.query.filter_by(id=hunt_hid).count(), 1, "hospital row is kept")
+            assert_eq(AHU.query.filter_by(hospital_id=hunt_hid).count(), 4, "fresh import leaves only the workbook AHUs")
+            assert_eq(fresh["ahus_created"], 4, "fresh import recreates the 4 units")
+            assert_eq(fresh["ahus_cleared"], before_repeats, "fresh import removed the repeats")
+            assert_eq(
+                AHU.query.filter_by(hospital_id=hid).count(),
+                foothill_before,
+                "other hospitals are not cleared",
+            )
+
             try:
                 os.unlink(hunt_path)
             except OSError:

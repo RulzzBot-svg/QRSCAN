@@ -16,7 +16,10 @@ export const updateHospitalSettings = (hospitalId, payload) => {
   return API.patch(`/admin/hospitals/${hospitalId}`, payload);
 };
 
-export const importSurveyWorkbook = (file, { dryRun = true, hospitalId, sheet } = {}) => {
+export const importSurveyWorkbook = (
+  file,
+  { dryRun = true, hospitalId, sheet, replaceExisting = false } = {}
+) => {
   const form = new FormData();
   form.append("file", file);
   form.append("dry_run", dryRun ? "true" : "false");
@@ -24,5 +27,6 @@ export const importSurveyWorkbook = (file, { dryRun = true, hospitalId, sheet } 
     form.append("hospital_id", String(hospitalId));
   }
   form.append("sheet", sheet || "all");
+  if (replaceExisting) form.append("replace_existing", "true");
   return API.post("/admin/surveys/import", form, { timeout: 180000 });
 };

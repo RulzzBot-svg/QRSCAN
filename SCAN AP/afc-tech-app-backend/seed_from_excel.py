@@ -7,10 +7,10 @@ from datetime import datetime, date
 
 import pandas as pd
 import openpyxl
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from db import db
-from models import Hospital, AHU, Filter, Building, Job, JobFilter
+from models import Hospital, AHU, Filter, Building, Job, JobFilter, JobSignature, Notification
 
 
 EXCEL_PATH = "./excel_data_raw/filter-datasheet.xlsm"
@@ -432,6 +432,11 @@ def serialize_seed_stats(stats, dry_run=False):
         "ahus_touched": touched,
         "filters_upserted": int(stats.get("filters_upserted") or 0),
         "filters_skipped": int(stats.get("filters_skipped") or 0),
+        "replace_existing": bool(stats.get("replace_existing")),
+        "ahus_cleared": int(stats.get("ahus_cleared") or 0),
+        "filters_cleared": int(stats.get("filters_cleared") or 0),
+        "jobs_cleared": int(stats.get("jobs_cleared") or 0),
+        "buildings_cleared": int(stats.get("buildings_cleared") or 0),
         "warnings": list(stats.get("warnings") or []),
     }
 
@@ -473,6 +478,76 @@ def upsert_hospital(name: str, hospital_id=None):
     db.session.add(h)
     db.session.flush()
     return h, True
+
+
+def clear_hospital_survey_records(hospital_id):
+    """
+    Delete AHUs/filters/buildings (and jobs on those AHUs) for one hospital.
+    Keeps the hospital row so Import can reload the workbook onto the same site.
+    """
+    try:
+        hid = int(hospital_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("hospital_id must be an integer") from exc
+
+    hospital = db.session.get(Hospital, hid)
+    if not hospital:
+        raise ValueError(f"Hospital id {hid} was not found")
+
+    building_ids = [r[0] for r in db.session.query(Building.id).filter_by(hospital_id=hid).all()]
+    ahu_q = db.session.query(AHU.id).filter(AHU.hospital_id == hid)
+    if building_ids:
+        ahu_q = db.session.query(AHU.id).filter(
+            or_(AHU.hospital_id == hid, AHU.building_id.in_(building_ids))
+        )
+    ahu_ids = [r[0] for r in ahu_q.all()]
+    job_ids = (
+        [r[0] for r in db.session.query(Job.id).filter(Job.ahu_id.in_(ahu_ids)).all()]
+        if ahu_ids
+        else []
+    )
+    filter_count = (
+        db.session.query(Filter.id).filter(Filter.ahu_id.in_(ahu_ids)).count() if ahu_ids else 0
+    )
+
+    counts = {
+        "ahus": len(ahu_ids),
+        "filters": int(filter_count),
+        "jobs": len(job_ids),
+        "buildings": len(building_ids),
+    }
+
+    notif_filters = [Notification.hospital_id == hid]
+    if ahu_ids:
+        notif_filters.append(Notification.ahu_id.in_(ahu_ids))
+    if job_ids:
+        notif_filters.append(Notification.job_id.in_(job_ids))
+    db.session.query(Notification).filter(or_(*notif_filters)).delete(synchronize_session=False)
+
+    if job_ids:
+        db.session.query(JobSignature).filter(JobSignature.job_id.in_(job_ids)).delete(
+            synchronize_session=False
+        )
+        db.session.query(JobFilter).filter(JobFilter.job_id.in_(job_ids)).delete(
+            synchronize_session=False
+        )
+        db.session.query(Job).filter(Job.id.in_(job_ids)).delete(synchronize_session=False)
+
+    if ahu_ids:
+        db.session.query(JobFilter).filter(
+            JobFilter.filter_id.in_(db.session.query(Filter.id).filter(Filter.ahu_id.in_(ahu_ids)))
+        ).delete(synchronize_session=False)
+        db.session.query(Filter).filter(Filter.ahu_id.in_(ahu_ids)).delete(synchronize_session=False)
+        db.session.query(AHU).filter(AHU.id.in_(ahu_ids)).delete(synchronize_session=False)
+
+    if building_ids:
+        db.session.query(Building).filter(Building.id.in_(building_ids)).delete(
+            synchronize_session=False
+        )
+
+    db.session.flush()
+    db.session.expire_all()
+    return counts
 
 
 def upsert_building(hospital_id: int, name: str, floor_area: str = None):
@@ -954,9 +1029,12 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
 # -----------------------------
 # Main seed
 # -----------------------------
-def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
+def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None, replace_existing=False):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Excel file not found: {path}")
+
+    if replace_existing and hospital_id is None:
+        raise ValueError("Pick the hospital in Import before starting fresh.")
 
     xls = pd.ExcelFile(path)
     data_sheets = select_data_sheets(xls.sheet_names, selected_sheet)
@@ -979,6 +1057,11 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
         "ahus_updated": 0,
         "filters_upserted": 0,
         "filters_skipped": 0,
+        "replace_existing": bool(replace_existing),
+        "ahus_cleared": 0,
+        "filters_cleared": 0,
+        "jobs_cleared": 0,
+        "buildings_cleared": 0,
         "warnings": [],
     }
 
@@ -993,6 +1076,18 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
     if hospital_created:
         stats["warnings"].append(
             f"Created a new hospital named '{hospital.name}'. Pick an existing hospital in Import if this should have updated one."
+        )
+
+    if replace_existing and not hospital_created:
+        cleared = clear_hospital_survey_records(hospital.id)
+        stats["ahus_cleared"] = cleared["ahus"]
+        stats["filters_cleared"] = cleared["filters"]
+        stats["jobs_cleared"] = cleared["jobs"]
+        stats["buildings_cleared"] = cleared["buildings"]
+        stats["warnings"].append(
+            f"Started fresh: removed {cleared['ahus']} AHUs, {cleared['filters']} filters"
+            + (f", {cleared['jobs']} jobs" if cleared["jobs"] else "")
+            + f" from '{hospital.name}'."
         )
 
     # logical key -> sequential id
@@ -1294,6 +1389,11 @@ def seed_from_excel(path, selected_sheet=None, dry_run=False, hospital_id=None):
     print(f"AHUs matched/updated: {result['ahus_updated']}")
     print(f"AHUs created: {result['ahus_created']}")
     print(f"AHUs touched: {result['ahus_touched']}")
+    if result.get("replace_existing"):
+        print(
+            f"Started fresh: cleared {result['ahus_cleared']} AHUs, "
+            f"{result['filters_cleared']} filters, {result['jobs_cleared']} jobs"
+        )
     print(f"Filters upserted: {result['filters_upserted']}")
     print(f"Filters skipped (missing size): {result['filters_skipped']}")
     for warning in result["warnings"]:
@@ -1333,6 +1433,11 @@ if __name__ == "__main__":
         default=None,
         help="Apply to this hospital id instead of creating one from cell B2",
     )
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="Delete this hospital's current AHUs/filters, then import the workbook fresh",
+    )
     args = parser.parse_args()
     workbook = args.path
     from app import app
@@ -1361,6 +1466,7 @@ if __name__ == "__main__":
                 None if str(selected).strip().lower() == "all" else selected,
                 dry_run=args.dry_run,
                 hospital_id=args.hospital_id,
+                replace_existing=args.replace,
             )
         except Exception as e:
             print(f"Error seeding workbook: {e}")
