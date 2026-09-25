@@ -343,7 +343,7 @@ def main():
             assert_eq(parsed[1]["display_name"], "RTU-2", "second block is RTU-2")
             assert_eq(len(parsed[0]["filters"]), 4, "four filters on RTU-1")
             assert_eq(len(parsed[1]["filters"]), 4, "four filters on RTU-2")
-            assert_eq(parsed[0]["filters"][0]["quantity"], 32, "qty from column L")
+            assert_eq(parsed[0]["filters"][0]["quantity"], 32, "qty from column K")
 
             fifth = seed_from_excel(letter_path, hospital_id=hid)
             names = sorted(a.name for a in AHU.query.filter_by(hospital_id=hid).all())
@@ -376,6 +376,8 @@ def main():
             assert_eq(len(pkg_blocks), 3, "building change splits Pkg Units with no blank row")
             assert_eq(pkg_blocks[0]["building"], "Charitable Foundation", "first building")
             assert_eq(len(pkg_blocks[0]["filters"]), 2, "two filters stay on Charitable Foundation")
+            assert_eq(pkg_blocks[0]["filters"][0]["quantity"], 1, "qty is column K, not L (4)")
+            assert_eq(pkg_blocks[0]["filters"][1]["quantity"], 6, "second row uses K=6 not L=24")
             assert_eq(pkg_blocks[1]["building"], "HDH", "HDH is its own AHU")
             assert_eq(pkg_blocks[2]["building"], "12780 Hesperia rd", "Hesperia is its own AHU")
             seed_from_excel(pkg_path, hospital_id=hid)
