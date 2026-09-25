@@ -810,6 +810,33 @@ def normalize_part_key(part):
     return re.sub(r"[^A-Z0-9]", "", (clean_str(part) or "").upper())
 
 
+def looks_like_filter_type(part):
+    """True for 'HV Pleat' / 'F84V' — old imports stored the type column as the PN."""
+    s = clean_str(part)
+    if not s:
+        return True
+    if " " in s:
+        return True
+    compact = re.sub(r"[^a-z0-9]", "", s.lower())
+    type_words = ("pleat", "vbank", "bag", "carbon", "hepa", "prefilter", "final", "panel")
+    if any(w in compact for w in type_words):
+        return True
+    digits = re.findall(r"\d", s)
+    if len(digits) <= 2 and "-" not in s and len(s) <= 8:
+        return True
+    return False
+
+
+def prefer_catalog_part(current, incoming):
+    """Keep F8V424-GWBB over F84V when a survey row upgrades the stored PN."""
+    incoming = clean_str(incoming)
+    current = clean_str(current)
+    if incoming and not looks_like_filter_type(incoming):
+        if not current or looks_like_filter_type(current):
+            return incoming
+    return current or incoming
+
+
 def part_match_keys(part, size=None):
     """
     Keys so F8V424-GWBB matches F8V42412-GWBB when the size depth is 12.
@@ -853,7 +880,8 @@ def find_matching_filters(ahu_id, phase, part_number, size):
         .order_by(Filter.id.asc())
         .all()
     )
-    matches = []
+    exact = []
+    typed = []
     for f in candidates:
         if phase_n != _norm_name(f.phase):
             continue
@@ -861,8 +889,10 @@ def find_matching_filters(ahu_id, phase, part_number, size):
             continue
         f_keys = part_match_keys(f.part_number, f.size) | part_match_keys(f.part_number, size)
         if part_keys & f_keys:
-            matches.append(f)
-    return matches
+            exact.append(f)
+        elif looks_like_filter_type(f.part_number) or looks_like_filter_type(part_number):
+            typed.append(f)
+    return exact + typed
 
 
 def find_existing_filter(ahu_id, phase, part_number, size):
@@ -919,6 +949,9 @@ def upsert_filter(
 
         existing.is_active = bool(is_active)
         existing.size = size
+        upgraded = prefer_catalog_part(existing.part_number, part_number)
+        if upgraded:
+            existing.part_number = upgraded
 
         if excel_order is not None and has_attr(existing, "excel_order"):
             existing.excel_order = int(excel_order)
