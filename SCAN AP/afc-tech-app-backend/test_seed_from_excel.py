@@ -20,8 +20,10 @@ from seed_from_excel import (
     ahu_name_matches,
     format_ahu_label,
     is_skip_sheet,
+    looks_like_filter_type,
     normalize_filter_size,
     part_match_keys,
+    prefer_catalog_part,
     read_survey_letter_blocks,
     seed_from_excel,
     serialize_seed_stats,
@@ -188,6 +190,11 @@ def main():
     assert ahu_name_matches("AHU-2 — 21 Building #2", "AHU-2", "21 Building"), "#2 still matches AHU-2"
     assert not ahu_name_matches("Pkg Units — MOB", "Pkg Units", "HDH"), "other building label does not match"
     assert is_skip_sheet("FILTER") and is_skip_sheet("Legend") and not is_skip_sheet("EAST")
+    assert looks_like_filter_type("HV Pleat") and looks_like_filter_type("F84V")
+    assert not looks_like_filter_type("HVP24242")
+    assert not looks_like_filter_type("F8V424-GWBB")
+    assert_eq(prefer_catalog_part("HV Pleat", "HVP24242"), "HVP24242", "upgrade type to catalog PN")
+    assert_eq(prefer_catalog_part("F8V42412-GWBB", "F8V424-GWBB"), "F8V42412-GWBB", "keep stored catalog")
 
     db_fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(db_fd)
@@ -293,6 +300,39 @@ def main():
             assert_eq(final.last_service_date, date(2026, 5, 5), "FINAL date from survey")
             assert_eq(fourth["ahus_created"], 0, "AHU still matched")
             assert_eq(Filter.query.filter_by(ahu_id=ahu.id).count(), 2, "unused extra PRE row deleted")
+
+            # Huntington leftover: old import stored type as PN next to the catalog number
+            Filter.query.filter_by(ahu_id=ahu.id).delete()
+            db.session.add(Filter(
+                ahu_id=ahu.id, phase="PRE", part_number="HV Pleat", size="24x24x2",
+                quantity=2, frequency_days=90, last_service_date=date(2026, 11, 9), is_active=True,
+            ))
+            db.session.add(Filter(
+                ahu_id=ahu.id, phase="PRE", part_number="HVP24242", size="24x24x2",
+                quantity=2, frequency_days=90, last_service_date=date(2026, 11, 9), is_active=True,
+            ))
+            db.session.add(Filter(
+                ahu_id=ahu.id, phase="FINAL", part_number="F84V", size="24x24x12",
+                quantity=2, frequency_days=90, last_service_date=date(2026, 2, 13), is_active=True,
+            ))
+            db.session.add(Filter(
+                ahu_id=ahu.id, phase="FINAL", part_number="F8V424-GWBB", size="24x24x12",
+                quantity=2, frequency_days=90, last_service_date=date(2026, 2, 13), is_active=True,
+            ))
+            db.session.commit()
+            write_workbook(
+                path,
+                "Foothill",
+                [
+                    ["AH-1", "Penthouse", "PRE", "24x24x2", "90 days", 2, "MAIN", "Roof", "HVP24242", "HV Pleat", date(2026, 11, 9)],
+                    ["AH-1", "Penthouse", "FINAL", "24x24x12", "90 days", 2, "MAIN", "Roof", "F8V424-GWBB", "F84V", date(2026, 2, 13)],
+                ],
+            )
+            seed_from_excel(path, hospital_id=hid)
+            after_type = Filter.query.filter_by(ahu_id=ahu.id, is_active=True).all()
+            assert_eq(len(after_type), 2, "type-as-PN extras collapse into catalog rows")
+            parts = sorted(f.part_number for f in after_type)
+            assert_eq(parts, ["F8V424-GWBB", "HVP24242"], "keep catalog part numbers")
 
             letter_path = path + ".letters.xlsx"
             write_lettered_survey(letter_path, "Foothill", [rtu_block("RTU-1"), rtu_block("RTU-2")])
