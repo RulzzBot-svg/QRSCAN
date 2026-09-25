@@ -346,6 +346,7 @@ def read_survey_letter_blocks(path, sheet_name, wb=None):
     - stage goes back to PRE after FINAL (second AHU-2 on the same floor)
     A blank / building-only row does not split PRE from FINAL of the same unit.
     A blank before a new PRE does split (next unit).
+    Quantity is column K (per changeout). L is the yearly total (K x 4 for 90-day).
     """
     close = False
     if wb is None:
@@ -391,9 +392,9 @@ def _read_survey_letter_blocks_ws(ws):
             if _looks_like_ahu_label(phase):
                 phase = None
             size = clean_str(vals.get("J"))
-            qty = vals.get("L")
+            qty = vals.get("K")
             if qty is None or clean_str(qty) is None:
-                qty = vals.get("K")
+                qty = vals.get("L")
             part = clean_str(vals.get("H")) or clean_str(vals.get("G"))
             filters.append({
                 "phase": phase,
