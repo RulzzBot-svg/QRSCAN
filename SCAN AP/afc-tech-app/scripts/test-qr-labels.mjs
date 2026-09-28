@@ -77,6 +77,7 @@ assert(zebra.includes("size: 4in 2in"), "zebra layout should use 4x2 page size")
 assert(zebra.includes("layout-zebra"), "zebra layout class should be present");
 assert(zebra.includes("width: 4in"), "zebra label should be 4 inches wide");
 assert(zebra.includes("height: 2in"), "zebra label should be 2 inches tall");
+assert(zebra.includes("1.82in"), "zebra QR should fill most of the 2in height");
 assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print the side logo");
 assert(zebra.includes("img class=\"qr\""), "zebra QR should keep a dedicated class");
 assert(!zebra.includes("grid-template-columns: repeat(3, 1fr)") || zebra.includes("layout-zebra"), "zebra html still contains shared CSS");

@@ -276,7 +276,7 @@ function ZebraPreviewCard({ label, logoSrc, onPrint }) {
         />
         <div className="min-w-0 pr-2">
           {logoSrc ? (
-            <img src={logoSrc} alt="AFC" className="h-10 w-auto max-w-full object-contain mb-1" />
+            <img src={logoSrc} alt="AFC" className="h-14 w-auto max-w-full object-contain mb-1" />
           ) : null}
           <div className="font-extrabold text-sm leading-tight">{label.name}</div>
           {meta ? <div className="text-xs mt-0.5">{meta}</div> : null}

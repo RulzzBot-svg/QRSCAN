@@ -335,7 +335,7 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 0.12in;
+      gap: 0.1in;
       padding: 0.08in 0.1in;
       border: 0;
       border-radius: 0;
@@ -350,9 +350,9 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       break-after: auto;
     }
     .layout-zebra .label img.qr {
-      width: 1.78in;
-      height: 1.78in;
-      flex: 0 0 1.78in;
+      width: 1.82in;
+      height: 1.82in;
+      flex: 0 0 1.82in;
     }
     .layout-zebra .copy {
       flex: 1;
@@ -362,14 +362,14 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       justify-content: center;
     }
     .layout-zebra .logo {
-      height: 0.62in;
+      height: 0.78in;
       width: auto;
-      max-width: 1.9in;
+      max-width: 1.95in;
       object-fit: contain;
-      margin: 0 0 0.06in;
+      margin: 0 0 0.05in;
     }
     .layout-zebra .name {
-      font-size: 15pt;
+      font-size: 14pt;
       font-weight: 800;
       line-height: 1.15;
       margin: 0 0 0.04in;
