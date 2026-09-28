@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  DEFAULT_AFC_LOGO_PATH,
+  DEFAULT_AFC_MARK_PATH,
   fileToLogoDataUrl,
   loadImageAsDataUrl,
   loadStoredQrLogo,
@@ -30,7 +30,7 @@ export default function QrLabelPrintModal({
     if (!open) return;
     setLayout(QR_LAYOUTS.zebra);
     setLogoDataUrl(loadStoredQrLogo());
-    loadImageAsDataUrl(DEFAULT_AFC_LOGO_PATH)
+    loadImageAsDataUrl(DEFAULT_AFC_MARK_PATH)
       .then(setAfcLogoDataUrl)
       .catch(() => setAfcLogoDataUrl(""));
   }, [open]);
@@ -169,7 +169,7 @@ export default function QrLabelPrintModal({
           ) : (
             <span className="text-xs opacity-70">
               {layout === QR_LAYOUTS.zebra
-                ? "AFC logo prints beside the QR in black & white"
+                ? "AFC mark top-right, hospital under the AHU, serviced-by footer"
                 : "Optional company logo sits in the center of each QR"}
             </span>
           )}
@@ -261,25 +261,51 @@ export default function QrLabelPrintModal({
 }
 
 function ZebraPreviewCard({ label, logoSrc, onPrint }) {
-  const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
+  const hospital = String(label.hospital || "").trim();
   return (
     <div className="border border-base-300 rounded bg-white text-black p-2">
       <div
-        className="flex items-center gap-3 bg-white"
+        className="flex items-stretch bg-white overflow-hidden"
         style={{ aspectRatio: "2 / 1" }}
       >
-        <img
-          src={label.qrDataUrl}
-          alt={`QR for ${label.name}`}
-          className="h-[75%] w-auto aspect-square shrink-0"
-        />
-        <div className="min-w-0 pr-1 flex-1">
+        <div className="w-[40%] flex items-center justify-center shrink-0">
+          <img
+            src={label.qrDataUrl}
+            alt={`QR for ${label.name}`}
+            className="h-[72%] w-auto aspect-square"
+          />
+        </div>
+        <div className="flex-1 min-w-0 border-l-2 border-black pl-3 pr-2 py-2 flex flex-col relative">
           {logoSrc ? (
-            <img src={logoSrc} alt="AFC" className="h-20 w-auto max-w-full object-contain mb-1" />
+            <img
+              src={logoSrc}
+              alt="AFC"
+              className="absolute top-1 right-2 h-7 w-auto max-w-[40%] object-contain"
+            />
           ) : null}
-          <div className="font-extrabold text-lg leading-tight">{label.name}</div>
-          {meta ? <div className="text-sm mt-0.5">{meta}</div> : null}
-          {label.location ? <div className="text-sm">{label.location}</div> : null}
+          <div className="flex-1 flex flex-col justify-center pr-8">
+            <div className="font-extrabold text-2xl leading-none tracking-tight">{label.name}</div>
+            {hospital ? (
+              <div className="text-[10px] font-bold tracking-[0.14em] mt-2">
+                [{hospital.toUpperCase()}]
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-auto">
+            <div className="border-t border-black mb-1.5" />
+            <div className="flex gap-3 text-[9px] font-extrabold uppercase tracking-wide leading-tight">
+              <div>
+                Serviced
+                <br />
+                by:
+              </div>
+              <div>
+                Advanced Filtration
+                <br />
+                Concepts
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <button className="btn btn-xs mt-2" type="button" onClick={onPrint}>

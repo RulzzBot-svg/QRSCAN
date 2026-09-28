@@ -79,13 +79,16 @@ assert(zebra.includes("size: 4in 2in"), "zebra layout should use 4x2 page size")
 assert(zebra.includes("layout-zebra"), "zebra layout class should be present");
 assert(zebra.includes("width: 4in"), "zebra label should be 4 inches wide");
 assert(zebra.includes("height: 2in"), "zebra label should be 2 inches tall");
-assert(zebra.includes("1.48in"), "zebra QR should leave room for a larger side logo");
-assert(zebra.includes("height: 0.98in"), "zebra side logo should be enlarged");
-assert(zebra.includes("font-size: 18pt"), "zebra AHU name should be enlarged");
-assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print the side logo");
+assert(zebra.includes("1.28in"), "zebra QR should sit in the left pane");
+assert(zebra.includes("border-left: 2px solid #000"), "zebra layout should use a vertical divider");
+assert(zebra.includes("[HUNTINGTON]"), "zebra layout should show the hospital in brackets");
+assert(zebra.includes("SERVICED"), "zebra footer should say serviced by");
+assert(zebra.includes("ADVANCED FILTRATION"), "zebra footer should name Advanced Filtration Concepts");
+assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print the corner logo");
 assert(zebra.includes("img class=\"qr\""), "zebra QR should keep a dedicated class");
 assert(zebra.includes("Zebra ZD220"), "zebra hint should mention the printer");
 assert(!zebra.includes("ID 128"), "zebra labels should not show the internal ID");
 assert(!zebra.includes("class=\"id\""), "zebra labels should not include an ID row");
+assert(!zebra.includes("6th Floor"), "zebra service layout should not print location");
 
 console.log("qrLabels tests passed");

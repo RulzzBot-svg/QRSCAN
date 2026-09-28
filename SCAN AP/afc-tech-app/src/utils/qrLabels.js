@@ -3,6 +3,7 @@
 export const DEFAULT_QR_BASE_URL = "https://qrscan-lyart.vercel.app/FilterInfo";
 export const QR_LOGO_STORAGE_KEY = "qrLabelLogo";
 export const DEFAULT_AFC_LOGO_PATH = "/afc-logo-bw.png";
+export const DEFAULT_AFC_MARK_PATH = "/afc-mark-bw.png";
 export const QR_LAYOUTS = { sheet: "sheet", single: "single", zebra: "zebra" };
 
 export function resolveQrLayout(layout) {
@@ -213,19 +214,35 @@ export async function applyLogoToLabels(labels, logoDataUrl) {
   return next;
 }
 
+function hospitalBracket(label) {
+  const name = String(label.hospital || "").trim();
+  return name ? `[${name.toUpperCase()}]` : "";
+}
+
 function labelCardHtml(label, options = {}) {
   const layout = resolveQrLayout(options.layout);
   const sideLogo = options.sideLogoDataUrl || "";
   const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
   if (layout === QR_LAYOUTS.zebra) {
+    const hospital = hospitalBracket(label);
     return `
     <article class="label">
-      <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(label.name)}" />
+      <div class="qr-wrap">
+        <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(label.name)}" />
+      </div>
       <div class="copy">
         ${sideLogo ? `<img class="logo" src="${sideLogo}" alt="AFC" />` : ""}
-        <div class="name">${escapeHtml(label.name)}</div>
-        ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
-        ${label.location ? `<div class="location">${escapeHtml(label.location)}</div>` : ""}
+        <div class="identity">
+          <div class="name">${escapeHtml(label.name)}</div>
+          ${hospital ? `<div class="hospital">${escapeHtml(hospital)}</div>` : ""}
+        </div>
+        <div class="footer">
+          <div class="rule"></div>
+          <div class="served">
+            <div class="served-label">SERVICED<br>BY:</div>
+            <div class="served-name">ADVANCED FILTRATION<br>CONCEPTS</div>
+          </div>
+        </div>
       </div>
     </article>
   `;
@@ -331,9 +348,9 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       height: 2in;
       display: flex;
       flex-direction: row;
-      align-items: center;
-      gap: 0.08in;
-      padding: 0.05in 0.07in;
+      align-items: stretch;
+      gap: 0;
+      padding: 0;
       border: 0;
       border-radius: 0;
       text-align: left;
@@ -346,36 +363,74 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       page-break-after: auto;
       break-after: auto;
     }
+    .layout-zebra .qr-wrap {
+      flex: 0 0 1.62in;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .layout-zebra .label img.qr {
-      width: 1.48in;
-      height: 1.48in;
-      flex: 0 0 1.48in;
+      width: 1.28in;
+      height: 1.28in;
     }
     .layout-zebra .copy {
       flex: 1;
       min-width: 0;
+      border-left: 2px solid #000;
+      padding: 0.1in 0.12in 0.1in 0.14in;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .layout-zebra .logo {
+      position: absolute;
+      top: 0.08in;
+      right: 0.1in;
+      height: 0.34in;
+      width: auto;
+      max-width: 0.95in;
+      object-fit: contain;
+    }
+    .layout-zebra .identity {
+      flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
-    }
-    .layout-zebra .logo {
-      height: 0.98in;
-      width: auto;
-      max-width: 2.28in;
-      object-fit: contain;
-      margin: 0 0 0.04in;
+      padding-right: 0.2in;
+      min-height: 0;
     }
     .layout-zebra .name {
-      font-size: 18pt;
+      font-size: 22pt;
       font-weight: 800;
-      line-height: 1;
-      margin: 0 0 0.04in;
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.08in;
     }
-    .layout-zebra .meta,
-    .layout-zebra .location {
-      font-size: 12pt;
-      color: #111;
-      margin: 0 0 0.02in;
+    .layout-zebra .hospital {
+      font-size: 8pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      margin: 0;
+    }
+    .layout-zebra .footer {
+      margin-top: auto;
+    }
+    .layout-zebra .rule {
+      border-top: 1.5px solid #000;
+      margin: 0 0 0.06in;
+    }
+    .layout-zebra .served {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.14in;
+    }
+    .layout-zebra .served-label,
+    .layout-zebra .served-name {
+      font-size: 7pt;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      line-height: 1.25;
+      text-transform: uppercase;
     }
     @media print {
       .toolbar { display: none !important; }
