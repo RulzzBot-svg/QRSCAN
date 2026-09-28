@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  DEFAULT_AFC_MARK_PATH,
   fileToLogoDataUrl,
+  loadImageAsDataUrl,
   loadStoredQrLogo,
   applyLogoToLabels,
   printQrLabels,
   QR_LAYOUTS,
   storeQrLogo,
+  toBlackAndWhiteDataUrl,
+  zebraHeadline,
 } from "../../utils/qrLabels";
 
 export default function QrLabelPrintModal({
@@ -17,23 +21,44 @@ export default function QrLabelPrintModal({
   onClose,
 }) {
   const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [afcLogoDataUrl, setAfcLogoDataUrl] = useState("");
+  const [bwLogoDataUrl, setBwLogoDataUrl] = useState("");
   const [logoBusy, setLogoBusy] = useState(false);
   const [displayLabels, setDisplayLabels] = useState(labels || []);
-  const [layout, setLayout] = useState(QR_LAYOUTS.sheet);
+  const [layout, setLayout] = useState(QR_LAYOUTS.zebra);
 
   useEffect(() => {
     if (!open) return;
+    setLayout(QR_LAYOUTS.zebra);
     setLogoDataUrl(loadStoredQrLogo());
+    loadImageAsDataUrl(DEFAULT_AFC_MARK_PATH)
+      .then(setAfcLogoDataUrl)
+      .catch(() => setAfcLogoDataUrl(""));
   }, [open]);
 
   useEffect(() => {
-    setLayout((labels?.length || 0) === 1 ? QR_LAYOUTS.single : QR_LAYOUTS.sheet);
-  }, [labels]);
+    let cancelled = false;
+    if (!logoDataUrl) {
+      setBwLogoDataUrl("");
+      return undefined;
+    }
+    toBlackAndWhiteDataUrl(logoDataUrl)
+      .then((next) => {
+        if (!cancelled) setBwLogoDataUrl(next);
+      })
+      .catch(() => {
+        if (!cancelled) setBwLogoDataUrl(logoDataUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [logoDataUrl]);
 
   useEffect(() => {
     let cancelled = false;
     const source = Array.isArray(labels) ? labels : [];
-    if (!logoDataUrl) {
+    const overlay = layout !== QR_LAYOUTS.zebra && logoDataUrl;
+    if (!overlay) {
       setDisplayLabels(source);
       return undefined;
     }
@@ -52,10 +77,22 @@ export default function QrLabelPrintModal({
     return () => {
       cancelled = true;
     };
-  }, [labels, logoDataUrl]);
+  }, [labels, logoDataUrl, layout]);
+
+  const zebraLogo = bwLogoDataUrl || logoDataUrl || afcLogoDataUrl;
+  const printOptions = useMemo(
+    () => ({
+      layout,
+      sideLogoDataUrl: layout === QR_LAYOUTS.zebra ? zebraLogo : "",
+    }),
+    [layout, zebraLogo]
+  );
 
   const count = displayLabels?.length || 0;
   const hint = useMemo(() => {
+    if (layout === QR_LAYOUTS.zebra) {
+      return "4×2 in Zebra ZD220 thermal labels (black & white)";
+    }
     if (layout === QR_LAYOUTS.single) return "One AHU per printed page";
     return "3 labels per letter page";
   }, [layout]);
@@ -99,7 +136,7 @@ export default function QrLabelPrintModal({
               className="btn btn-sm btn-primary"
               type="button"
               disabled={loading || logoBusy || !count}
-              onClick={() => printQrLabels(displayLabels, title, { layout })}
+              onClick={() => printQrLabels(displayLabels, title, printOptions)}
             >
               Print {count === 1 ? "this AHU" : "all"}
             </button>
@@ -121,13 +158,21 @@ export default function QrLabelPrintModal({
           </label>
           {logoDataUrl ? (
             <>
-              <img src={logoDataUrl} alt="QR logo" className="h-6 w-6 object-contain border bg-white" />
+              <img
+                src={layout === QR_LAYOUTS.zebra ? zebraLogo : logoDataUrl}
+                alt="QR logo"
+                className="h-6 object-contain border bg-white"
+              />
               <button className="btn btn-xs btn-ghost" type="button" onClick={clearLogo}>
-                Remove logo
+                Use AFC logo
               </button>
             </>
           ) : (
-            <span className="text-xs opacity-70">Optional company logo sits in the center of each QR</span>
+            <span className="text-xs opacity-70">
+              {layout === QR_LAYOUTS.zebra
+                ? "AFC mark top-right, hospital under the AHU, serviced-by footer"
+                : "Optional company logo sits in the center of each QR"}
+            </span>
           )}
           <div className="ml-auto flex items-center gap-2 text-xs">
             <span className="opacity-70">Layout</span>
@@ -136,6 +181,7 @@ export default function QrLabelPrintModal({
               value={layout}
               onChange={(e) => setLayout(e.target.value)}
             >
+              <option value={QR_LAYOUTS.zebra}>Zebra 4×2 in</option>
               <option value={QR_LAYOUTS.sheet}>Sheet (3 per page)</option>
               <option value={QR_LAYOUTS.single}>One AHU per page</option>
             </select>
@@ -157,7 +203,25 @@ export default function QrLabelPrintModal({
             <div className="text-center py-12 opacity-70">No AHUs to print.</div>
           )}
 
-          {!loading && !error && count > 0 && (
+          {!loading && !error && count > 0 && layout === QR_LAYOUTS.zebra && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {displayLabels.map((label) => (
+                <ZebraPreviewCard
+                  key={label.id}
+                  label={label}
+                  logoSrc={zebraLogo}
+                  onPrint={() =>
+                    printQrLabels([label], label.name, {
+                      layout: QR_LAYOUTS.zebra,
+                      sideLogoDataUrl: zebraLogo,
+                    })
+                  }
+                />
+              ))}
+            </div>
+          )}
+
+          {!loading && !error && count > 0 && layout !== QR_LAYOUTS.zebra && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {displayLabels.map((label) => (
                 <div
@@ -178,7 +242,6 @@ export default function QrLabelPrintModal({
                   {label.location ? (
                     <div className="text-xs mt-0.5">{label.location}</div>
                   ) : null}
-                  <div className="text-[10px] opacity-60 mt-1">ID {label.id}</div>
                   <button
                     className="btn btn-xs mt-2"
                     type="button"
@@ -194,6 +257,62 @@ export default function QrLabelPrintModal({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ZebraPreviewCard({ label, logoSrc, onPrint }) {
+  const hospital = String(label.hospital || "").trim();
+  const headline = zebraHeadline(label);
+  return (
+    <div className="border border-base-300 rounded bg-white text-black p-2">
+      <div
+        className="flex items-stretch bg-white overflow-hidden"
+        style={{ aspectRatio: "2 / 1" }}
+      >
+        <div className="w-[40%] flex items-center justify-center shrink-0">
+          <img
+            src={label.qrDataUrl}
+            alt={`QR for ${headline}`}
+            className="h-[72%] w-auto aspect-square"
+          />
+        </div>
+        <div className="flex-1 min-w-0 border-l-2 border-black pl-3 pr-2 py-2 flex flex-col relative">
+          {logoSrc ? (
+            <img
+              src={logoSrc}
+              alt="AFC"
+              className="absolute top-1 right-2 h-7 w-auto max-w-[40%] object-contain"
+            />
+          ) : null}
+          <div className="flex-1 flex flex-col justify-center pr-6 pt-3">
+            <div className="font-extrabold text-3xl leading-none tracking-tight">{headline}</div>
+            {hospital ? (
+              <div className="text-[10px] font-bold tracking-[0.14em] mt-2">
+                [{hospital.toUpperCase()}]
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-auto">
+            <div className="border-t border-black mb-1.5" />
+            <div className="flex gap-3 text-[9px] font-extrabold uppercase tracking-wide leading-tight">
+              <div>
+                Serviced
+                <br />
+                by:
+              </div>
+              <div>
+                Advanced Filtration
+                <br />
+                Concepts
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button className="btn btn-xs mt-2" type="button" onClick={onPrint}>
+        Print this AHU
+      </button>
     </div>
   );
 }
