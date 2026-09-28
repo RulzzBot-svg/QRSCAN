@@ -5,5 +5,5 @@ from flask_limiter.util import get_remote_address
 limiter = Limiter(
     key_func=get_remote_address,
     storage_uri="memory://",
-    default_limits=["300 per hour"],
+    default_limits=["2000 per hour"],
 )

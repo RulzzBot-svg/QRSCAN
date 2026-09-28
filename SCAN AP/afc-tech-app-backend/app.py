@@ -98,6 +98,11 @@ def create_app():
         return _ensure_cors(app.make_default_options_response())
 
     limiter.init_app(app)
+
+    @limiter.request_filter
+    def _skip_unauthenticated_preflight():
+        return request.method == "OPTIONS"
+
     db.init_app(app)
     with app.app_context():
         ensure_schema()

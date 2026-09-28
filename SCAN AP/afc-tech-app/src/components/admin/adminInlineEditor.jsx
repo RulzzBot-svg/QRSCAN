@@ -118,7 +118,15 @@ const changeoutsLeftLabel = (f) => {
   return `${left}/${perYear} left`;
 };
 
-function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange, ahuNotes = null }, ref) {
+function mapFetchedFilters(rows) {
+  return (Array.isArray(rows) ? rows : []).map((f) => ({
+    ...f,
+    sizeParts: parseSize(f.size),
+    _inactive: f.is_active === false,
+  }));
+}
+
+function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChange, ahuNotes = null, preloadedFilters }, ref) {
   const [filters, setFilters] = useState([]);
   const [filterInvoices, setFilterInvoices] = useState({});
 
@@ -132,6 +140,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   const [toast, setToast] = useState(null);
   const filtersRef = useRef([]);
   const pendingSelectAll = useRef(null);
+  const skipPreloadRef = useRef(false);
   // QuickBooks Pull modal state (mocked integration)
   const [qbOpen, setQbOpen] = useState(false);
   const [qbRef, setQbRef] = useState("");
@@ -252,6 +261,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     setConfirmAction(null);
     setSelectedFilters(new Set());
     pendingSelectAll.current = null;
+    skipPreloadRef.current = false;
   }, [ahuId]);
 
   filtersRef.current = filters;
@@ -305,25 +315,16 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   useEffect(() => {
     if (!isOpen || loaded) return;
 
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await API.get(`/admin/ahus/${ahuId}/filters?include_inactive=1`);
-        const fetched = (Array.isArray(res.data) ? res.data : []).map((f) => ({
-          ...f,
-          sizeParts: parseSize(f.size),
-          _inactive: f.is_active === false,
-        }));
+    const applyFetched = async (fetchedRows, { augmentFromJobs = false } = {}) => {
+      const fetched = mapFetchedFilters(fetchedRows);
 
-        // Try to augment filters' last_service_date using job history for this AHU
+      if (augmentFromJobs) {
         try {
-          // Only fetch job history if any fetched filter is missing a last_service_date
           const needsJobs = fetched.some((ff) => !ff.last_service_date);
           if (needsJobs) {
             const jobsRes = await API.get(`/admin/jobs?ahu_id=${ahuId}`);
             const jobs = Array.isArray(jobsRes.data) ? jobsRes.data : [];
 
-            // Build map of most recent completed_at per filter id for this AHU
             const lastByFilter = {};
             for (const job of jobs) {
               if (String(job.ahu_id) !== String(ahuId)) continue;
@@ -332,34 +333,65 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
               for (const jf of job.filters) {
                 const fid = jf.filter_id || jf.id || jf.filterId;
                 if (!fid) continue;
-                // Keep the most recent completed_at
                 if (!lastByFilter[fid] || new Date(completedAt) > new Date(lastByFilter[fid])) {
                   lastByFilter[fid] = completedAt;
                 }
               }
             }
 
-            // Apply mapping to fetched filters where applicable
             for (const f of fetched) {
               const candidate = lastByFilter[f.id];
               if (candidate) f.last_service_date = candidate;
             }
           }
         } catch (e) {
-          // If job fetch fails, silently continue using server's last_service_date
           console.warn("Could not augment filter last_service_date from jobs:", e);
         }
+      }
 
-        setFilters(fetched);
-        // load AHU notes to extract per-filter invoice metadata (if present)
-        try {
-          if (ahuNotes !== null) {
-            const notes = ahuNotes || "";
+      setFilters(fetched);
+      try {
+        if (ahuNotes !== null) {
+          const notes = ahuNotes || "";
+          const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
+          if (m) {
+            try {
+              const parsed = JSON.parse(m[1]);
+              let local = {};
+              try {
+                const raw = localStorage.getItem(localInvoicesKey);
+                if (raw) local = JSON.parse(raw) || {};
+              } catch (e) {
+                local = {};
+              }
+              setFilterInvoices({ ...(parsed || {}), ...local });
+            } catch (e) {
+              // ignore parse errors
+            }
+          } else {
+            try {
+              const raw = localStorage.getItem(localInvoicesKey);
+              setFilterInvoices(raw ? JSON.parse(raw) : {});
+            } catch (e) {
+              setFilterInvoices({});
+            }
+          }
+        } else {
+          const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
+          const ahuData = ahuRes?.data || {};
+          if (ahuData.not_found) {
+            try {
+              const raw = localStorage.getItem(localInvoicesKey);
+              setFilterInvoices(raw ? JSON.parse(raw) : {});
+            } catch (e) {
+              setFilterInvoices({});
+            }
+          } else {
+            const notes = ahuData.notes || "";
             const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
             if (m) {
               try {
                 const parsed = JSON.parse(m[1]);
-                // merge with any locally-stored invoices (local overrides server)
                 let local = {};
                 try {
                   const raw = localStorage.getItem(localInvoicesKey);
@@ -372,7 +404,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                 // ignore parse errors
               }
             } else {
-              // prefer local cache if present
               try {
                 const raw = localStorage.getItem(localInvoicesKey);
                 setFilterInvoices(raw ? JSON.parse(raw) : {});
@@ -380,55 +411,24 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                 setFilterInvoices({});
               }
             }
-          } else {
-            const ahuRes = await API.get(`/ahu/qr/${ahuId}`);
-            const ahuData = ahuRes?.data || {};
-            if (ahuData.not_found) {
-              // no AHU details available on server
-              try {
-                const raw = localStorage.getItem(localInvoicesKey);
-                setFilterInvoices(raw ? JSON.parse(raw) : {});
-              } catch (e) {
-                setFilterInvoices({});
-              }
-            } else {
-              const notes = ahuData.notes || "";
-              const m = notes.match(/FILTER_INVOICES_JSON::(\{.*\})/);
-              if (m) {
-                try {
-                  const parsed = JSON.parse(m[1]);
-                  // merge with local cache (local overrides server)
-                  let local = {};
-                  try {
-                    const raw = localStorage.getItem(localInvoicesKey);
-                    if (raw) local = JSON.parse(raw) || {};
-                  } catch (e) {
-                    local = {};
-                  }
-                  setFilterInvoices({ ...(parsed || {}), ...local });
-                } catch (e) {
-                  // ignore parse errors
-                }
-              } else {
-                try {
-                  const raw = localStorage.getItem(localInvoicesKey);
-                  setFilterInvoices(raw ? JSON.parse(raw) : {});
-                } catch (e) {
-                  setFilterInvoices({});
-                }
-              }
-            }
-          }
-        } catch (e) {
-          // ignore if AHU details not available
-          try {
-            const raw = localStorage.getItem(localInvoicesKey);
-            setFilterInvoices(raw ? JSON.parse(raw) : {});
-          } catch (err) {
-            setFilterInvoices({});
           }
         }
-        setLoaded(true);
+      } catch (e) {
+        try {
+          const raw = localStorage.getItem(localInvoicesKey);
+          setFilterInvoices(raw ? JSON.parse(raw) : {});
+        } catch (err) {
+          setFilterInvoices({});
+        }
+      }
+      setLoaded(true);
+    };
+
+    const loadFromApi = async () => {
+      setLoading(true);
+      try {
+        const res = await API.get(`/admin/ahus/${ahuId}/filters?include_inactive=1`);
+        await applyFetched(res.data, { augmentFromJobs: true });
       } catch (e) {
         console.error("Error loading filters:", e);
         showToast("Failed to load filters.", "error");
@@ -437,8 +437,21 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       }
     };
 
-    load();
-  }, [ahuId, isOpen, loaded]);
+    if (!skipPreloadRef.current && preloadedFilters === undefined) {
+      setLoading(true);
+      return;
+    }
+
+    if (!skipPreloadRef.current && Array.isArray(preloadedFilters)) {
+      setLoading(true);
+      applyFetched(preloadedFilters, { augmentFromJobs: false }).finally(() => {
+        setLoading(false);
+      });
+      return;
+    }
+
+    loadFromApi();
+  }, [ahuId, isOpen, loaded, preloadedFilters, ahuNotes, localInvoicesKey]);
 
   // 1. Updated Persistence Effect
   // This ensures that every time 'filterInvoices' state changes, 
@@ -538,6 +551,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       }
 
       showToast("Filter added and saved!", "success");
+      skipPreloadRef.current = true;
       setLoaded(false); // Reload to get fresh data from DB
     } catch (err) {
       showToast("Error adding filter.", "error");

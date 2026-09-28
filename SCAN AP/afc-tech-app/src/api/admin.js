@@ -30,3 +30,27 @@ export const importSurveyWorkbook = (
   if (replaceExisting) form.append("replace_existing", "true");
   return API.post("/admin/surveys/import", form, { timeout: 180000 });
 };
+
+const FILTERS_CHUNK = 100;
+
+export async function fetchFiltersByAhuIds(ahuIds, { includeInactive = true } = {}) {
+  const ids = [...new Set((ahuIds || []).map((id) => String(id)).filter(Boolean))];
+  if (!ids.length) return {};
+
+  const out = {};
+  for (let i = 0; i < ids.length; i += FILTERS_CHUNK) {
+    const chunk = ids.slice(i, i + FILTERS_CHUNK);
+    const res = await API.get("/admin/filters", {
+      params: {
+        ahu_ids: chunk.join(","),
+        include_inactive: includeInactive ? 1 : 0,
+      },
+    });
+    const map = res.data?.filters_by_ahu || {};
+    for (const id of chunk) {
+      const rows = map[id] ?? map[Number(id)];
+      out[id] = Array.isArray(rows) ? rows : [];
+    }
+  }
+  return out;
+}

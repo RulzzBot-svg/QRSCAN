@@ -2,6 +2,7 @@
 // Redesigned Admin AHU UI: two-pane layout
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API } from "../../api/api";
+import { fetchFiltersByAhuIds } from "../../api/admin";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
 import PackingSlipPanel from "./PackingSlipPanel";
@@ -67,6 +68,10 @@ function AdminAHUs() {
     error: "",
   });
   const [ahuPartial, setAhuPartial] = useState({});
+  const [preloadedFiltersByAhu, setPreloadedFiltersByAhu] = useState({});
+  const [filtersBulkError, setFiltersBulkError] = useState("");
+  const [filtersReloadToken, setFiltersReloadToken] = useState(0);
+  const [visibleAhus, setVisibleAhus] = useState(50);
   const filterEditorRefs = useRef(new Map());
 
   const HOSPITAL_PREVIEW_LIMIT = 10;
@@ -100,6 +105,8 @@ function AdminAHUs() {
 
   // helper to refresh data after mutations
   const refreshData = async () => {
+    setPreloadedFiltersByAhu({});
+    setFiltersReloadToken((n) => n + 1);
     try {
       const res = await API.get("/admin/ahus");
       setAhus(Array.isArray(res.data) ? res.data : []);
@@ -151,6 +158,41 @@ function AdminAHUs() {
     });
   }, [ahus, ahuQuery, selectedHospitalKey]);
 
+  const visibleAhusList = useMemo(
+    () => filtered.slice(0, visibleAhus),
+    [filtered, visibleAhus]
+  );
+  const visibleAhuIdsKey = visibleAhusList.map((a) => String(a.id)).join(",");
+
+  useEffect(() => {
+    const ids = visibleAhuIdsKey ? visibleAhuIdsKey.split(",") : [];
+    const missing = ids.filter((id) => preloadedFiltersByAhu[id] === undefined);
+    if (!missing.length) {
+      setFiltersBulkError("");
+      return undefined;
+    }
+
+    let cancelled = false;
+    setFiltersBulkError("");
+    fetchFiltersByAhuIds(missing)
+      .then((map) => {
+        if (cancelled) return;
+        setPreloadedFiltersByAhu((prev) => ({ ...prev, ...map }));
+      })
+      .catch((e) => {
+        console.error("Error loading filters:", e);
+        if (!cancelled) {
+          setFiltersBulkError("Could not load filters. Wait a moment and retry.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Reload when the visible AHU set changes or the user hits Retry / refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleAhuIdsKey, filtersReloadToken]);
+
   const setEditorRef = (ahuId) => (el) => {
     if (el) filterEditorRefs.current.set(ahuId, el);
     else filterEditorRefs.current.delete(ahuId);
@@ -167,9 +209,6 @@ function AdminAHUs() {
     });
     setAhuPartial((p) => ({ ...p, [id]: false }));
   };
-
-  // Limit how many AHU filter editors mount at once to avoid too many concurrent requests
-  const [visibleAhus, setVisibleAhus] = useState(50);
 
   const handleBulkAction = (action) => {
     const ids = Object.keys(selected).filter((k) => selected[k]);
@@ -484,9 +523,24 @@ function AdminAHUs() {
 
             {/* Compact card list */}
             <div className="p-2 overflow-auto lg:max-h-[calc(100vh-240px)] space-y-2">
-              {filtered.slice(0, visibleAhus).map((a) => {
+              {filtersBulkError ? (
+                <div className="alert alert-warning text-sm py-2">
+                  <span>{filtersBulkError}</span>
+                  <button
+                    type="button"
+                    className="btn btn-xs"
+                    onClick={() => {
+                      setPreloadedFiltersByAhu({});
+                      setFiltersReloadToken((n) => n + 1);
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : null}
+              {visibleAhusList.map((a) => {
                 return (
-                  <div key={a.id} className="border border-base-300 rounded-lg overflow-hidden">
+                  <div key={`${a.id}-${filtersReloadToken}`} className="border border-base-300 rounded-lg overflow-hidden">
                     {/* Compact AHU header */}
                     <div className="bg-base-200 px-3 py-1.5 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -533,6 +587,7 @@ function AdminAHUs() {
                         isOpen={true} 
                         globalFilters={globalFilters}
                         ahuNotes={a.notes}
+                        preloadedFilters={preloadedFiltersByAhu[String(a.id)]}
                         onSelectionChange={(selectedObjs, meta) => handleFilterSelection(a.id, selectedObjs, meta)}
                       />
                     </div>
