@@ -235,20 +235,20 @@ function FilterInfo() {
         {ahu && (
           <div className="card bg-base-100 border border-base-300 shadow-sm mb-4">
             <div className="card-body p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-xl font-bold text-primary">
+              <div className="flex justify-between items-start gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-xl font-bold text-primary break-words">
                     {ahu.name}
                   </h1>
                   {ahu.location && (
-                    <p className="text-sm text-base-content/70">
+                    <p className="text-sm text-base-content/70 break-words">
                       📍 {ahu.location}
                     </p>
                   )}
                 </div>
 
                 <span
-                  className={`badge ${ahu.status === "Overdue"
+                  className={`badge shrink-0 ${ahu.status === "Overdue"
                     ? "badge-error"
                     : ahu.status === "Due Soon"
                       ? "badge-warning"
@@ -313,32 +313,32 @@ function FilterInfo() {
             >
               {/* Collapsed Header - Always Visible */}
               <div
-                className={`p-4 cursor-pointer hover:bg-base-200 transition-colors ${checked[row.id] ? "bg-success/10" : ""
+                className={`p-3 md:p-4 cursor-pointer hover:bg-base-200 transition-colors ${checked[row.id] ? "bg-success/10" : ""
                   }`}
                 onClick={() => toggleRowExpansion(row.id)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="grid grid-cols-5 gap-4 flex-1 text-sm">
-                    <div>
+                <div className="flex items-start md:items-center justify-between gap-2">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 flex-1 min-w-0 text-sm md:grid-cols-5 md:gap-4">
+                    <div className="min-w-0">
                       <div className="text-base-content/60 text-xs">Qty</div>
                       <div className="font-medium">{row.quantity}</div>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-base-content/60 text-xs">Phase</div>
-                      <div className="font-medium">{row.phase}</div>
+                      <div className="font-medium break-words">{row.phase}</div>
                     </div>
-                    <div>
+                    <div className="min-w-0 col-span-2 md:col-span-1">
                       <div className="text-base-content/60 text-xs">Part</div>
-                      <div className="font-medium">{row.part_number}</div>
+                      <div className="font-medium break-words">{row.part_number}</div>
                     </div>
-                    <div>
+                    <div className="min-w-0 col-span-2 md:col-span-1">
                       <div className="text-base-content/60 text-xs">Size</div>
-                      <div className="font-medium">{row.size}</div>
+                      <div className="font-medium break-words">{row.size}</div>
                     </div>
-                    <div>
+                    <div className="min-w-0 col-span-2 md:col-span-1">
                       <div className="text-base-content/60 text-xs">Last Serviced</div>
                       <div>
-                        <span className="badge badge-success badge-sm">
+                        <span className="badge badge-success badge-sm max-w-full whitespace-nowrap">
                           {row.last_service_date
                             ? formatDate(new Date(parseIsoToDate(row.last_service_date).getTime() - (8 * 60 * 60 * 1000)))
                             : "Never"}
@@ -346,7 +346,7 @@ function FilterInfo() {
                       </div>
                     </div>
                   </div>
-                  <div className="ml-4">
+                  <div className="ml-1 md:ml-4 shrink-0">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className={`h-5 w-5 transition-transform ${expandedRows[row.id] ? "rotate-180" : ""
