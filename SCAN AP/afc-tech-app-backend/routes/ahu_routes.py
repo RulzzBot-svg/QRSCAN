@@ -10,19 +10,12 @@ from datetime import date, datetime
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy import func
 from utility.status import compute_filter_status
+from utility.admin_filters import (
+    admin_filter_dict,
+    parse_ahu_ids,
+)
 
 ahu_bp = Blueprint("ahu", __name__)
-
-
-def yearly_changeouts_for_frequency(frequency_days):
-    """Map filter frequency to expected changeouts per year (90→4, 30→12, …)."""
-    try:
-        days = int(frequency_days or 0)
-    except (TypeError, ValueError):
-        days = 0
-    if days <= 0:
-        return 4
-    return max(1, int(round(365 / days)))
 
 
 def parse_unit_price(val):
@@ -46,15 +39,6 @@ def parse_unit_price(val):
     return round(n, 2)
 
 
-def json_unit_price(val):
-    if val is None:
-        return None
-    try:
-        return float(val)
-    except (TypeError, ValueError):
-        return None
-
-
 def changeout_window_for_hospital(hospital):
     """Return (start, end) dates for counting completed changeouts."""
     today = date.today()
@@ -66,6 +50,47 @@ def changeout_window_for_hospital(hospital):
         return start, today
     # Default: calendar year
     return date(today.year, 1, 1), date(today.year, 12, 31)
+
+
+def completed_changeouts_for_filter_ids(filter_ids, window_start, window_end):
+    if not filter_ids:
+        return {}
+    rows = (
+        db.session.query(JobFilter.filter_id, func.count(JobFilter.id))
+        .join(Job, Job.id == JobFilter.job_id)
+        .filter(
+            JobFilter.filter_id.in_(filter_ids),
+            JobFilter.is_completed.is_(True),
+            Job.completed_at.isnot(None),
+            func.date(Job.completed_at) >= window_start,
+            func.date(Job.completed_at) <= window_end,
+        )
+        .group_by(JobFilter.filter_id)
+        .all()
+    )
+    return {fid: int(cnt) for fid, cnt in rows}
+
+
+def completed_changeouts_for_filters(filters, ahu_by_id):
+    """Count completed changeouts, grouping filters by hospital contract window."""
+    groups = {}
+    for f in filters:
+        ahu = ahu_by_id.get(f.ahu_id) if ahu_by_id else None
+        hospital = getattr(ahu, "hospital", None) if ahu else None
+        window = changeout_window_for_hospital(hospital)
+        groups.setdefault(window, []).append(f.id)
+    completed = {}
+    for (window_start, window_end), fids in groups.items():
+        completed.update(completed_changeouts_for_filter_ids(fids, window_start, window_end))
+    return completed
+
+
+def _query_admin_filters(ahu_ids, include_inactive, active_only):
+    q = db.session.query(Filter).filter(Filter.ahu_id.in_(ahu_ids))
+    filters = q.order_by(Filter.ahu_id.asc(), Filter.excel_order.asc(), Filter.id.asc()).all()
+    if active_only and not include_inactive:
+        filters = [f for f in filters if getattr(f, "is_active", True)]
+    return filters
 
 
 # ---------------------------------------------------
@@ -217,6 +242,41 @@ def get_ahu_by_qr(ahu_id):
 
 
 # ---------------------------------------------------
+# Admin: Get filters for many AHUs (one request, avoids 429 storms)
+# ---------------------------------------------------
+@ahu_bp.route("/admin/filters", methods=["GET"])
+@require_admin
+def get_admin_filters_by_ahu():
+    try:
+        ahu_ids = parse_ahu_ids(request.args.get("ahu_ids") or request.args.get("ids"))
+        if not ahu_ids:
+            return jsonify({"filters_by_ahu": {}}), 200
+
+        include_inactive = request.args.get("include_inactive", "0") == "1"
+        active_only = request.args.get("active_only", "0") == "1"
+
+        ahus = (
+            db.session.query(AHU)
+            .options(joinedload(AHU.hospital))
+            .filter(AHU.id.in_(ahu_ids))
+            .all()
+        )
+        ahu_by_id = {a.id: a for a in ahus}
+        found_ids = list(ahu_by_id.keys())
+        filters = _query_admin_filters(found_ids, include_inactive, active_only) if found_ids else []
+        completed_by_filter = completed_changeouts_for_filters(filters, ahu_by_id)
+
+        out = {str(aid): [] for aid in ahu_ids}
+        for f in filters:
+            out.setdefault(str(f.ahu_id), []).append(admin_filter_dict(f, completed_by_filter))
+
+        return jsonify({"filters_by_ahu": out}), 200
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------
 # Admin: Get filters for an AHU (ACTIVE only)
 # ---------------------------------------------------
 @ahu_bp.route("/admin/ahus/<string:ahu_id>/filters", methods=["GET"])
@@ -227,76 +287,30 @@ def get_filters_for_admin(ahu_id):
         ahu = None
         try:
             aid = int(ahu_id)
-            ahu = db.session.get(AHU, aid)
+            ahu = (
+                db.session.query(AHU)
+                .options(joinedload(AHU.hospital))
+                .filter_by(id=aid)
+                .first()
+            )
         except Exception:
-            ahu = AHU.query.filter_by(name=ahu_id).first()
+            ahu = (
+                AHU.query.options(joinedload(AHU.hospital))
+                .filter_by(name=ahu_id)
+                .first()
+            )
 
         if not ahu:
             return jsonify({"error": "AHU not found"}), 404
 
-        # Normalize AHU id to numeric for querying filters
-        aid = ahu.id
-
-        # Support either explicit `active_only=1` or `include_inactive=1` from clients.
-        # `include_inactive=1` means do not filter out inactive rows.
         include_inactive = request.args.get("include_inactive", "0") == "1"
         active_only = request.args.get("active_only", "0") == "1"
 
-        q = db.session.query(Filter).filter(Filter.ahu_id == aid)
-
-        filters = q.order_by(Filter.excel_order.asc(), Filter.id.asc()).all()
-        if active_only and not include_inactive:
-            filters = [f for f in filters if getattr(f, "is_active", True)]
-
-        # Count completed replacements this contract/calendar year per filter
-        completed_by_filter = {}
-        filter_ids = [f.id for f in filters]
-        if filter_ids:
-            hospital = db.session.get(Hospital, ahu.hospital_id) if ahu.hospital_id else None
-            window_start, window_end = changeout_window_for_hospital(hospital)
-            rows = (
-                db.session.query(JobFilter.filter_id, func.count(JobFilter.id))
-                .join(Job, Job.id == JobFilter.job_id)
-                .filter(
-                    JobFilter.filter_id.in_(filter_ids),
-                    JobFilter.is_completed.is_(True),
-                    Job.completed_at.isnot(None),
-                    func.date(Job.completed_at) >= window_start,
-                    func.date(Job.completed_at) <= window_end,
-                )
-                .group_by(JobFilter.filter_id)
-                .all()
-            )
-            completed_by_filter = {fid: int(cnt) for fid, cnt in rows}
-
-        result = []
-        for f in filters:
-            per_year = yearly_changeouts_for_frequency(f.frequency_days)
-            completed = completed_by_filter.get(f.id, 0) if getattr(f, "is_active", True) else 0
-            # Inactive filters stay visible but are excluded from remaining counts
-            if not getattr(f, "is_active", True):
-                left = None
-            else:
-                left = max(0, per_year - completed)
-
-            result.append({
-                "id": f.id,
-                "phase": f.phase,
-                "part_number": f.part_number,
-                "size": f.size,
-                "quantity": f.quantity,
-                "unit_price": json_unit_price(getattr(f, "unit_price", None)),
-                "frequency_days": f.frequency_days,
-                "last_service_date": (
-                    f.last_service_date.isoformat()
-                    if getattr(f, "last_service_date", None) else None
-                ),
-                "is_active": f.is_active,
-                "changeouts_per_year": per_year,
-                "changeouts_completed": completed_by_filter.get(f.id, 0),
-                "changeouts_left": left,
-            })
-
+        filters = _query_admin_filters([ahu.id], include_inactive, active_only)
+        completed_by_filter = completed_changeouts_for_filters(
+            filters, {ahu.id: ahu}
+        )
+        result = [admin_filter_dict(f, completed_by_filter) for f in filters]
         return jsonify(result), 200
 
     except Exception as e:
