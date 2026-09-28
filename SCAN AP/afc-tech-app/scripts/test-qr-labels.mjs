@@ -55,4 +55,31 @@ const single = buildQrPrintDocument(
 assert(single.includes("layout-single"), "single layout should print one AHU per page");
 assert(single.includes("page-break-after: always"), "one-per-page layout should break after each label");
 
+const zebra = buildQrPrintDocument(
+  [
+    {
+      id: 128,
+      name: "AHU-1 — 21 Building",
+      location: "6th Floor",
+      hospital: "Huntington",
+      building: "21 Building",
+      url: "https://qrscan-lyart.vercel.app/FilterInfo/128",
+      qrDataUrl: "data:image/png;base64,AAA",
+    },
+  ],
+  "QR Codes — Huntington",
+  {
+    layout: "zebra",
+    sideLogoDataUrl: "data:image/png;base64,LOGO",
+  }
+);
+assert(zebra.includes("size: 4in 2in"), "zebra layout should use 4x2 page size");
+assert(zebra.includes("layout-zebra"), "zebra layout class should be present");
+assert(zebra.includes("width: 4in"), "zebra label should be 4 inches wide");
+assert(zebra.includes("height: 2in"), "zebra label should be 2 inches tall");
+assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print the side logo");
+assert(zebra.includes("img class=\"qr\""), "zebra QR should keep a dedicated class");
+assert(!zebra.includes("grid-template-columns: repeat(3, 1fr)") || zebra.includes("layout-zebra"), "zebra html still contains shared CSS");
+assert(zebra.includes("Zebra ZD220"), "zebra hint should mention the printer");
+
 console.log("qrLabels tests passed");
