@@ -9,6 +9,7 @@ import {
   QR_LAYOUTS,
   storeQrLogo,
   toBlackAndWhiteDataUrl,
+  zebraHeadline,
 } from "../../utils/qrLabels";
 
 export default function QrLabelPrintModal({
@@ -262,6 +263,7 @@ export default function QrLabelPrintModal({
 
 function ZebraPreviewCard({ label, logoSrc, onPrint }) {
   const hospital = String(label.hospital || "").trim();
+  const headline = zebraHeadline(label);
   return (
     <div className="border border-base-300 rounded bg-white text-black p-2">
       <div
@@ -271,7 +273,7 @@ function ZebraPreviewCard({ label, logoSrc, onPrint }) {
         <div className="w-[40%] flex items-center justify-center shrink-0">
           <img
             src={label.qrDataUrl}
-            alt={`QR for ${label.name}`}
+            alt={`QR for ${headline}`}
             className="h-[72%] w-auto aspect-square"
           />
         </div>
@@ -283,8 +285,8 @@ function ZebraPreviewCard({ label, logoSrc, onPrint }) {
               className="absolute top-1 right-2 h-7 w-auto max-w-[40%] object-contain"
             />
           ) : null}
-          <div className="flex-1 flex flex-col justify-center pr-8">
-            <div className="font-extrabold text-2xl leading-none tracking-tight">{label.name}</div>
+          <div className="flex-1 flex flex-col justify-center pr-6 pt-3">
+            <div className="font-extrabold text-3xl leading-none tracking-tight">{headline}</div>
             {hospital ? (
               <div className="text-[10px] font-bold tracking-[0.14em] mt-2">
                 [{hospital.toUpperCase()}]

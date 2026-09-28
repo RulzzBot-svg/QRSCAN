@@ -3,6 +3,7 @@ import {
   buildQrPrintDocument,
   DEFAULT_QR_BASE_URL,
   escapeHtml,
+  zebraHeadline,
 } from "../src/utils/qrLabels.js";
 
 function assert(cond, message) {
@@ -87,8 +88,36 @@ assert(zebra.includes("ADVANCED FILTRATION"), "zebra footer should name Advanced
 assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print the corner logo");
 assert(zebra.includes("img class=\"qr\""), "zebra QR should keep a dedicated class");
 assert(zebra.includes("Zebra ZD220"), "zebra hint should mention the printer");
+assert(zebra.includes("AHU-1 — 21 Building"), "zebra headline should keep building already in the AHU name");
+assert(zebra.includes("font-size: 24pt"), "zebra name should use the larger wrapping type");
 assert(!zebra.includes("ID 128"), "zebra labels should not show the internal ID");
 assert(!zebra.includes("class=\"id\""), "zebra labels should not include an ID row");
 assert(!zebra.includes("6th Floor"), "zebra service layout should not print location");
+
+assert(
+  zebraHeadline({ name: "AHU-012", building: "Main" }) === "AHU-012 — Main",
+  "short AHU names should pick up the building in the headline"
+);
+assert(
+  zebraHeadline({ name: "AHU-1 — 21 Building", building: "21 Building" }) === "AHU-1 — 21 Building",
+  "should not duplicate a building already in the name"
+);
+
+const short = buildQrPrintDocument(
+  [
+    {
+      id: 12,
+      name: "AHU-012",
+      hospital: "Foothill",
+      building: "Main",
+      url: "https://qrscan-lyart.vercel.app/FilterInfo/12",
+      qrDataUrl: "data:image/png;base64,AAA",
+    },
+  ],
+  "QR Codes — Foothill",
+  { layout: "zebra" }
+);
+assert(short.includes("AHU-012 — Main"), "print HTML should use the building headline");
+assert(short.includes("[FOOTHILL]"), "short-name labels should still show the hospital");
 
 console.log("qrLabels tests passed");

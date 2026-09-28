@@ -214,6 +214,16 @@ export async function applyLogoToLabels(labels, logoDataUrl) {
   return next;
 }
 
+export function zebraHeadline(label) {
+  const name = String(label?.name || "").trim();
+  const building = String(label?.building || "").trim();
+  if (!building) return name;
+  const haystack = name.toLowerCase();
+  const needle = building.toLowerCase();
+  if (haystack.includes(needle)) return name;
+  return name ? `${name} — ${building}` : building;
+}
+
 function hospitalBracket(label) {
   const name = String(label.hospital || "").trim();
   return name ? `[${name.toUpperCase()}]` : "";
@@ -225,15 +235,16 @@ function labelCardHtml(label, options = {}) {
   const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
   if (layout === QR_LAYOUTS.zebra) {
     const hospital = hospitalBracket(label);
+    const headline = zebraHeadline(label);
     return `
     <article class="label">
       <div class="qr-wrap">
-        <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(label.name)}" />
+        <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(headline)}" />
       </div>
       <div class="copy">
         ${sideLogo ? `<img class="logo" src="${sideLogo}" alt="AFC" />` : ""}
         <div class="identity">
-          <div class="name">${escapeHtml(label.name)}</div>
+          <div class="name">${escapeHtml(headline)}</div>
           ${hospital ? `<div class="hospital">${escapeHtml(hospital)}</div>` : ""}
         </div>
         <div class="footer">
@@ -396,15 +407,16 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding-right: 0.2in;
+      padding-top: 0.16in;
+      padding-right: 0.12in;
       min-height: 0;
     }
     .layout-zebra .name {
-      font-size: 22pt;
+      font-size: 24pt;
       font-weight: 800;
-      line-height: 0.95;
-      letter-spacing: -0.02em;
-      margin: 0 0 0.08in;
+      line-height: 0.92;
+      letter-spacing: -0.03em;
+      margin: 0 0 0.07in;
     }
     .layout-zebra .hospital {
       font-size: 8pt;
