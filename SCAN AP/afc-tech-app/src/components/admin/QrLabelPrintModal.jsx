@@ -241,7 +241,6 @@ export default function QrLabelPrintModal({
                   {label.location ? (
                     <div className="text-xs mt-0.5">{label.location}</div>
                   ) : null}
-                  <div className="text-[10px] opacity-60 mt-1">ID {label.id}</div>
                   <button
                     className="btn btn-xs mt-2"
                     type="button"
@@ -272,16 +271,15 @@ function ZebraPreviewCard({ label, logoSrc, onPrint }) {
         <img
           src={label.qrDataUrl}
           alt={`QR for ${label.name}`}
-          className="h-full w-auto aspect-square shrink-0"
+          className="h-[75%] w-auto aspect-square shrink-0"
         />
-        <div className="min-w-0 pr-2">
+        <div className="min-w-0 pr-1 flex-1">
           {logoSrc ? (
-            <img src={logoSrc} alt="AFC" className="h-14 w-auto max-w-full object-contain mb-1" />
+            <img src={logoSrc} alt="AFC" className="h-20 w-auto max-w-full object-contain mb-1" />
           ) : null}
-          <div className="font-extrabold text-sm leading-tight">{label.name}</div>
-          {meta ? <div className="text-xs mt-0.5">{meta}</div> : null}
-          {label.location ? <div className="text-xs">{label.location}</div> : null}
-          <div className="text-[10px] mt-1">ID {label.id}</div>
+          <div className="font-extrabold text-lg leading-tight">{label.name}</div>
+          {meta ? <div className="text-sm mt-0.5">{meta}</div> : null}
+          {label.location ? <div className="text-sm">{label.location}</div> : null}
         </div>
       </div>
       <button className="btn btn-xs mt-2" type="button" onClick={onPrint}>

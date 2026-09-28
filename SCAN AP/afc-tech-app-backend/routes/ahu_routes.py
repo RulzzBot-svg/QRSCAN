@@ -25,6 +25,36 @@ def yearly_changeouts_for_frequency(frequency_days):
     return max(1, int(round(365 / days)))
 
 
+def parse_unit_price(val):
+    """Accept blank, number, or '$12.50' / '1,200.00'. Return Decimal-friendly float or None."""
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        raise ValueError("unit_price must be a number")
+    if isinstance(val, (int, float)):
+        n = float(val)
+    else:
+        s = str(val).replace("$", "").replace(",", "").strip()
+        if not s:
+            return None
+        try:
+            n = float(s)
+        except ValueError as exc:
+            raise ValueError("unit_price must be a number") from exc
+    if n < 0:
+        raise ValueError("unit_price cannot be negative")
+    return round(n, 2)
+
+
+def json_unit_price(val):
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def changeout_window_for_hospital(hospital):
     """Return (start, end) dates for counting completed changeouts."""
     today = date.today()
@@ -255,6 +285,7 @@ def get_filters_for_admin(ahu_id):
                 "part_number": f.part_number,
                 "size": f.size,
                 "quantity": f.quantity,
+                "unit_price": json_unit_price(getattr(f, "unit_price", None)),
                 "frequency_days": f.frequency_days,
                 "last_service_date": (
                     f.last_service_date.isoformat()
@@ -301,6 +332,12 @@ def add_filter(ahu_id):
             frequency_days=int(data.get("frequency_days", 90)),
             is_active=True,
         )
+
+        if "unit_price" in data:
+            try:
+                f.unit_price = parse_unit_price(data.get("unit_price"))
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
 
         # Optional: accept last_service_date from admin UI
         if data.get("last_service_date"):
@@ -359,6 +396,11 @@ def update_filter(filter_id):
         f.size = data.get("size", f.size)
         f.quantity = int(data.get("quantity", f.quantity))
         f.frequency_days = int(data.get("frequency_days", f.frequency_days))
+        if "unit_price" in data:
+            try:
+                f.unit_price = parse_unit_price(data.get("unit_price"))
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
         # allow last_service_date to be updated by admin (accepts YYYY-MM-DD or ISO)
         if "last_service_date" in data:
             try:

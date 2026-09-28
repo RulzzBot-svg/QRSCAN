@@ -20,6 +20,7 @@ export function filterObjectsForSelection(filters, selectedIds) {
       part_number: f.part_number,
       size: f.size,
       quantity: f.quantity,
+      unit_price: f.unit_price ?? f.price ?? "",
       phase: f.phase,
     }));
 }

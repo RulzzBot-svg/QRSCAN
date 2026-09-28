@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { fetchPackingSlipFromJobs } from "../../api/qb";
-import { groupLinesByAhu } from "../../utils/qbPackingSlip";
+import {
+  copyPackingSlipToClipboard,
+  groupLinesByAhu,
+  qbCopySummary,
+  selectionToFiltersByAhu,
+} from "../../utils/qbPackingSlip";
 import PackingSlipReviewModal from "./PackingSlipReviewModal";
 
 function defaultDateRange() {
@@ -19,6 +24,7 @@ export default function PackingSlipPanel({
   selectedFiltersForQB,
   ahus,
   onOpenManualReview,
+  onCopied,
 }) {
   const defaults = defaultDateRange();
   const [fromDate, setFromDate] = useState(defaults.from);
@@ -71,19 +77,25 @@ export default function PackingSlipPanel({
 
   const openManualReview = () => {
     if (!manualCount) {
-      alert("Check at least one filter checkbox in the AHU tables below.");
+      alert("Check AHUs or filters below first.");
       return;
     }
-    const filtersByAhu = {};
-    for (const [ahuId, filterObjects] of Object.entries(selectedFiltersForQB)) {
-      if (!filterObjects?.length) continue;
-      const ahu = ahus.find((a) => String(a.id) === String(ahuId));
-      filtersByAhu[ahuId] = {
-        ahu_name: ahu?.name || ahuId,
-        filters: filterObjects,
-      };
+    onOpenManualReview(selectionToFiltersByAhu(selectedFiltersForQB, ahus));
+  };
+
+  const copyManualSelection = async () => {
+    if (!manualCount) {
+      alert("Check AHUs or filters below first.");
+      return;
     }
-    onOpenManualReview(filtersByAhu);
+    const filtersByAhu = selectionToFiltersByAhu(selectedFiltersForQB, ahus);
+    try {
+      await copyPackingSlipToClipboard(filtersByAhu, { mode: "special" });
+      onCopied?.(qbCopySummary(filtersByAhu, "special"));
+    } catch (err) {
+      console.error(err);
+      alert("Could not copy. Allow clipboard access for this site, then try again.");
+    }
   };
 
   return (
@@ -117,21 +129,29 @@ export default function PackingSlipPanel({
           >
             Load replaced filters from jobs
           </button>
+          {!selectedHospitalKey && (
+            <span className="text-xs text-warning">← Pick a hospital first to load from jobs</span>
+          )}
+          <button
+            type="button"
+            className="btn btn-sm btn-accent"
+            disabled={!manualCount}
+            onClick={copyManualSelection}
+          >
+            Copy for QuickBooks ({manualCount})
+          </button>
           <button
             type="button"
             className="btn btn-sm btn-outline"
             disabled={!manualCount}
             onClick={openManualReview}
           >
-            Review manual selection ({manualCount})
+            Review first
           </button>
-          {!selectedHospitalKey && (
-            <span className="text-xs text-warning">← Pick a hospital first</span>
-          )}
         </div>
         <p className="text-xs opacity-60 mt-2">
-          Recommended: load from completed jobs so qty/part match what techs actually replaced.
-          Review the table before pasting into QuickBooks.
+          Check an AHU to select every filter in it, then Copy for QuickBooks. In QB click QTY
+          and press Ctrl+Alt+V — not Ctrl+V.
         </p>
       </div>
 
@@ -144,6 +164,7 @@ export default function PackingSlipPanel({
             ? `${loadMeta.count} replaced filter(s) from ${loadMeta.jobs} job(s)`
             : "completed jobs"
         }
+        onCopied={onCopied}
         onSuccess={() => {
           setShowJobReview(false);
           setJobFiltersByAhu(null);

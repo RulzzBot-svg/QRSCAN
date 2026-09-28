@@ -215,8 +215,8 @@ export async function applyLogoToLabels(labels, logoDataUrl) {
 
 function labelCardHtml(label, options = {}) {
   const layout = resolveQrLayout(options.layout);
-  const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
   const sideLogo = options.sideLogoDataUrl || "";
+  const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
   if (layout === QR_LAYOUTS.zebra) {
     return `
     <article class="label">
@@ -226,7 +226,6 @@ function labelCardHtml(label, options = {}) {
         <div class="name">${escapeHtml(label.name)}</div>
         ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
         ${label.location ? `<div class="location">${escapeHtml(label.location)}</div>` : ""}
-        <div class="id">ID ${escapeHtml(label.id)}</div>
       </div>
     </article>
   `;
@@ -237,7 +236,6 @@ function labelCardHtml(label, options = {}) {
       ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
       <div class="name">${escapeHtml(label.name)}</div>
       ${label.location ? `<div class="location">${escapeHtml(label.location)}</div>` : ""}
-      <div class="id">ID ${escapeHtml(label.id)}</div>
     </article>
   `;
 }
@@ -307,7 +305,6 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     .meta { font-size: 11px; color: #444; margin-top: 6px; }
     .name { font-size: 14px; font-weight: 700; margin-top: 4px; }
     .location { font-size: 12px; margin-top: 2px; }
-    .id { font-size: 10px; color: #555; margin-top: 6px; letter-spacing: 0.02em; }
     .grid.layout-single {
       grid-template-columns: 1fr;
       justify-items: center;
@@ -335,8 +332,8 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 0.1in;
-      padding: 0.08in 0.1in;
+      gap: 0.08in;
+      padding: 0.05in 0.07in;
       border: 0;
       border-radius: 0;
       text-align: left;
@@ -350,9 +347,9 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       break-after: auto;
     }
     .layout-zebra .label img.qr {
-      width: 1.82in;
-      height: 1.82in;
-      flex: 0 0 1.82in;
+      width: 1.48in;
+      height: 1.48in;
+      flex: 0 0 1.48in;
     }
     .layout-zebra .copy {
       flex: 1;
@@ -362,28 +359,23 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       justify-content: center;
     }
     .layout-zebra .logo {
-      height: 0.78in;
+      height: 0.98in;
       width: auto;
-      max-width: 1.95in;
+      max-width: 2.28in;
       object-fit: contain;
-      margin: 0 0 0.05in;
+      margin: 0 0 0.04in;
     }
     .layout-zebra .name {
-      font-size: 14pt;
+      font-size: 18pt;
       font-weight: 800;
-      line-height: 1.15;
+      line-height: 1;
       margin: 0 0 0.04in;
     }
     .layout-zebra .meta,
     .layout-zebra .location {
-      font-size: 10pt;
+      font-size: 12pt;
       color: #111;
       margin: 0 0 0.02in;
-    }
-    .layout-zebra .id {
-      font-size: 8pt;
-      color: #111;
-      margin: 0.04in 0 0;
     }
     @media print {
       .toolbar { display: none !important; }

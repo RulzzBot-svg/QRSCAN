@@ -1,8 +1,10 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from db import db
 from flask_cors import CORS
 from dotenv import load_dotenv
+import logging
 import os
+from sqlalchemy import text
 
 from extensions import limiter
 from routes.hospital_routes import hospital_bp
@@ -15,6 +17,8 @@ from routes.qbd_conductor import qbd_bp
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 _DEFAULT_CORS = (
     "https://qrscan-lyart.vercel.app,"
     "https://qrscan-8ql2.onrender.com,"
@@ -23,6 +27,20 @@ _DEFAULT_CORS = (
     "http://127.0.0.1:5173,"
     "http://127.0.0.1:5174"
 )
+
+
+def ensure_schema():
+    """Add columns the running code expects. Safe to run on every boot."""
+    statements = (
+        "ALTER TABLE filters ADD COLUMN IF NOT EXISTS unit_price NUMERIC(10, 2)",
+    )
+    for sql in statements:
+        try:
+            db.session.execute(text(sql))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.exception("Could not apply schema update: %s", sql)
 
 
 def create_app():
@@ -40,24 +58,49 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET"] = jwt_secret
     app.config["JWT_EXPIRY_HOURS"] = os.getenv("JWT_EXPIRY_HOURS", "12")
-    app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024  # 2 MB request bodies
+    app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # survey workbooks
 
     cors_origins = [
-        o.strip()
+        o.strip().rstrip("/")
         for o in os.getenv("CORS_ORIGINS", _DEFAULT_CORS).split(",")
         if o.strip()
     ]
+    cors_header_list = (
+        "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+    )
+    cors_method_list = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
     CORS(
         app,
         resources={r"/api/*": {"origins": cors_origins}},
         supports_credentials=True,
-        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
         expose_headers=["Content-Disposition"],
     )
 
+    def _ensure_cors(response):
+        origin = (request.headers.get("Origin") or "").strip().rstrip("/")
+        if origin and origin in cors_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            requested = request.headers.get("Access-Control-Request-Headers")
+            response.headers["Access-Control-Allow-Headers"] = requested or cors_header_list
+            response.headers["Access-Control-Allow-Methods"] = cors_method_list
+            vary = response.headers.get("Vary", "")
+            if "Origin" not in vary:
+                response.headers["Vary"] = ", ".join(p for p in (vary, "Origin") if p)
+        return response
+
+    @app.before_request
+    def _cors_preflight():
+        if request.method != "OPTIONS":
+            return None
+        return _ensure_cors(app.make_default_options_response())
+
     limiter.init_app(app)
     db.init_app(app)
+    with app.app_context():
+        ensure_schema()
 
     app.register_blueprint(ahu_bp, url_prefix="/api")
     app.register_blueprint(job_bp, url_prefix="/api")
@@ -75,12 +118,25 @@ def create_app():
     def health():
         return jsonify({"status": "ok"}), 200
 
+    @app.errorhandler(413)
+    def request_entity_too_large(_e):
+        return _ensure_cors(jsonify({"error": "File is too large (max 25 MB)"})), 413
+
+    @app.errorhandler(429)
+    def rate_limited(_e):
+        return _ensure_cors(jsonify({"error": "Too many requests. Wait a minute and try again."})), 429
+
+    @app.errorhandler(500)
+    def unhandled_500(e):
+        logger.exception("Unhandled server error")
+        return _ensure_cors(jsonify({"error": "Import or server error. Try again."})), 500
+
     @app.after_request
     def add_security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        return response
+        return _ensure_cors(response)
 
     return app
 

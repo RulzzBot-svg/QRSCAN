@@ -9,6 +9,7 @@ from datetime import datetime, date
 from middleware.auth import require_admin
 from utility.http import internal_error, validate_signature_payload
 import subprocess
+import tempfile
 import time
 import os
 import platform
@@ -638,6 +639,7 @@ def packing_slip_lines_from_jobs():
             .join(Job, Job.id == JobFilter.job_id)
             .join(Filter, Filter.id == JobFilter.filter_id)
             .join(AHU, AHU.id == Job.ahu_id)
+            .options(joinedload(AHU.building))
             .filter(
                 AHU.hospital_id == hospital_id,
                 JobFilter.is_completed.is_(True),
@@ -663,9 +665,11 @@ def packing_slip_lines_from_jobs():
                 "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                 "ahu_id": ahu.id,
                 "ahu_name": ahu.name,
+                "building": ahu.building.name if ahu.building and getattr(ahu.building, "name", None) else None,
                 "filter_id": filt.id,
                 "part_number": filt.part_number,
                 "quantity": filt.quantity if filt.quantity is not None else 1,
+                "unit_price": float(filt.unit_price) if getattr(filt, "unit_price", None) is not None else None,
                 "size": filt.size,
                 "phase": filt.phase,
             })
@@ -681,3 +685,90 @@ def packing_slip_lines_from_jobs():
     except Exception as e:
         logger.error("packing_slip_lines_from_jobs: %s", e)
         return internal_error(e)
+
+
+ALLOWED_SURVEY_EXTS = {".xlsx", ".xlsm"}
+
+
+def _form_truthy(val, default=True):
+    if val is None or str(val).strip() == "":
+        return default
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+
+@admin_bp.route("/surveys/import", methods=["POST"])
+@require_admin
+def import_surveys():
+    """
+    Upload a hospital survey workbook and upsert AHUs/filters.
+
+    Multipart form:
+      file: .xlsx or .xlsm
+      dry_run: true|false (default true)
+      hospital_id: optional — apply to this hospital instead of cell B2
+      sheet: optional sheet name, or omit/'all' for every data sheet
+      replace_existing: true to delete this hospital's current AHUs/filters first
+    """
+    uploaded = request.files.get("file")
+    if uploaded is None or not (uploaded.filename or "").strip():
+        return jsonify({"error": "Choose an Excel file (.xlsx or .xlsm)"}), 400
+
+    ext = os.path.splitext(uploaded.filename)[1].lower()
+    if ext not in ALLOWED_SURVEY_EXTS:
+        return jsonify({"error": "Upload an .xlsx or .xlsm survey workbook"}), 400
+
+    dry_run = _form_truthy(request.form.get("dry_run"), default=True)
+    replace_existing = _form_truthy(
+        request.form.get("replace_existing") or request.form.get("replaceExisting"),
+        default=False,
+    )
+    sheet_raw = (request.form.get("sheet") or "").strip()
+    selected_sheet = None
+    if sheet_raw and sheet_raw.lower() != "all":
+        selected_sheet = sheet_raw
+
+    hospital_id = request.form.get("hospital_id") or request.form.get("hospitalId")
+    if hospital_id in ("", None):
+        hospital_id = None
+    else:
+        try:
+            hospital_id = int(hospital_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "hospital_id must be an integer"}), 400
+
+    if replace_existing and hospital_id is None:
+        return jsonify({"error": "Pick the hospital before starting fresh."}), 400
+
+    fd, tmp_path = tempfile.mkstemp(suffix=ext)
+    os.close(fd)
+    try:
+        uploaded.save(tmp_path)
+        from seed_from_excel import seed_from_excel
+
+        stats = seed_from_excel(
+            tmp_path,
+            selected_sheet=selected_sheet,
+            dry_run=dry_run,
+            hospital_id=hospital_id,
+            replace_existing=replace_existing,
+        )
+        return jsonify(stats), 200
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except MemoryError:
+        db.session.rollback()
+        logger.exception("Survey import ran out of memory")
+        return jsonify({
+            "error": "Workbook is too large for the server. Close extra tabs or try again."
+        }), 500
+    except Exception as e:
+        db.session.rollback()
+        logger.exception("Survey import failed")
+        return jsonify({"error": f"Import failed: {e}"}), 500
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass

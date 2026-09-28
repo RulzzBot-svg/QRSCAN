@@ -8,6 +8,14 @@ import PackingSlipPanel from "./PackingSlipPanel";
 import PackingSlipReviewModal from "./PackingSlipReviewModal";
 import QrLabelPrintModal from "./QrLabelPrintModal";
 import { buildQrLabels } from "../../utils/qrLabels";
+import QbCopyResultModal from "./QbCopyResultModal";
+import SurveyImportModal from "./SurveyImportModal";
+import {
+  copyPackingSlipToClipboard,
+  countPackingSlipItems,
+  qbCopySummary,
+  selectionToFiltersByAhu,
+} from "../../utils/qbPackingSlip";
 
 const naturalAhuSort = (a, b) => {
   const A = String(a ?? "");
@@ -39,7 +47,6 @@ function AdminAHUs() {
   const [selected, setSelected] = useState({}); // { [ahuId]: true }
   const [selectedHospitalKey, setSelectedHospitalKey] = useState(null);
   const [showImport, setShowImport] = useState(false);
-  const [importPreview, setImportPreview] = useState([]);
   const [showSignoff, setShowSignoff] = useState(false);
   const [showAddAhu, setShowAddAhu] = useState(false);
   const [newAhuHospital, setNewAhuHospital] = useState(null);
@@ -49,6 +56,7 @@ function AdminAHUs() {
   const [newAhuNotes, setNewAhuNotes] = useState("");
   const [selectedFiltersForQB, setSelectedFiltersForQB] = useState({});
   const [manualReviewData, setManualReviewData] = useState(null);
+  const [qbCopyResult, setQbCopyResult] = useState(null);
   const [buildingFilter, setBuildingFilter] = useState("");
   const [showAllHospitals, setShowAllHospitals] = useState(false);
   const [qrPrint, setQrPrint] = useState({
@@ -136,6 +144,7 @@ function AdminAHUs() {
       return (
         String(a.id || "").toLowerCase().includes(q) ||
         String(a.name || "").toLowerCase().includes(q) ||
+        String(a.building || "").toLowerCase().includes(q) ||
         String(a.location || "").toLowerCase().includes(q) ||
         String(a.excel_block || a.group || a.display_name || "").toLowerCase().includes(q)
       );
@@ -209,33 +218,6 @@ function AdminAHUs() {
     }
   };
 
-  // CSV import preview: group by blank lines into blocks (simple)
-  const parseCsvBlocks = (text) => {
-    const lines = text.split(/\r?\n/);
-    const blocks = [];
-    let cur = [];
-    for (const line of lines) {
-      if (line.trim() === "") {
-        if (cur.length) {
-          blocks.push(cur);
-          cur = [];
-        }
-      } else cur.push(line);
-    }
-    if (cur.length) blocks.push(cur);
-    return blocks.map((b, i) => ({ id: i + 1, rows: b, group: b[0]?.split(",")[0] || `Block ${i + 1}` }));
-  };
-
-  const handleImportFile = (file) => {
-    const r = new FileReader();
-    r.onload = (e) => {
-      const txt = e.target.result;
-      const blocks = parseCsvBlocks(txt);
-      setImportPreview(blocks);
-    };
-    r.readAsText(file);
-  };
-
   const clearGlobalFilters = () => {
     setGlobalFilters({ frequency: "all", status: "all", nextFrom: "", nextTo: "" });
   };
@@ -252,6 +234,25 @@ function AdminAHUs() {
 
   const handleManualReviewOpen = (filtersByAhu) => {
     setManualReviewData(filtersByAhu);
+  };
+
+  const filtersByAhuFromChecks = () =>
+    selectionToFiltersByAhu(selectedFiltersForQB, ahus);
+
+  const copySelectionForQb = async () => {
+    const filtersByAhu = filtersByAhuFromChecks();
+    const itemCount = countPackingSlipItems(filtersByAhu);
+    if (!itemCount) {
+      alert("Check AHUs or filters first, then copy.");
+      return;
+    }
+    try {
+      await copyPackingSlipToClipboard(filtersByAhu, { mode: "special" });
+      setQbCopyResult(qbCopySummary(filtersByAhu, "special"));
+    } catch (err) {
+      console.error(err);
+      alert("Could not copy. Allow clipboard access for this site, then try again.");
+    }
   };
 
   const manualSelectionCount = Object.values(selectedFiltersForQB).reduce(
@@ -283,22 +284,19 @@ function AdminAHUs() {
           </button>
           <button
             className={`btn btn-xs ${manualSelectionCount ? "btn-accent" : "btn-disabled"}`}
-            onClick={() => {
-              const filtersByAhu = {};
-              for (const [ahuId, filterObjects] of Object.entries(selectedFiltersForQB)) {
-                if (!filterObjects?.length) continue;
-                const ahu = ahus.find((a) => a.id == ahuId);
-                filtersByAhu[ahuId] = {
-                  ahu_name: ahu?.name || ahuId,
-                  filters: filterObjects,
-                };
-              }
-              handleManualReviewOpen(filtersByAhu);
-            }}
+            onClick={copySelectionForQb}
             disabled={!manualSelectionCount}
             type="button"
           >
-            📋 Review &amp; paste to QB
+            Copy for QuickBooks
+          </button>
+          <button
+            className={`btn btn-xs ${manualSelectionCount ? "btn-outline" : "btn-disabled"}`}
+            onClick={() => handleManualReviewOpen(filtersByAhuFromChecks())}
+            disabled={!manualSelectionCount}
+            type="button"
+          >
+            Review first
           </button>
           <button className="btn btn-xs btn-secondary" onClick={() => setShowSignoff(true)} type="button">
             Sign-off
@@ -312,6 +310,7 @@ function AdminAHUs() {
         selectedFiltersForQB={selectedFiltersForQB}
         ahus={ahus}
         onOpenManualReview={handleManualReviewOpen}
+        onCopied={setQbCopyResult}
       />
 
       <div className="flex gap-4 px-4 pb-4">
@@ -505,6 +504,9 @@ function AdminAHUs() {
                           <div className="text-xs font-semibold truncate">
                             {a.name || String(a.id).split("-").slice(1).join("-") || a.id}
                           </div>
+                          {a.building ? (
+                            <div className="badge badge-ghost badge-xs shrink-0">{a.building}</div>
+                          ) : null}
                           <div className="text-xs opacity-70 truncate">{a.location || ""}</div>
                         </div>
                       </div>
@@ -555,47 +557,13 @@ function AdminAHUs() {
         </section>
       </div>
 
-      {/* Import preview modal */}
-      {showImport && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-          <div className="bg-base-100 border p-4 rounded-lg w-3/4 max-h-[80vh] overflow-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold">Import Preview</div>
-              <div className="flex gap-2">
-                <label className="btn btn-sm btn-ghost">
-                  Choose CSV
-                  <input
-                    type="file"
-                    accept="text/csv,text/plain"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleImportFile(e.target.files[0])}
-                  />
-                </label>
-                <button className="btn btn-sm" onClick={() => { setShowImport(false); setImportPreview([]); }} type="button">
-                  Close
-                </button>
-              </div>
-            </div>
-
-            {importPreview.length === 0 ? (
-              <div className="text-center opacity-70">No preview loaded. Choose a CSV to preview grouping by blank line separators.</div>
-            ) : (
-              <div className="space-y-2">
-                {importPreview.map((b) => (
-                  <div key={b.id} className="p-2 border rounded">
-                    <div className="font-medium">
-                      {b.group} — {b.rows.length} rows
-                    </div>
-                    <div className="text-xs mt-1 overflow-auto">
-                      <pre className="whitespace-pre-wrap">{b.rows.join("\n")}</pre>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <SurveyImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        hospitals={hospitals}
+        selectedHospitalKey={selectedHospitalKey}
+        onImported={refreshData}
+      />
 
       {/* Add AHU modal */}
       {showAddAhu && (
@@ -663,6 +631,25 @@ function AdminAHUs() {
         </div>
       )}
 
+      {manualSelectionCount > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-base-100 border border-base-300 shadow-lg rounded-lg px-4 py-2 flex items-center gap-3">
+          <div className="text-sm">
+            <span className="font-semibold">{manualSelectionCount}</span> filter
+            {manualSelectionCount === 1 ? "" : "s"} selected
+          </div>
+          <button className="btn btn-sm btn-accent" type="button" onClick={copySelectionForQb}>
+            Copy for QuickBooks
+          </button>
+          <button
+            className="btn btn-sm btn-outline"
+            type="button"
+            onClick={() => handleManualReviewOpen(filtersByAhuFromChecks())}
+          >
+            Review
+          </button>
+        </div>
+      )}
+
       <SupervisorSignoff open={showSignoff} onClose={() => setShowSignoff(false)} hospitals={hospitals} ahus={ahus} />
 
       <PackingSlipReviewModal
@@ -670,11 +657,13 @@ function AdminAHUs() {
         onClose={() => setManualReviewData(null)}
         filtersByAhu={manualReviewData || {}}
         sourceLabel="manual checkbox selection"
+        onCopied={setQbCopyResult}
         onSuccess={() => {
           setManualReviewData(null);
-          setSelectedFiltersForQB({});
         }}
       />
+
+      <QbCopyResultModal result={qbCopyResult} onClose={setQbCopyResult} />
 
       <QrLabelPrintModal
         open={qrPrint.open}
