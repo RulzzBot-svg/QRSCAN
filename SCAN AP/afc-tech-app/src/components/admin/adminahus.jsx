@@ -207,14 +207,12 @@ function AdminAHUs() {
 
   // multi-select: AHU checkbox also selects/clears every active filter in that AHU
   const toggleSelect = (id) => {
-    setSelected((s) => {
-      const nextChecked = !s[id];
-      const editor = filterEditorRefs.current.get(id);
-      if (nextChecked) editor?.selectAllActive?.();
-      else editor?.clearAll?.();
-      return { ...s, [id]: nextChecked };
-    });
+    const nextChecked = !(selected[id] || selected[String(id)]);
+    setSelected((s) => ({ ...s, [id]: nextChecked }));
     setAhuPartial((p) => ({ ...p, [id]: false }));
+    const editor = filterEditorRefs.current.get(id);
+    if (nextChecked) editor?.selectAllActive?.();
+    else editor?.clearAll?.();
   };
 
   const handleBulkAction = (action) => {
@@ -321,7 +319,12 @@ function AdminAHUs() {
       [ahuId]: selectedFilterObjects || [],
     }));
     if (!meta) return;
-    setSelected((s) => ({ ...s, [ahuId]: !!meta.allSelected }));
+    setSelected((s) => {
+      const alreadyOn = !!(s[ahuId] || s[String(ahuId)]);
+      // Checking the AHU header can report 0 filters in the same tick; keep the header checked.
+      if (alreadyOn && !meta.allSelected && !meta.someSelected) return s;
+      return { ...s, [ahuId]: !!meta.allSelected };
+    });
     setAhuPartial((p) => ({ ...p, [ahuId]: !!meta.someSelected }));
   };
 
@@ -508,16 +511,19 @@ function AdminAHUs() {
                 <button className="btn btn-xs btn-warning" onClick={() => handlePrintQr()} type="button">
                   QR
                 </button>
-                {selectedAhus.length > 0 ? (
-                  <button
-                    className="btn btn-xs btn-error"
-                    onClick={() => askDeleteAhus(selectedAhus)}
-                    type="button"
-                    disabled={deleting}
-                  >
-                    Delete selected ({selectedAhus.length})
-                  </button>
-                ) : null}
+                <button
+                  className="btn btn-xs btn-error"
+                  onClick={() => askDeleteAhus(selectedAhus)}
+                  type="button"
+                  disabled={deleting || selectedAhus.length === 0}
+                  title={
+                    selectedAhus.length
+                      ? `Delete ${selectedAhus.length} checked AHU(s)`
+                      : "Check AHUs, then delete them"
+                  }
+                >
+                  {selectedAhus.length ? `Delete selected (${selectedAhus.length})` : "Delete selected"}
+                </button>
                 <button className="btn btn-xs btn-ghost" onClick={() => setSelected({})} type="button">
                   Clear selection
                 </button>
