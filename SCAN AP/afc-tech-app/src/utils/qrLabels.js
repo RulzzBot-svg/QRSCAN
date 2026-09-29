@@ -227,12 +227,18 @@ export function zebraHeadline(label) {
 export const AFC_COMPANY_NAME = "ADVANCED FILTRATION CONCEPTS";
 export const AFC_PHONE = "323.832.8316";
 
+export function hospitalLine(label) {
+  const name = String(label?.hospital || "").trim();
+  return name ? name.toUpperCase() : "";
+}
+
 function labelCardHtml(label, options = {}) {
   const layout = resolveQrLayout(options.layout);
   const sideLogo = options.sideLogoDataUrl || "";
   const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
   if (layout === QR_LAYOUTS.zebra) {
     const headline = zebraHeadline(label);
+    const hospital = hospitalLine(label);
     return `
     <article class="label">
       <div class="qr-wrap">
@@ -242,6 +248,7 @@ function labelCardHtml(label, options = {}) {
         ${sideLogo ? `<img class="logo" src="${sideLogo}" alt="AFC" />` : ""}
         <div class="identity">
           <div class="name">${escapeHtml(headline)}</div>
+          ${hospital ? `<div class="hospital">${escapeHtml(hospital)}</div>` : ""}
         </div>
         <div class="footer">
           <div class="rule"></div>
@@ -411,6 +418,13 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       line-height: 0.92;
       letter-spacing: -0.03em;
       margin: 0;
+    }
+    .layout-zebra .hospital {
+      font-size: 8pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      margin: 0.06in 0 0;
+      text-transform: uppercase;
     }
     .layout-zebra .footer {
       margin-top: auto;

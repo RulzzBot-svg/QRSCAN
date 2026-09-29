@@ -4,6 +4,7 @@ import {
   DEFAULT_QR_BASE_URL,
   escapeHtml,
   zebraHeadline,
+  hospitalLine,
 } from "../src/utils/qrLabels.js";
 
 function assert(cond, message) {
@@ -83,6 +84,7 @@ assert(zebra.includes("height: 2in"), "zebra label should be 2 inches tall");
 assert(zebra.includes("1.28in"), "zebra QR should sit in the left pane");
 assert(zebra.includes("border-left: 2px solid #000"), "zebra layout should use a vertical divider");
 assert(!zebra.includes("[HUNTINGTON]"), "zebra footer should not wrap the hospital in brackets");
+assert(zebra.includes(">HUNTINGTON<"), "zebra labels should still show the hospital name");
 assert(!zebra.includes("SERVICED"), "zebra footer should not say serviced by");
 assert(zebra.includes("ADVANCED FILTRATION CONCEPTS"), "zebra footer should name Advanced Filtration Concepts");
 assert(zebra.includes("323.832.8316"), "zebra footer should show the company phone");
@@ -103,6 +105,8 @@ assert(
   zebraHeadline({ name: "AHU-1 — 21 Building", building: "21 Building" }) === "AHU-1 — 21 Building",
   "should not duplicate a building already in the name"
 );
+assert(hospitalLine({ hospital: "Huntington" }) === "HUNTINGTON", "hospital line is uppercase without brackets");
+assert(hospitalLine({ hospital: "" }) === "", "blank hospital stays off the label");
 
 const short = buildQrPrintDocument(
   [
@@ -121,5 +125,6 @@ const short = buildQrPrintDocument(
 assert(short.includes("AHU-012 — Main"), "print HTML should use the building headline");
 assert(short.includes("323.832.8316"), "short-name labels should still show the company phone");
 assert(!short.includes("[FOOTHILL]"), "short-name labels should not show a bracketed hospital");
+assert(short.includes(">FOOTHILL<"), "short-name labels should still show the hospital name");
 
 console.log("qrLabels tests passed");
