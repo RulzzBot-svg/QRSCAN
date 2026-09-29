@@ -23,6 +23,8 @@ from seed_from_excel import (
     looks_like_filter_type,
     normalize_filter_size,
     part_match_keys,
+    parse_frequency_to_days,
+    pick_survey_frequency,
     prefer_catalog_part,
     read_survey_letter_blocks,
     seed_from_excel,
@@ -198,6 +200,13 @@ def main():
     assert not looks_like_filter_type("F8V4GL-2424-GWB")
     assert_eq(prefer_catalog_part("HV Pleat", "HVP24242"), "HVP24242", "upgrade type to catalog PN")
     assert_eq(prefer_catalog_part("F8V42412-GWBB", "F8V424-GWBB"), "F8V42412-GWBB", "keep stored catalog")
+    assert_eq(parse_frequency_to_days("2 Years"), 730, "2 Years → 730 days")
+    assert_eq(parse_frequency_to_days("3 Years"), 1095, "3 Years → 1095 days")
+    assert_eq(parse_frequency_to_days("2yr"), 730, "2yr → 730 days")
+    assert_eq(parse_frequency_to_days("18 Months"), 540, "18 Months → 540 days")
+    assert_eq(parse_frequency_to_days(29302), None, "unit price is not a frequency")
+    assert_eq(pick_survey_frequency(26950, "2 Years", 8310), "2 Years", "freq in L when M is a price")
+    assert_eq(pick_survey_frequency("3 Years", 20, 8310), "3 Years", "standard M frequency wins")
 
     db_fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(db_fd)
@@ -374,6 +383,87 @@ def main():
                 4,
                 "re-import does not collapse MV95 into F8V4GL",
             )
+
+            # CHOC South Tower AHU-E2 / E3 from the survey screenshot:
+            # FINAL Mini Pleat + Carbon, then PRE, then FINAL HEPA. No blank between units.
+            # Frequency can sit in L when M is a unit price (Mini Pleat 29302).
+            e2_path = path + ".choc-e2.xlsx"
+            write_lettered_flat(
+                e2_path,
+                "CHOC",
+                [
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "FINAL", "F": "AHU-E2", "G": "Mini Pleat No Head", "H": "CI-MP15F-2424", "J": "24x24x4", "K": 20, "L": "365 Days", "M": 29302, "O": date(2024, 5, 21)},
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "FINAL", "F": "AHU-E2", "G": "Carbon V4 Bank", "H": "FGP-CARB 1/1 G", "J": "24x24x12", "K": 20, "L": "3 Years", "M": 8310, "O": date(2024, 5, 21)},
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "PRE", "F": "AHU-E2", "G": "F8 V4-Bank", "H": "F8V4-2424-GWB", "J": "24x24x12", "K": 55, "L": "2 Years", "M": 26950, "O": date(2025, 4, 29)},
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "FINAL", "F": "AHU-E2", "G": "HEPA", "H": "H13HEPA-2323115-W", "J": "23x23x11.5", "K": 55, "L": "3 Years", "M": 26500, "O": date(2025, 4, 29)},
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "FINAL", "F": "AHU-E3", "G": "Mini Pleat No Head", "H": "CI-MP15F-2424", "J": "24x24x4", "K": 20, "L": "365 Days", "M": 29302, "O": date(2024, 5, 21)},
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "FINAL", "F": "AHU-E3", "G": "Carbon V4 Bank", "H": "FGP-CARB 1/1 G", "J": "24x24x12", "K": 20, "L": "3 Years", "M": 8310, "O": date(2024, 5, 21)},
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "PRE", "F": "AHU-E3", "G": "F7 V4-Bank", "H": "F7V4-2424-GWB", "J": "24x24x12", "K": 55, "L": "2 Years", "M": 26950, "O": date(2025, 4, 29)},
+                    {"B": "South Tower", "C": "Penthouse1 Roof", "E": "FINAL", "F": "AHU-E3", "G": "HEPA", "H": "H13HEPA-2323115-W", "J": "23x23x11.5", "K": 55, "L": "3 Years", "M": 26500, "O": date(2025, 4, 29)},
+                ],
+                sheet="SOUTH TOWER",
+            )
+            e2_blocks = read_survey_letter_blocks(e2_path, "SOUTH TOWER")
+            assert_eq(len(e2_blocks), 2, "AHU-E2 and AHU-E3 stay two units")
+            assert_eq(e2_blocks[0]["display_name"], "AHU-E2", "first block is E2")
+            assert_eq(e2_blocks[1]["display_name"], "AHU-E3", "name change starts E3")
+            assert_eq(len(e2_blocks[0]["filters"]), 4, "E2 keeps Mini Pleat + Carbon + PRE + HEPA")
+            assert_eq(len(e2_blocks[1]["filters"]), 4, "E3 keeps Mini Pleat + Carbon + PRE + HEPA")
+            e2_seed = seed_from_excel(e2_path, hospital_id=choc_hid)
+            e2_ahus = [
+                a for a in AHU.query.filter_by(hospital_id=choc_hid).all()
+                if ahu_name_matches(a.name, "AHU-E2", getattr(a.building, "name", None))
+            ]
+            e3_ahus = [
+                a for a in AHU.query.filter_by(hospital_id=choc_hid).all()
+                if ahu_name_matches(a.name, "AHU-E3", getattr(a.building, "name", None))
+            ]
+            assert_eq(len(e2_ahus), 1, "AHU-E2 is not split into #2")
+            assert_eq(len(e3_ahus), 1, "AHU-E3 is not split into #2")
+            e2_rows = sorted(
+                (f.phase or "", f.part_number, int(f.frequency_days or 0), f.quantity)
+                for f in Filter.query.filter_by(ahu_id=e2_ahus[0].id, is_active=True).all()
+            )
+            e3_rows = sorted(
+                (f.phase or "", f.part_number, int(f.frequency_days or 0), f.quantity)
+                for f in Filter.query.filter_by(ahu_id=e3_ahus[0].id, is_active=True).all()
+            )
+            assert_eq(
+                e2_rows,
+                [
+                    ("FINAL", "CI-MP15F-2424", 365, 20),
+                    ("FINAL", "FGP-CARB 1/1 G", 1095, 20),
+                    ("FINAL", "H13HEPA-2323115-W", 1095, 55),
+                    ("PRE", "F8V4-2424-GWB", 730, 55),
+                ],
+                "AHU-E2 keeps 365d / 2yr / 3yr even when freq is in column L",
+            )
+            assert_eq(
+                e3_rows,
+                [
+                    ("FINAL", "CI-MP15F-2424", 365, 20),
+                    ("FINAL", "FGP-CARB 1/1 G", 1095, 20),
+                    ("FINAL", "H13HEPA-2323115-W", 1095, 55),
+                    ("PRE", "F7V4-2424-GWB", 730, 55),
+                ],
+                "AHU-E3 PRE is F7 at 2 years",
+            )
+            assert_eq(e2_seed["ahus_created"], 2, "one E2 and one E3")
+
+            for f in Filter.query.filter_by(ahu_id=e2_ahus[0].id).all():
+                f.frequency_days = 90
+            db.session.commit()
+            e2_again = seed_from_excel(e2_path, hospital_id=choc_hid)
+            assert_eq(e2_again["ahus_created"], 0, "re-import updates E2/E3")
+            e2_updated = sorted(
+                int(f.frequency_days or 0)
+                for f in Filter.query.filter_by(ahu_id=e2_ahus[0].id, is_active=True).all()
+            )
+            assert_eq(e2_updated, [365, 730, 1095, 1095], "re-import restores 2yr/3yr/365d")
+            try:
+                os.unlink(e2_path)
+            except OSError:
+                pass
 
             letter_path = path + ".letters.xlsx"
             write_lettered_survey(letter_path, "Foothill", [rtu_block("RTU-1"), rtu_block("RTU-2")])

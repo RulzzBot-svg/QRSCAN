@@ -114,11 +114,20 @@ def parse_frequency_to_days(raw):
     if m:
         return int(m.group(1)) * 30
 
-    m = re.search(r"(\d+)\s*year", s, re.IGNORECASE)
+    # 2 Years / 3 Years / 2yr — do not treat a bare price like 29302 as days.
+    m = re.search(r"(\d+)\s*[-]?\s*y(?:ea)?rs?\b", s, re.IGNORECASE)
     if m:
         return int(m.group(1)) * 365
 
     return None
+
+
+def pick_survey_frequency(*candidates):
+    """First cell that is '90 Days' / '2 Years', not a qty or price."""
+    for raw in candidates:
+        if parse_frequency_to_days(raw) is not None:
+            return raw
+    return candidates[0] if candidates else None
 
 
 def open_survey_workbook(path):
@@ -308,11 +317,18 @@ def _block_has_post_pre_stage(rows):
     return False
 
 
+def _block_has_pre_stage(rows):
+    return any(_stage_kind(vals.get("E")) == "pre" for vals in rows)
+
+
 def _should_start_new_ahu(current, vals):
     """
     One physical unit is usually PRE row(s) then FINAL row(s).
-    Split on building change, AHU name change, or PRE after FINAL
-    (Huntington: two AHU-2s on 6th floor, 12/12 then 4/4).
+    Split on building change, AHU name change, or PRE after a block that
+    already had PRE then FINAL (Huntington: two AHU-2s on 6th floor).
+
+    Do not split when FINAL rows come first and PRE is listed later
+    (CHOC AHU-E2 / AHU-E3: Mini Pleat + Carbon FINAL, then PRE, then more FINAL).
     """
     if not current:
         return False
@@ -324,7 +340,11 @@ def _should_start_new_ahu(current, vals):
         return True
     if row_ahu and block_ahu and _norm_name(row_ahu) != _norm_name(block_ahu):
         return True
-    if _stage_kind(vals.get("E")) == "pre" and _block_has_post_pre_stage(current):
+    if (
+        _stage_kind(vals.get("E")) == "pre"
+        and _block_has_post_pre_stage(current)
+        and _block_has_pre_stage(current)
+    ):
         return True
     return False
 
@@ -344,10 +364,12 @@ def read_survey_letter_blocks(path, sheet_name, wb=None):
     One block per physical AHU. Split when:
     - column B building changes (East Building vs MOB vs HDH)
     - column F writes a different AHU name
-    - stage goes back to PRE after FINAL (second AHU-2 on the same floor)
+    - PRE after a block that already had PRE then FINAL (second AHU-2 on the same floor)
+    FINAL-first then PRE on the same AHU name stays one unit (CHOC AHU-E2).
     A blank / building-only row does not split PRE from FINAL of the same unit.
     A blank before a new PRE does split (next unit).
     Quantity is column K (per changeout). L is the yearly total (K x 4 for 90-day).
+    Frequency is column M, or L/N if M is a unit price instead of '2 Years'.
     """
     close = False
     if wb is None:
@@ -401,7 +423,7 @@ def _read_survey_letter_blocks_ws(ws):
                 "phase": phase,
                 "size": size,
                 "quantity": qty,
-                "freq_raw": vals.get("M"),
+                "freq_raw": pick_survey_frequency(vals.get("M"), vals.get("L"), vals.get("N")),
                 "part_number": part,
                 "last_service_date": to_date(vals.get("O")),
                 "invoice": clean_str(vals.get("N")),

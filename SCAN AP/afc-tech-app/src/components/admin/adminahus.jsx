@@ -495,7 +495,9 @@ function AdminAHUs() {
                 <div className="text-xs opacity-70">{filtered.length} shown</div>
             <span className="badge badge-error badge-xs align-middle">Overdue</span> = past due,{" "}
             <span className="badge badge-warning badge-xs align-middle">Due Soon</span> = within 14 days,{" "}
-            <span className="badge badge-info badge-xs align-middle">540 Days</span> = 18 Months
+            <span className="badge badge-info badge-xs align-middle">540 Days</span> = 18 Months,{" "}
+            <span className="badge badge-info badge-xs align-middle">2yr</span> = 730 days,{" "}
+            <span className="badge badge-info badge-xs align-middle">3yr</span> = 1095 days
               </div>
 
               <div className="flex items-center gap-2">
@@ -546,6 +548,9 @@ function AdminAHUs() {
                     <option value="90">90d</option>
                     <option value="180">180d</option>
                     <option value="365">365d</option>
+                    <option value="540">18mo</option>
+                    <option value="730">2yr</option>
+                    <option value="1095">3yr</option>
                   </select>
                 </div>
 

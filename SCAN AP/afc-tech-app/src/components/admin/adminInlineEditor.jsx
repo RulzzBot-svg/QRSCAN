@@ -5,13 +5,25 @@ import { parseIsoToDate, formatDate } from "../../utils/dates";
 import { selectableFilters, selectionMeta } from "../../utils/filterSelection";
 
 const FREQUENCY_OPTIONS = [
-  { label: "30 Days", value: 30 },
-  { label: "60 Days", value: 60 },
-  { label: "90 Days", value: 90 },
-  { label: "180 Days", value: 180 },
-  { label: "365 Days", value: 365 },
-  { label: "18 Months", value: 540 },
+  { label: "30 Days", value: 30, short: "30d" },
+  { label: "60 Days", value: 60, short: "60d" },
+  { label: "90 Days", value: 90, short: "90d" },
+  { label: "180 Days", value: 180, short: "180d" },
+  { label: "365 Days", value: 365, short: "365d" },
+  { label: "18 Months", value: 540, short: "18mo" },
+  { label: "2 Years", value: 730, short: "2yr" },
+  { label: "3 Years", value: 1095, short: "3yr" },
 ];
+
+function frequencySelectValue(days) {
+  const n = Number(days);
+  return Number.isFinite(n) && n > 0 ? String(n) : "";
+}
+
+function knownFrequencyOption(days) {
+  const n = Number(days);
+  return FREQUENCY_OPTIONS.find((opt) => opt.value === n) || null;
+}
 
 const QB_PRICE_VISIBLE_KEY = "adminShowQbPrice";
 
@@ -625,7 +637,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     return filters.filter((f) => {
       if (globalFilters.frequency !== "all") {
         const selectedFreq = Number(globalFilters.frequency);
-        if (f.frequency_days !== selectedFreq) return false;
+        if (Number(f.frequency_days) !== selectedFreq) return false;
       }
 
       if (globalFilters.status !== "all") {
@@ -847,18 +859,23 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
                     <td className="px-1 py-0.5">
                       <select
-                        className="select select-xs select-bordered w-20 text-xs"
-                        value={f.frequency_days}
+                        className="select select-xs select-bordered w-24 text-xs"
+                        value={frequencySelectValue(f.frequency_days)}
                         disabled={f._inactive}
                         onChange={(e) =>
-                          updateFilter(f.id, "frequency_days", e.target.value)
+                          updateFilter(f.id, "frequency_days", Number(e.target.value))
                         }
                       >
                         {FREQUENCY_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.value}d
+                          <option key={opt.value} value={String(opt.value)}>
+                            {opt.short}
                           </option>
                         ))}
+                        {f.frequency_days && !knownFrequencyOption(f.frequency_days) ? (
+                          <option value={frequencySelectValue(f.frequency_days)}>
+                            {Number(f.frequency_days)}d
+                          </option>
+                        ) : null}
                       </select>
                     </td>
 
