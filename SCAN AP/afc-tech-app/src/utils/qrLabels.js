@@ -224,17 +224,14 @@ export function zebraHeadline(label) {
   return name ? `${name} — ${building}` : building;
 }
 
-function hospitalBracket(label) {
-  const name = String(label.hospital || "").trim();
-  return name ? `[${name.toUpperCase()}]` : "";
-}
+export const AFC_COMPANY_NAME = "ADVANCED FILTRATION CONCEPTS";
+export const AFC_PHONE = "323.832.8316";
 
 function labelCardHtml(label, options = {}) {
   const layout = resolveQrLayout(options.layout);
   const sideLogo = options.sideLogoDataUrl || "";
   const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
   if (layout === QR_LAYOUTS.zebra) {
-    const hospital = hospitalBracket(label);
     const headline = zebraHeadline(label);
     return `
     <article class="label">
@@ -245,14 +242,11 @@ function labelCardHtml(label, options = {}) {
         ${sideLogo ? `<img class="logo" src="${sideLogo}" alt="AFC" />` : ""}
         <div class="identity">
           <div class="name">${escapeHtml(headline)}</div>
-          ${hospital ? `<div class="hospital">${escapeHtml(hospital)}</div>` : ""}
         </div>
         <div class="footer">
           <div class="rule"></div>
-          <div class="served">
-            <div class="served-label">SERVICED<br>BY:</div>
-            <div class="served-name">ADVANCED FILTRATION<br>CONCEPTS</div>
-          </div>
+          <div class="company">${escapeHtml(AFC_COMPANY_NAME)}</div>
+          <div class="phone">${escapeHtml(AFC_PHONE)}</div>
         </div>
       </div>
     </article>
@@ -416,12 +410,6 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       font-weight: 800;
       line-height: 0.92;
       letter-spacing: -0.03em;
-      margin: 0 0 0.07in;
-    }
-    .layout-zebra .hospital {
-      font-size: 8pt;
-      font-weight: 700;
-      letter-spacing: 0.14em;
       margin: 0;
     }
     .layout-zebra .footer {
@@ -429,20 +417,21 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     }
     .layout-zebra .rule {
       border-top: 1.5px solid #000;
-      margin: 0 0 0.06in;
+      margin: 0 0 0.05in;
     }
-    .layout-zebra .served {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.14in;
-    }
-    .layout-zebra .served-label,
-    .layout-zebra .served-name {
+    .layout-zebra .company {
       font-size: 7pt;
       font-weight: 800;
-      letter-spacing: 0.06em;
-      line-height: 1.25;
+      letter-spacing: 0.05em;
+      line-height: 1.15;
       text-transform: uppercase;
+    }
+    .layout-zebra .phone {
+      font-size: 8pt;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1.15;
+      margin-top: 0.02in;
     }
     @media print {
       .toolbar { display: none !important; }

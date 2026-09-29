@@ -170,7 +170,7 @@ export default function QrLabelPrintModal({
           ) : (
             <span className="text-xs opacity-70">
               {layout === QR_LAYOUTS.zebra
-                ? "AFC mark top-right, hospital under the AHU, serviced-by footer"
+                ? "AFC mark top-right, company name and phone in the footer"
                 : "Optional company logo sits in the center of each QR"}
             </span>
           )}
@@ -262,7 +262,6 @@ export default function QrLabelPrintModal({
 }
 
 function ZebraPreviewCard({ label, logoSrc, onPrint }) {
-  const hospital = String(label.hospital || "").trim();
   const headline = zebraHeadline(label);
   return (
     <div className="border border-base-300 rounded bg-white text-black p-2">
@@ -287,25 +286,14 @@ function ZebraPreviewCard({ label, logoSrc, onPrint }) {
           ) : null}
           <div className="flex-1 flex flex-col justify-center pr-6 pt-3">
             <div className="font-extrabold text-3xl leading-none tracking-tight">{headline}</div>
-            {hospital ? (
-              <div className="text-[10px] font-bold tracking-[0.14em] mt-2">
-                [{hospital.toUpperCase()}]
-              </div>
-            ) : null}
           </div>
           <div className="mt-auto">
             <div className="border-t border-black mb-1.5" />
-            <div className="flex gap-3 text-[9px] font-extrabold uppercase tracking-wide leading-tight">
-              <div>
-                Serviced
-                <br />
-                by:
-              </div>
-              <div>
-                Advanced Filtration
-                <br />
-                Concepts
-              </div>
+            <div className="text-[9px] font-extrabold uppercase tracking-wide leading-tight">
+              Advanced Filtration Concepts
+            </div>
+            <div className="text-[10px] font-extrabold tracking-wide leading-tight mt-0.5">
+              323.832.8316
             </div>
           </div>
         </div>

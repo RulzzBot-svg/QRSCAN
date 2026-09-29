@@ -82,9 +82,10 @@ assert(zebra.includes("width: 4in"), "zebra label should be 4 inches wide");
 assert(zebra.includes("height: 2in"), "zebra label should be 2 inches tall");
 assert(zebra.includes("1.28in"), "zebra QR should sit in the left pane");
 assert(zebra.includes("border-left: 2px solid #000"), "zebra layout should use a vertical divider");
-assert(zebra.includes("[HUNTINGTON]"), "zebra layout should show the hospital in brackets");
-assert(zebra.includes("SERVICED"), "zebra footer should say serviced by");
-assert(zebra.includes("ADVANCED FILTRATION"), "zebra footer should name Advanced Filtration Concepts");
+assert(!zebra.includes("[HUNTINGTON]"), "zebra footer should not wrap the hospital in brackets");
+assert(!zebra.includes("SERVICED"), "zebra footer should not say serviced by");
+assert(zebra.includes("ADVANCED FILTRATION CONCEPTS"), "zebra footer should name Advanced Filtration Concepts");
+assert(zebra.includes("323.832.8316"), "zebra footer should show the company phone");
 assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print the corner logo");
 assert(zebra.includes("img class=\"qr\""), "zebra QR should keep a dedicated class");
 assert(zebra.includes("Zebra ZD220"), "zebra hint should mention the printer");
@@ -118,6 +119,7 @@ const short = buildQrPrintDocument(
   { layout: "zebra" }
 );
 assert(short.includes("AHU-012 — Main"), "print HTML should use the building headline");
-assert(short.includes("[FOOTHILL]"), "short-name labels should still show the hospital");
+assert(short.includes("323.832.8316"), "short-name labels should still show the company phone");
+assert(!short.includes("[FOOTHILL]"), "short-name labels should not show a bracketed hospital");
 
 console.log("qrLabels tests passed");
