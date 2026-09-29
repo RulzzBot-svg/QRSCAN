@@ -10,6 +10,7 @@ import {
   storeQrLogo,
   toBlackAndWhiteDataUrl,
   zebraHeadline,
+  hospitalLine,
 } from "../../utils/qrLabels";
 
 export default function QrLabelPrintModal({
@@ -170,7 +171,7 @@ export default function QrLabelPrintModal({
           ) : (
             <span className="text-xs opacity-70">
               {layout === QR_LAYOUTS.zebra
-                ? "AFC mark top-right, company name and phone in the footer"
+                ? "AFC mark top-right, hospital name under the AHU, company and phone in the footer"
                 : "Optional company logo sits in the center of each QR"}
             </span>
           )}
@@ -263,6 +264,7 @@ export default function QrLabelPrintModal({
 
 function ZebraPreviewCard({ label, logoSrc, onPrint }) {
   const headline = zebraHeadline(label);
+  const hospital = hospitalLine(label);
   return (
     <div className="border border-base-300 rounded bg-white text-black p-2">
       <div
@@ -286,6 +288,11 @@ function ZebraPreviewCard({ label, logoSrc, onPrint }) {
           ) : null}
           <div className="flex-1 flex flex-col justify-center pr-6 pt-3">
             <div className="font-extrabold text-3xl leading-none tracking-tight">{headline}</div>
+            {hospital ? (
+              <div className="text-[10px] font-bold tracking-[0.14em] uppercase mt-2">
+                {hospital}
+              </div>
+            ) : null}
           </div>
           <div className="mt-auto">
             <div className="border-t border-black mb-1.5" />
