@@ -2,7 +2,7 @@
 // Redesigned Admin AHU UI: two-pane layout
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API } from "../../api/api";
-import { fetchFiltersByAhuIds } from "../../api/admin";
+import { deleteAdminAhus, fetchFiltersByAhuIds } from "../../api/admin";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
 import PackingSlipPanel from "./PackingSlipPanel";
@@ -72,6 +72,8 @@ function AdminAHUs() {
   const [filtersBulkError, setFiltersBulkError] = useState("");
   const [filtersReloadToken, setFiltersReloadToken] = useState(0);
   const [visibleAhus, setVisibleAhus] = useState(50);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const filterEditorRefs = useRef(new Map());
 
   const HOSPITAL_PREVIEW_LIMIT = 10;
@@ -158,6 +160,11 @@ function AdminAHUs() {
     });
   }, [ahus, ahuQuery, selectedHospitalKey]);
 
+  const selectedAhus = useMemo(
+    () => filtered.filter((a) => selected[a.id] || selected[String(a.id)]),
+    [filtered, selected]
+  );
+
   const visibleAhusList = useMemo(
     () => filtered.slice(0, visibleAhus),
     [filtered, visibleAhus]
@@ -200,20 +207,65 @@ function AdminAHUs() {
 
   // multi-select: AHU checkbox also selects/clears every active filter in that AHU
   const toggleSelect = (id) => {
-    setSelected((s) => {
-      const nextChecked = !s[id];
-      const editor = filterEditorRefs.current.get(id);
-      if (nextChecked) editor?.selectAllActive?.();
-      else editor?.clearAll?.();
-      return { ...s, [id]: nextChecked };
-    });
+    const nextChecked = !(selected[id] || selected[String(id)]);
+    setSelected((s) => ({ ...s, [id]: nextChecked }));
     setAhuPartial((p) => ({ ...p, [id]: false }));
+    const editor = filterEditorRefs.current.get(id);
+    if (nextChecked) editor?.selectAllActive?.();
+    else editor?.clearAll?.();
   };
 
   const handleBulkAction = (action) => {
     const ids = Object.keys(selected).filter((k) => selected[k]);
     if (!ids.length) return alert("No rows selected");
     alert(`${action} on ${ids.length} AHU(s)`);
+  };
+
+  const askDeleteAhus = (rows) => {
+    const list = (rows || []).filter(Boolean);
+    if (!list.length) return;
+    setDeleteConfirm({ ahus: list });
+  };
+
+  const confirmDeleteAhus = async () => {
+    const list = deleteConfirm?.ahus || [];
+    if (!list.length) return;
+    setDeleting(true);
+    try {
+      await deleteAdminAhus(list.map((a) => a.id));
+      const gone = new Set(list.map((a) => String(a.id)));
+      setSelected((s) => {
+        const next = { ...s };
+        for (const id of gone) {
+          delete next[id];
+          delete next[Number(id)];
+        }
+        return next;
+      });
+      setAhuPartial((p) => {
+        const next = { ...p };
+        for (const id of gone) {
+          delete next[id];
+          delete next[Number(id)];
+        }
+        return next;
+      });
+      setSelectedFiltersForQB((prev) => {
+        const next = { ...prev };
+        for (const id of gone) {
+          delete next[id];
+          delete next[Number(id)];
+        }
+        return next;
+      });
+      setDeleteConfirm(null);
+      await refreshData();
+    } catch (err) {
+      console.error("Delete AHU failed", err);
+      alert(err.response?.data?.error || "Failed to delete AHU(s)");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handlePrintQr = async (ahusOverride) => {
@@ -267,7 +319,12 @@ function AdminAHUs() {
       [ahuId]: selectedFilterObjects || [],
     }));
     if (!meta) return;
-    setSelected((s) => ({ ...s, [ahuId]: !!meta.allSelected }));
+    setSelected((s) => {
+      const alreadyOn = !!(s[ahuId] || s[String(ahuId)]);
+      // Checking the AHU header can report 0 filters in the same tick; keep the header checked.
+      if (alreadyOn && !meta.allSelected && !meta.someSelected) return s;
+      return { ...s, [ahuId]: !!meta.allSelected };
+    });
     setAhuPartial((p) => ({ ...p, [ahuId]: !!meta.someSelected }));
   };
 
@@ -454,6 +511,19 @@ function AdminAHUs() {
                 <button className="btn btn-xs btn-warning" onClick={() => handlePrintQr()} type="button">
                   QR
                 </button>
+                <button
+                  className="btn btn-xs btn-error"
+                  onClick={() => askDeleteAhus(selectedAhus)}
+                  type="button"
+                  disabled={deleting || selectedAhus.length === 0}
+                  title={
+                    selectedAhus.length
+                      ? `Delete ${selectedAhus.length} checked AHU(s)`
+                      : "Check AHUs, then delete them"
+                  }
+                >
+                  {selectedAhus.length ? `Delete selected (${selectedAhus.length})` : "Delete selected"}
+                </button>
                 <button className="btn btn-xs btn-ghost" onClick={() => setSelected({})} type="button">
                   Clear selection
                 </button>
@@ -575,6 +645,14 @@ function AdminAHUs() {
                         <button className="btn btn-xs btn-ghost" onClick={() => window.open(`/FilterInfo/${a.id}`, "_blank")} type="button">
                           Open
                         </button>
+                        <button
+                          className="btn btn-xs btn-error btn-outline"
+                          onClick={() => askDeleteAhus([a])}
+                          type="button"
+                          disabled={deleting}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
 
@@ -685,6 +763,56 @@ function AdminAHUs() {
           </div>
         </div>
       )}
+
+      {/* Delete AHU confirm */}
+      {deleteConfirm?.ahus?.length ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-base-100 border p-4 rounded-lg w-[28rem] max-w-[95vw]">
+            <div className="font-semibold mb-2">
+              Delete {deleteConfirm.ahus.length === 1 ? "this AHU" : `${deleteConfirm.ahus.length} AHUs`}?
+            </div>
+            <p className="text-sm opacity-80 mb-3">
+              This removes the unit{deleteConfirm.ahus.length === 1 ? "" : "s"} and every filter on
+              {deleteConfirm.ahus.length === 1 ? " it" : " them"} from the dashboard. Job history on
+              those units is removed too. This cannot be undone.
+            </p>
+            <ul className="text-sm bg-base-200 rounded-md p-2 mb-4 max-h-40 overflow-auto space-y-1">
+              {deleteConfirm.ahus.slice(0, 12).map((a) => (
+                <li key={a.id} className="truncate">
+                  <span className="font-medium">{a.name || a.id}</span>
+                  {a.building ? <span className="opacity-70"> · {a.building}</span> : null}
+                  <span className="opacity-60"> · QR {a.id}</span>
+                </li>
+              ))}
+              {deleteConfirm.ahus.length > 12 ? (
+                <li className="opacity-70">and {deleteConfirm.ahus.length - 12} more</li>
+              ) : null}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <button
+                className="btn btn-sm"
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-sm btn-error"
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteAhus}
+              >
+                {deleting
+                  ? "Deleting…"
+                  : deleteConfirm.ahus.length === 1
+                    ? "Delete AHU"
+                    : `Delete ${deleteConfirm.ahus.length} AHUs`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {manualSelectionCount > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-base-100 border border-base-300 shadow-lg rounded-lg px-4 py-2 flex items-center gap-3">

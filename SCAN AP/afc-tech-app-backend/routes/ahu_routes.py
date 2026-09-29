@@ -14,6 +14,7 @@ from utility.admin_filters import (
     admin_filter_dict,
     parse_ahu_ids,
 )
+from utility.ahu_delete import AHU_DELETE_LIMIT, delete_ahus_by_ids, normalize_ahu_ids
 
 ahu_bp = Blueprint("ahu", __name__)
 
@@ -750,5 +751,54 @@ def admin_update_ahu(ahu_id):
         return jsonify({"id": a.id, "notes": a.notes}), 200
 
     except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------
+# Admin: Delete one AHU (filters + jobs go with it)
+# ---------------------------------------------------
+@ahu_bp.route("/admin/ahus/<int:ahu_id>", methods=["DELETE"])
+@require_admin
+def admin_delete_ahu(ahu_id):
+    try:
+        a = db.session.get(AHU, ahu_id)
+        if not a:
+            return jsonify({"error": "AHU not found"}), 404
+
+        deleted = delete_ahus_by_ids([ahu_id])
+        db.session.commit()
+        return jsonify({"message": "AHU deleted", **deleted}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------
+# Admin: Delete several AHUs at once (junk import cleanup)
+# ---------------------------------------------------
+@ahu_bp.route("/admin/ahus/bulk-delete", methods=["POST"])
+@require_admin
+def admin_bulk_delete_ahus():
+    try:
+        data = request.json or {}
+        raw_ids = data.get("ids")
+        if not isinstance(raw_ids, list):
+            return jsonify({"error": "ids must be a list of AHU ids"}), 400
+
+        ids = normalize_ahu_ids(raw_ids)
+        if not ids:
+            return jsonify({"error": "No valid AHU ids"}), 400
+        if len(raw_ids) > AHU_DELETE_LIMIT:
+            return jsonify({"error": f"Delete at most {AHU_DELETE_LIMIT} AHUs at a time"}), 400
+
+        deleted = delete_ahus_by_ids(ids)
+        db.session.commit()
+        return jsonify({"message": "AHUs deleted", **deleted}), 200
+
+    except Exception as e:
+        db.session.rollback()
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
