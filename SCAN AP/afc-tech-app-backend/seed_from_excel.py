@@ -308,11 +308,18 @@ def _block_has_post_pre_stage(rows):
     return False
 
 
+def _block_has_pre_stage(rows):
+    return any(_stage_kind(vals.get("E")) == "pre" for vals in rows)
+
+
 def _should_start_new_ahu(current, vals):
     """
     One physical unit is usually PRE row(s) then FINAL row(s).
-    Split on building change, AHU name change, or PRE after FINAL
-    (Huntington: two AHU-2s on 6th floor, 12/12 then 4/4).
+    Split on building change, AHU name change, or PRE after a block that
+    already had PRE then FINAL (Huntington: two AHU-2s on 6th floor).
+
+    Do not split when FINAL rows come first and PRE is listed later
+    (CHOC AHU-E2 / AHU-E3: Mini Pleat + Carbon FINAL, then PRE, then more FINAL).
     """
     if not current:
         return False
@@ -324,7 +331,11 @@ def _should_start_new_ahu(current, vals):
         return True
     if row_ahu and block_ahu and _norm_name(row_ahu) != _norm_name(block_ahu):
         return True
-    if _stage_kind(vals.get("E")) == "pre" and _block_has_post_pre_stage(current):
+    if (
+        _stage_kind(vals.get("E")) == "pre"
+        and _block_has_post_pre_stage(current)
+        and _block_has_pre_stage(current)
+    ):
         return True
     return False
 
