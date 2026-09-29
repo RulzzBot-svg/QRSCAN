@@ -193,6 +193,9 @@ def main():
     assert looks_like_filter_type("HV Pleat") and looks_like_filter_type("F84V")
     assert not looks_like_filter_type("HVP24242")
     assert not looks_like_filter_type("F8V424-GWBB")
+    assert not looks_like_filter_type("MV95 1/1 Non Recess"), "CHOC MV95 PN is a catalog name"
+    assert not looks_like_filter_type("FGP-CARB 1/1 G"), "carbon catalog PN is not a type"
+    assert not looks_like_filter_type("F8V4GL-2424-GWB")
     assert_eq(prefer_catalog_part("HV Pleat", "HVP24242"), "HVP24242", "upgrade type to catalog PN")
     assert_eq(prefer_catalog_part("F8V42412-GWBB", "F8V424-GWBB"), "F8V42412-GWBB", "keep stored catalog")
 
@@ -333,6 +336,44 @@ def main():
             assert_eq(len(after_type), 2, "type-as-PN extras collapse into catalog rows")
             parts = sorted(f.part_number for f in after_type)
             assert_eq(parts, ["F8V424-GWBB", "HVP24242"], "keep catalog part numbers")
+
+            # CHOC AHU-4 / AHU-5: two FINAL 24x24x12s (cold F8V4GL + hot MV95).
+            write_workbook(
+                path,
+                "CHOC",
+                [
+                    ["AHU-4", "Penthouse", "PRE", "20x25x2", "90 Days", 4, "North Building", "NICU", "HVP20252", "HVP Pleat", None],
+                    ["AHU-4", "Penthouse", "PRE", "20x20x2", "90 Days", 12, "North Building", "NICU", "HVP20202", "HVP Pleat", None],
+                    ["AHU-4", "Penthouse", "FINAL", "24x24x12", "365 Days", 8, "North Building", "NICU COLD Deck", "F8V4GL-2424-GWB", "F8V4GL Microglass", date(2025, 10, 22)],
+                    ["AHU-4", "Penthouse", "FINAL", "24x24x12", "2 Years", 8, "North Building", "NICU HOT Deck", "MV95 1/1 Non Recess", "MV95 1/1 NR", date(2025, 1, 15)],
+                ],
+            )
+            choc = seed_from_excel(path)
+            choc_hid = choc["hospital_id"]
+            choc_ahu = next(
+                a for a in AHU.query.filter_by(hospital_id=choc_hid).all()
+                if ahu_name_matches(a.name, "AHU-4", getattr(a.building, "name", None))
+            )
+            choc_parts = sorted(
+                (f.phase or "", f.part_number, f.quantity)
+                for f in Filter.query.filter_by(ahu_id=choc_ahu.id, is_active=True).all()
+            )
+            assert_eq(
+                choc_parts,
+                [
+                    ("FINAL", "F8V4GL-2424-GWB", 8),
+                    ("FINAL", "MV95 1/1 Non Recess", 8),
+                    ("PRE", "HVP20202", 12),
+                    ("PRE", "HVP20252", 4),
+                ],
+                "CHOC AHU-4 keeps both FINAL 24x24x12s",
+            )
+            seed_from_excel(path, hospital_id=choc_hid)
+            assert_eq(
+                Filter.query.filter_by(ahu_id=choc_ahu.id, is_active=True).count(),
+                4,
+                "re-import does not collapse MV95 into F8V4GL",
+            )
 
             letter_path = path + ".letters.xlsx"
             write_lettered_survey(letter_path, "Foothill", [rtu_block("RTU-1"), rtu_block("RTU-2")])
