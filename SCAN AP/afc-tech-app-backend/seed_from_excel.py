@@ -10,7 +10,8 @@ import openpyxl
 from sqlalchemy import func, or_
 
 from db import db
-from models import Hospital, AHU, Filter, Building, Job, JobFilter, JobSignature, Notification
+from models import Hospital, AHU, Filter, Building, Job, JobFilter, Notification
+from utility.ahu_delete import delete_ahus_by_ids
 
 
 EXCEL_PATH = "./excel_data_raw/filter-datasheet.xlsm"
@@ -536,50 +537,23 @@ def clear_hospital_survey_records(hospital_id):
             or_(AHU.hospital_id == hid, AHU.building_id.in_(building_ids))
         )
     ahu_ids = [r[0] for r in ahu_q.all()]
-    job_ids = (
-        [r[0] for r in db.session.query(Job.id).filter(Job.ahu_id.in_(ahu_ids)).all()]
-        if ahu_ids
-        else []
-    )
-    filter_count = (
-        db.session.query(Filter.id).filter(Filter.ahu_id.in_(ahu_ids)).count() if ahu_ids else 0
-    )
 
     counts = {
-        "ahus": len(ahu_ids),
-        "filters": int(filter_count),
-        "jobs": len(job_ids),
+        "ahus": 0,
+        "filters": 0,
+        "jobs": 0,
         "buildings": len(building_ids),
     }
 
-    notif_filters = [Notification.hospital_id == hid]
-    if ahu_ids:
-        notif_filters.append(Notification.ahu_id.in_(ahu_ids))
-    if job_ids:
-        notif_filters.append(Notification.job_id.in_(job_ids))
-    db.session.query(Notification).filter(or_(*notif_filters)).delete(synchronize_session=False)
-
-    if job_ids:
-        db.session.query(JobSignature).filter(JobSignature.job_id.in_(job_ids)).delete(
-            synchronize_session=False
-        )
-        db.session.query(JobFilter).filter(JobFilter.job_id.in_(job_ids)).delete(
-            synchronize_session=False
-        )
-        db.session.query(Job).filter(Job.id.in_(job_ids)).delete(synchronize_session=False)
+    db.session.query(Notification).filter(Notification.hospital_id == hid).delete(
+        synchronize_session=False
+    )
 
     if ahu_ids:
-        filter_ids = [
-            r[0] for r in db.session.query(Filter.id).filter(Filter.ahu_id.in_(ahu_ids)).all()
-        ]
-        if filter_ids:
-            db.session.query(JobFilter).filter(JobFilter.filter_id.in_(filter_ids)).delete(
-                synchronize_session=False
-            )
-            db.session.query(Filter).filter(Filter.id.in_(filter_ids)).delete(
-                synchronize_session=False
-            )
-        db.session.query(AHU).filter(AHU.id.in_(ahu_ids)).delete(synchronize_session=False)
+        deleted = delete_ahus_by_ids(ahu_ids)
+        counts["ahus"] = deleted["ahus"]
+        counts["filters"] = deleted["filters"]
+        counts["jobs"] = deleted["jobs"]
 
     if building_ids:
         db.session.query(Building).filter(Building.id.in_(building_ids)).delete(

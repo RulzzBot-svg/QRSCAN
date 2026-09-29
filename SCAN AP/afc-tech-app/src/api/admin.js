@@ -31,6 +31,14 @@ export const importSurveyWorkbook = (
   return API.post("/admin/surveys/import", form, { timeout: 180000 });
 };
 
+export const deleteAdminAhu = (ahuId) => {
+  return API.delete(`/admin/ahus/${ahuId}`);
+};
+
+export const deleteAdminAhus = (ids) => {
+  return API.post("/admin/ahus/bulk-delete", { ids });
+};
+
 const FILTERS_CHUNK = 100;
 
 export async function fetchFiltersByAhuIds(ahuIds, { includeInactive = true } = {}) {
