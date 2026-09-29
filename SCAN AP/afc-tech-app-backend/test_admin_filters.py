@@ -27,6 +27,8 @@ def test_yearly_changeouts():
     assert yearly_changeouts_for_frequency(90) == 4
     assert yearly_changeouts_for_frequency(30) == 12
     assert yearly_changeouts_for_frequency(None) == 4
+    assert yearly_changeouts_for_frequency(730) == 1
+    assert yearly_changeouts_for_frequency(1095) == 1
 
 
 def test_admin_filter_dict_shape():
