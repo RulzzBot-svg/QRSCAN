@@ -790,12 +790,16 @@ def looks_like_filter_type(part):
     s = clean_str(part)
     if not s:
         return True
-    if " " in s:
-        return True
     compact = re.sub(r"[^a-z0-9]", "", s.lower())
     type_words = ("pleat", "vbank", "bag", "carbon", "hepa", "prefilter", "final", "panel")
+    # Catalog names often have spaces: "MV95 1/1 Non Recess", "FGP-CARB 1/1 G".
+    model_like = bool(re.search(r"\d\s*/\s*\d", s) or len(re.findall(r"\d", s)) >= 3)
     if any(w in compact for w in type_words):
+        if model_like:
+            return False
         return True
+    if " " in s:
+        return not re.search(r"\d", s)
     digits = re.findall(r"\d", s)
     if len(digits) <= 2 and "-" not in s and len(s) <= 8:
         return True
@@ -865,8 +869,14 @@ def find_matching_filters(ahu_id, phase, part_number, size):
         f_keys = part_match_keys(f.part_number, f.size) | part_match_keys(f.part_number, size)
         if part_keys & f_keys:
             exact.append(f)
-        elif looks_like_filter_type(f.part_number) or looks_like_filter_type(part_number):
-            typed.append(f)
+        else:
+            stored_type = looks_like_filter_type(f.part_number)
+            incoming_type = looks_like_filter_type(part_number)
+            # One side is a vague type label (HV Pleat / F84V) and the other is the
+            # catalog number for that same slot. Do not merge two different catalog
+            # names that happen to share phase+size (CHOC FINAL F8V4GL vs MV95 1/1).
+            if stored_type ^ incoming_type:
+                typed.append(f)
     return exact + typed
 
 
