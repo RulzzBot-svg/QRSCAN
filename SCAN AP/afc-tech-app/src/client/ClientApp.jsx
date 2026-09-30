@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearClientSession, hasClientToken, readClientUser } from "./api";
-import { readClientTheme, storeClientTheme, toggleClientTheme } from "./theme";
+import {
+  applyClientTheme,
+  clearDocumentTheme,
+  readClientTheme,
+  storeClientTheme,
+  toggleClientTheme,
+} from "./theme";
 import ThemeToggle from "./ThemeToggle";
 
 const NAV = [
@@ -30,7 +36,9 @@ export default function ClientApp() {
   }, [navigate, location.pathname, location.search, user]);
 
   useEffect(() => {
+    applyClientTheme(theme);
     storeClientTheme(theme);
+    return () => clearDocumentTheme();
   }, [theme]);
 
   if (!hasClientToken() || !user) return null;
