@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginClient, saveClientSession } from "./api";
-import { readClientTheme, storeClientTheme, toggleClientTheme } from "./theme";
+import { readClientTheme, storeClientTheme, toggleClientTheme, applyClientTheme } from "./theme";
 import ThemeToggle from "./ThemeToggle";
 
 export default function ClientLogin() {
@@ -12,10 +12,15 @@ export default function ClientLogin() {
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(readClientTheme);
 
+  useEffect(() => {
+    applyClientTheme(theme);
+  }, [theme]);
+
   const switchTheme = () => {
     const next = toggleClientTheme(theme);
     setTheme(next);
     storeClientTheme(next);
+    applyClientTheme(next);
   };
 
   const handleSubmit = async (e) => {

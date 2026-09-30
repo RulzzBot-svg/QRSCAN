@@ -1,11 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
     <title>afc-tech-app</title>
+    <script>
+      (function () {
+        try {
+          if ((location.pathname || "").indexOf("/client") !== 0) return;
+          var t = localStorage.getItem("client_appearance");
+          document.documentElement.setAttribute("data-theme", t === "afc-dark" ? "afc-dark" : "afc");
+          document.documentElement.style.colorScheme = t === "afc-dark" ? "dark" : "light";
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "afc");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
