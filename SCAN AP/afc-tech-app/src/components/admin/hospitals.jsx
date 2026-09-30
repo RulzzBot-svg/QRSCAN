@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getHospitals } from "../../api/hospitals";
+import HospitalSettingsModal from "./HospitalSettingsModal";
 
 function AdminHospitals() {
   const [hospitals, setHospitals] = useState([]);
@@ -8,6 +9,7 @@ function AdminHospitals() {
   const [page, setPage] = useState(0);
   const perPage = 10;
   const [total, setTotal] = useState(null);
+  const [settingsHospital, setSettingsHospital] = useState(null);
 
   useEffect(() => {
     loadPage(0);
@@ -42,7 +44,10 @@ function AdminHospitals() {
   return (
     <div data-theme="corporate" className="min-h-screen bg-base-200">
       <main className="p-6">
-        <h1 className="text-3xl font-bold text-primary mb-6">Hospital Maintenance Overview</h1>
+        <h1 className="text-3xl font-bold text-primary mb-2">Hospital Maintenance Overview</h1>
+        <p className="text-sm text-base-content/60 mb-6">
+          Open Settings on a hospital to add portal usernames and PINs.
+        </p>
 
         <div className="bg-base-100 border border-base-300 rounded-lg shadow">
           {loading ? (
@@ -62,6 +67,7 @@ function AdminHospitals() {
                     <th>Last Job</th>
                     <th className="text-center">AHUs</th>
                     <th>Status</th>
+                    <th>Portal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -107,6 +113,16 @@ function AdminHospitals() {
                           {h.active ? "Active" : "Inactive"}
                         </span>
                       </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          title="Contract settings and hospital portal logins"
+                          onClick={() => setSettingsHospital(h)}
+                        >
+                          Settings
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -127,6 +143,12 @@ function AdminHospitals() {
           )}
         </div>
       </main>
+
+      <HospitalSettingsModal
+        hospital={settingsHospital}
+        open={!!settingsHospital}
+        onClose={() => setSettingsHospital(null)}
+      />
     </div>
   );
 }

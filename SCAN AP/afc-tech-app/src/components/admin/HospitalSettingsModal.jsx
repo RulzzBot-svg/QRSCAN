@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   createHospitalClient,
   getHospitalClients,
+  getHospitalSettings,
   updateHospitalClient,
   updateHospitalSettings,
 } from "../../api/admin";
@@ -28,17 +29,25 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
     setError(null);
     setClientsError(null);
     setNewClient({ name: "", username: "", pin: "" });
-    setForm({
-      estimate_number: hospital.estimate_number || "",
-      po_number: hospital.po_number || "",
-      contract_year_start: hospital.contract_year_start
-        ? String(hospital.contract_year_start).slice(0, 10)
-        : "",
-      contract_year_end: hospital.contract_year_end
-        ? String(hospital.contract_year_end).slice(0, 10)
-        : "",
-      contract_notes: hospital.contract_notes || "",
-    });
+    const applyHospital = (data) => {
+      setForm({
+        estimate_number: data.estimate_number || "",
+        po_number: data.po_number || "",
+        contract_year_start: data.contract_year_start
+          ? String(data.contract_year_start).slice(0, 10)
+          : "",
+        contract_year_end: data.contract_year_end
+          ? String(data.contract_year_end).slice(0, 10)
+          : "",
+        contract_notes: data.contract_notes || "",
+      });
+    };
+    applyHospital(hospital);
+    getHospitalSettings(hospital.id)
+      .then((res) => applyHospital(res.data || hospital))
+      .catch(() => {
+        /* keep fields from the row we already have */
+      });
     getHospitalClients(hospital.id)
       .then((res) => setClients(Array.isArray(res.data) ? res.data : []))
       .catch(() => setClientsError("Could not load portal logins"));
@@ -114,7 +123,9 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
     <dialog className="modal modal-open">
       <div className="modal-box max-w-lg">
         <h3 className="font-bold text-lg text-slate-800">{hospital.name}</h3>
-        <p className="text-sm text-base-content/60 mb-4">Contract settings</p>
+        <p className="text-sm text-base-content/60 mb-4">
+          Contract settings and hospital portal logins
+        </p>
 
         <form onSubmit={handleSave} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
