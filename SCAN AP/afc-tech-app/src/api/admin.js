@@ -39,6 +39,18 @@ export const deleteAdminAhus = (ids) => {
   return API.post("/admin/ahus/bulk-delete", { ids });
 };
 
+export const getHospitalClients = (hospitalId) => {
+  return API.get(`/admin/hospitals/${hospitalId}/clients`);
+};
+
+export const createHospitalClient = (hospitalId, payload) => {
+  return API.post(`/admin/hospitals/${hospitalId}/clients`, payload);
+};
+
+export const updateHospitalClient = (clientId, payload) => {
+  return API.patch(`/admin/clients/${clientId}`, payload);
+};
+
 const FILTERS_CHUNK = 100;
 
 export async function fetchFiltersByAhuIds(ahuIds, { includeInactive = true } = {}) {

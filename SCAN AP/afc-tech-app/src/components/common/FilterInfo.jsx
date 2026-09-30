@@ -33,11 +33,24 @@ function FilterInfo() {
     const storedTech = localStorage.getItem("tech");
     if (storedTech) {
       setTech(JSON.parse(storedTech));
-    } else {
-      // If no tech logged in, redirect to login
-      navigate("/");
+      return;
     }
-  }, [navigate]);
+    try {
+      if (localStorage.getItem("client_token") && localStorage.getItem("client_user")) {
+        navigate(`/client/ahu/${ahuId}`, { replace: true });
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    try {
+      sessionStorage.setItem("post_login_path", `/FilterInfo/${ahuId}`);
+      sessionStorage.setItem("post_client_path", `/client/ahu/${ahuId}`);
+    } catch {
+      /* ignore */
+    }
+    navigate("/");
+  }, [navigate, ahuId]);
 
   /* ----------------------------- */
   /* Online / Offline status watch */
@@ -59,6 +72,7 @@ function FilterInfo() {
   /* Load AHU (online OR offline)  */
   /* ----------------------------- */
   useEffect(() => {
+    if (!tech) return;
     let cancelled = false;
 
     const loadAHU = async () => {
@@ -95,7 +109,7 @@ function FilterInfo() {
     return () => {
       cancelled = true;
     };
-  }, [ahuId, navigate]);
+  }, [ahuId, navigate, tech]);
 
   /* ----------------------------- */
   /* UI helpers                    */

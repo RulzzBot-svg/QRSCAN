@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { updateHospitalSettings } from "../../api/admin";
+import {
+  createHospitalClient,
+  getHospitalClients,
+  updateHospitalClient,
+  updateHospitalSettings,
+} from "../../api/admin";
 
 const emptyForm = {
   estimate_number: "",
@@ -13,10 +18,16 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [clients, setClients] = useState([]);
+  const [clientsError, setClientsError] = useState(null);
+  const [newClient, setNewClient] = useState({ name: "", username: "", pin: "" });
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!hospital || !open) return;
     setError(null);
+    setClientsError(null);
+    setNewClient({ name: "", username: "", pin: "" });
     setForm({
       estimate_number: hospital.estimate_number || "",
       po_number: hospital.po_number || "",
@@ -28,6 +39,9 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
         : "",
       contract_notes: hospital.contract_notes || "",
     });
+    getHospitalClients(hospital.id)
+      .then((res) => setClients(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setClientsError("Could not load portal logins"));
   }, [hospital, open]);
 
   if (!open || !hospital) return null;
@@ -56,9 +70,49 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
     }
   };
 
+  const handleCreateClient = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    setClientsError(null);
+    try {
+      const res = await createHospitalClient(hospital.id, newClient);
+      setClients((prev) => [...prev, res.data]);
+      setNewClient({ name: "", username: "", pin: "" });
+    } catch (err) {
+      setClientsError(err?.response?.data?.error || "Could not create portal login");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const toggleClient = async (row) => {
+    try {
+      const res = await updateHospitalClient(row.id, { active: !row.active });
+      setClients((prev) => prev.map((c) => (c.id === row.id ? res.data : c)));
+    } catch (err) {
+      setClientsError(err?.response?.data?.error || "Could not update portal login");
+    }
+  };
+
+  const resetClientPin = async (row) => {
+    const pin = window.prompt(`New PIN for ${row.username} (4+ characters)`);
+    if (pin == null) return;
+    if (String(pin).trim().length < 4) {
+      setClientsError("PIN must be at least 4 characters");
+      return;
+    }
+    try {
+      const res = await updateHospitalClient(row.id, { pin: String(pin).trim() });
+      setClients((prev) => prev.map((c) => (c.id === row.id ? res.data : c)));
+      setClientsError(null);
+    } catch (err) {
+      setClientsError(err?.response?.data?.error || "Could not update PIN");
+    }
+  };
+
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box max-w-md">
+      <div className="modal-box max-w-lg">
         <h3 className="font-bold text-lg text-slate-800">{hospital.name}</h3>
         <p className="text-sm text-base-content/60 mb-4">Contract settings</p>
 
@@ -130,6 +184,69 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
               {saving ? <span className="loading loading-spinner loading-xs" /> : "Save"}
             </button>
           </div>
+        </form>
+
+        <div className="divider my-4">Hospital portal</div>
+        <p className="text-xs text-base-content/60 mb-3">
+          These logins see this hospital only: unit status, next due, and graphs. No prices or invoices.
+          Share <code className="text-[11px]">/client/login</code> with them.
+        </p>
+
+        {clientsError ? (
+          <div className="alert alert-warning text-xs py-2 mb-3">{clientsError}</div>
+        ) : null}
+
+        <ul className="space-y-1 mb-3">
+          {clients.map((row) => (
+            <li key={row.id} className="flex items-center justify-between gap-2 text-sm">
+              <div>
+                <span className="font-medium">{row.name}</span>
+                <span className="text-base-content/50 ml-2">{row.username}</span>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button type="button" className="btn btn-xs btn-ghost" onClick={() => resetClientPin(row)}>
+                  Reset PIN
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-xs ${row.active ? "btn-ghost" : "btn-success"}`}
+                  onClick={() => toggleClient(row)}
+                >
+                  {row.active ? "Deactivate" : "Reactivate"}
+                </button>
+              </div>
+            </li>
+          ))}
+          {clients.length === 0 ? (
+            <li className="text-xs text-base-content/50">No portal logins yet.</li>
+          ) : null}
+        </ul>
+
+        <form onSubmit={handleCreateClient} className="grid grid-cols-2 gap-2">
+          <input
+            className="input input-xs input-bordered col-span-2"
+            placeholder="Contact name"
+            value={newClient.name}
+            onChange={(e) => setNewClient((p) => ({ ...p, name: e.target.value }))}
+            required
+          />
+          <input
+            className="input input-xs input-bordered"
+            placeholder="username"
+            value={newClient.username}
+            onChange={(e) => setNewClient((p) => ({ ...p, username: e.target.value }))}
+            required
+          />
+          <input
+            className="input input-xs input-bordered"
+            placeholder="PIN (4+)"
+            value={newClient.pin}
+            onChange={(e) => setNewClient((p) => ({ ...p, pin: e.target.value }))}
+            required
+          />
+          <button type="submit" className="btn btn-xs btn-outline col-span-2" disabled={creating}>
+            {creating ? "Saving…" : "Add portal login"}
+          </button>
         </form>
       </div>
       <form method="dialog" className="modal-backdrop">

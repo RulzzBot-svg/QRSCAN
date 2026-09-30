@@ -5,14 +5,15 @@ import jwt
 from flask import current_app
 
 
-def create_access_token(tech_id: int, role: str) -> str:
+def create_access_token(subject_id: int, role: str, token_type: str = "tech") -> str:
     secret = current_app.config["JWT_SECRET"]
     hours = int(current_app.config.get("JWT_EXPIRY_HOURS", 12))
     now = datetime.now(timezone.utc)
     exp = now + timedelta(hours=hours)
     payload = {
-        "sub": str(tech_id),
+        "sub": str(subject_id),
         "role": role,
+        "typ": token_type or "tech",
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }

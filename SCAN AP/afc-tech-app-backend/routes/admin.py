@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models import Hospital, AHU, Job, Technician, Filter, JobFilter
+from models import Hospital, AHU, Job, Technician, Filter, JobFilter, ClientUser
 from models import SupervisorSignoff
 from db import db
 from sqlalchemy.orm import joinedload
@@ -7,6 +7,7 @@ from sqlalchemy import func
 import re
 from datetime import datetime, date
 from middleware.auth import require_admin
+from middleware.pin_utils import hash_pin
 from utility.http import internal_error, validate_signature_payload
 import subprocess
 import tempfile
@@ -772,3 +773,88 @@ def import_surveys():
             os.unlink(tmp_path)
         except OSError:
             pass
+
+
+def _client_admin_dict(c):
+    return {
+        "id": c.id,
+        "hospital_id": c.hospital_id,
+        "name": c.name,
+        "username": c.username,
+        "active": bool(c.active),
+    }
+
+
+def _normalize_client_username(raw):
+    return str(raw or "").strip().lower()
+
+
+@admin_bp.route("/hospitals/<int:hospital_id>/clients", methods=["GET"])
+@require_admin
+def list_hospital_clients(hospital_id):
+    hospital = db.session.get(Hospital, hospital_id)
+    if not hospital:
+        return jsonify({"error": "Hospital not found"}), 404
+    rows = (
+        ClientUser.query.filter_by(hospital_id=hospital_id)
+        .order_by(ClientUser.username.asc())
+        .all()
+    )
+    return jsonify([_client_admin_dict(c) for c in rows]), 200
+
+
+@admin_bp.route("/hospitals/<int:hospital_id>/clients", methods=["POST"])
+@require_admin
+def create_hospital_client(hospital_id):
+    hospital = db.session.get(Hospital, hospital_id)
+    if not hospital:
+        return jsonify({"error": "Hospital not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name") or "").strip()
+    username = _normalize_client_username(data.get("username"))
+    pin = str(data.get("pin") or "")
+
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    if not username or len(username) < 3:
+        return jsonify({"error": "Username must be at least 3 characters"}), 400
+    if not pin or len(pin) < 4:
+        return jsonify({"error": "PIN must be at least 4 characters"}), 400
+    if ClientUser.query.filter_by(username=username).first():
+        return jsonify({"error": "That username is already in use"}), 409
+
+    client = ClientUser(
+        hospital_id=hospital_id,
+        name=name,
+        username=username,
+        pin=hash_pin(pin),
+        active=True,
+    )
+    db.session.add(client)
+    db.session.commit()
+    return jsonify(_client_admin_dict(client)), 201
+
+
+@admin_bp.route("/clients/<int:client_id>", methods=["PATCH"])
+@require_admin
+def update_hospital_client(client_id):
+    client = db.session.get(ClientUser, client_id)
+    if not client:
+        return jsonify({"error": "Client login not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    if "name" in data and data["name"] is not None:
+        name = str(data["name"]).strip()
+        if name:
+            client.name = name
+    if "active" in data:
+        client.active = bool(data["active"])
+    if "pin" in data and data["pin"]:
+        pin = str(data["pin"])
+        if len(pin) < 4:
+            return jsonify({"error": "PIN must be at least 4 characters"}), 400
+        client.pin = hash_pin(pin)
+
+    db.session.commit()
+    return jsonify(_client_admin_dict(client)), 200

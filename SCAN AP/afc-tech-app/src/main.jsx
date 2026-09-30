@@ -22,6 +22,13 @@ import JobSignature from "./components/common/jobSignatures";
 import SummaryExample from "./pages/SummaryExample";
 import QrPrintExample from "./pages/QrPrintExample";
 import TechSignoff from "./pages/TechSignoff";
+import ClientApp from "./client/ClientApp";
+import ClientLogin from "./client/ClientLogin";
+import ClientHome from "./client/ClientHome";
+import ClientScan from "./client/ClientScan";
+import ClientUnits from "./client/ClientUnits";
+import ClientAhu from "./client/ClientAhu";
+import ClientGraphs from "./client/ClientGraphs";
 import { registerSW } from "virtual:pwa-register";
 
 if (import.meta.env.PROD) {
@@ -62,6 +69,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         ) : null}
 
         <Route path="/tech/signoff" element={<TechSignoff />} />
+
+        <Route path="/client/login" element={<ClientLogin />} />
+        <Route path="/client" element={<ClientApp />}>
+          <Route index element={<ClientHome />} />
+          <Route path="scan" element={<ClientScan />} />
+          <Route path="units" element={<ClientUnits />} />
+          <Route path="ahu/:ahuId" element={<ClientAhu />} />
+          <Route path="graphs" element={<ClientGraphs />} />
+        </Route>
 
 
 
