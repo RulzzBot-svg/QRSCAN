@@ -136,6 +136,24 @@ class Technician(db.Model):
 
 
 # -------------------------
+# HOSPITAL CLIENT PORTAL
+# -------------------------
+class ClientUser(db.Model):
+    """Read-only hospital portal login. Cannot access technician or admin routes."""
+
+    __tablename__ = "client_users"
+
+    id = Column(Integer, primary_key=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
+    name = Column(String(150), nullable=False)
+    username = Column(String(80), nullable=False, unique=True)
+    pin = Column(String(128), nullable=False)
+    active = Column(Boolean, default=True)
+
+    hospital = relationship("Hospital")
+
+
+# -------------------------
 # JOB
 # -------------------------
 class Job(db.Model):

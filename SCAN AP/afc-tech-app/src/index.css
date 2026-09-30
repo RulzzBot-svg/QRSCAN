@@ -1,8 +1,63 @@
 @import "tailwindcss";
-@plugin "daisyui" {
-  themes: "all";
+@plugin "daisyui";
+
+@plugin "daisyui/theme" {
+  name: "afc";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: #ffffff;
+  --color-base-200: #eef4f8;
+  --color-base-300: #d4e1ea;
+  --color-base-content: #0b1f33;
+  --color-primary: #0a4d8c;
+  --color-primary-content: #f4fbff;
+  --color-secondary: #0f8f8c;
+  --color-secondary-content: #f4fffe;
+  --color-accent: #14b8a6;
+  --color-accent-content: #042422;
+  --color-neutral: #16324f;
+  --color-neutral-content: #e8eef5;
+  --color-info: #3b82f6;
+  --color-success: #15803d;
+  --color-warning: #d97706;
+  --color-error: #dc2626;
+}
+
+@plugin "daisyui/theme" {
+  name: "afc-dark";
+  default: false;
+  prefersdark: false;
+  color-scheme: dark;
+  --color-base-100: #0c1a2b;
+  --color-base-200: #071422;
+  --color-base-300: #16324f;
+  --color-base-content: #e8eef5;
+  --color-primary: #3b9ae0;
+  --color-primary-content: #041525;
+  --color-secondary: #2dd4bf;
+  --color-secondary-content: #042422;
+  --color-accent: #14b8a6;
+  --color-accent-content: #042422;
+  --color-neutral: #d5e0ea;
+  --color-neutral-content: #0b1f33;
+  --color-info: #60a5fa;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
 }
 
 body {
   @apply bg-base-200 text-base-content;
+}
+
+#client-qr-reader video {
+  width: 100% !important;
+  min-height: 280px;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+#client-qr-reader__dashboard {
+  display: none !important;
 }

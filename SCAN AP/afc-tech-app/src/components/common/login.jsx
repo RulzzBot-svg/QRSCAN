@@ -195,6 +195,12 @@ export default function Login() {
         <p className="text-xs text-base-content/60 text-center mt-6">
           Authorized personnel only
         </p>
+        <p className="text-xs text-base-content/50 text-center mt-3">
+          Hospital client?{" "}
+          <a className="link link-primary" href="/client/login">
+            Open the hospital portal
+          </a>
+        </p>
       </div>
     </div>
   );

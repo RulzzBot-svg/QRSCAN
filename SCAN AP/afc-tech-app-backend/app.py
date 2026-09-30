@@ -14,6 +14,7 @@ from routes.job_routes import job_bp
 from routes.admin import admin_bp
 from routes.signature import signature_bp
 from routes.qbd_conductor import qbd_bp
+from routes.client_routes import client_bp
 
 load_dotenv()
 
@@ -33,6 +34,17 @@ def ensure_schema():
     """Add columns the running code expects. Safe to run on every boot."""
     statements = (
         "ALTER TABLE filters ADD COLUMN IF NOT EXISTS unit_price NUMERIC(10, 2)",
+        """
+        CREATE TABLE IF NOT EXISTS client_users (
+            id SERIAL PRIMARY KEY,
+            hospital_id INTEGER NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
+            name VARCHAR(150) NOT NULL,
+            username VARCHAR(80) NOT NULL UNIQUE,
+            pin VARCHAR(128) NOT NULL,
+            active BOOLEAN DEFAULT TRUE
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_client_users_hospital_id ON client_users (hospital_id)",
     )
     for sql in statements:
         try:
@@ -111,6 +123,7 @@ def create_app():
     app.register_blueprint(job_bp, url_prefix="/api")
     app.register_blueprint(tech_bp, url_prefix="/api")
     app.register_blueprint(hospital_bp, url_prefix="/api")
+    app.register_blueprint(client_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(signature_bp, url_prefix="/api")
     app.register_blueprint(qbd_bp, url_prefix="/api/qbd")
