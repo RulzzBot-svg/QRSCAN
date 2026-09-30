@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearClientSession, hasClientToken, readClientUser } from "./api";
 import { readClientTheme, storeClientTheme, toggleClientTheme } from "./theme";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV = [
   { to: "/client", label: "Home", end: true, icon: HomeIcon },
@@ -134,44 +135,6 @@ export default function ClientApp() {
         </div>
       </div>
     </div>
-  );
-}
-
-function ThemeToggle({ theme, onToggle, compact }) {
-  const dark = theme === "afc-dark";
-  return (
-    <button
-      type="button"
-      className={
-        compact
-          ? "btn btn-ghost btn-sm btn-square"
-          : "btn btn-ghost btn-sm w-full justify-start"
-      }
-      onClick={onToggle}
-      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-    >
-      <span className="inline-flex items-center gap-2 min-w-0">
-        {dark ? <SunIcon className="w-4 h-4 shrink-0" /> : <MoonIcon className="w-4 h-4 shrink-0" />}
-        {compact ? null : <span className="whitespace-nowrap">{dark ? "Light mode" : "Dark mode"}</span>}
-      </span>
-    </button>
-  );
-}
-
-function SunIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.2 6.2 4.8 4.8M19.2 19.2l-1.4-1.4M17.8 6.2l1.4-1.4M6.2 17.8l-1.4 1.4" />
-    </svg>
-  );
-}
-
-function MoonIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
-    </svg>
   );
 }
 
