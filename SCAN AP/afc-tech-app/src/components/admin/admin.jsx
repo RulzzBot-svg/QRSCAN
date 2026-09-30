@@ -210,7 +210,12 @@ function AdminDashboard() {
 
         <div className="mt-6 bg-base-100 border border-base-300 rounded-lg shadow p-4">
           <div className="flex items-center justify-between mb-3 gap-2">
-            <h2 className="text-lg font-semibold">Hospital Details</h2>
+            <div>
+              <h2 className="text-lg font-semibold">Hospital Details</h2>
+              <p className="text-xs text-base-content/50">
+                Settings opens contract fields and hospital portal logins.
+              </p>
+            </div>
             {!loading && hospitalRows.length > HOSPITAL_PREVIEW_LIMIT && (
               <button
                 type="button"
@@ -239,7 +244,7 @@ function AdminDashboard() {
                     <th className="text-center">Due Soon</th>
                     <th className="text-center">Compliant</th>
                     <th>Status</th>
-                    <th className="w-16"></th>
+                    <th>Portal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -285,10 +290,10 @@ function AdminDashboard() {
                         <button
                           type="button"
                           className="btn btn-ghost btn-xs"
-                          title="Hospital settings"
+                          title="Contract settings and hospital portal logins"
                           onClick={() => setSettingsHospital(row)}
                         >
-                          ⚙
+                          Settings
                         </button>
                       </td>
                     </tr>

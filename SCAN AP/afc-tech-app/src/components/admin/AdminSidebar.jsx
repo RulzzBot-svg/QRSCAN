@@ -26,6 +26,13 @@ function AdminSidebar() {
         </li>
 
         <li>
+          <NavLink to="/admin/hospitals" className={linkClass}>
+            🏥
+            <span className="ml-2">Hospitals</span>
+          </NavLink>
+        </li>
+
+        <li>
           <NavLink to="/admin/ahus" className={linkClass}>
             🌀
             <span className="ml-2">AHUs</span>
