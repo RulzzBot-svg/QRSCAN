@@ -1,16 +1,16 @@
 const THEME_KEY = "client_theme";
 
+export const LIGHT_THEME = "afc";
+export const DARK_THEME = "afc-dark";
+
 export function readClientTheme() {
   try {
     const stored = localStorage.getItem(THEME_KEY);
-    if (stored === "afc" || stored === "afc-dark") return stored;
+    if (stored === LIGHT_THEME || stored === DARK_THEME) return stored;
   } catch {
     /* ignore */
   }
-  if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    return "afc-dark";
-  }
-  return "afc";
+  return LIGHT_THEME;
 }
 
 export function storeClientTheme(theme) {
@@ -22,5 +22,5 @@ export function storeClientTheme(theme) {
 }
 
 export function toggleClientTheme(current) {
-  return current === "afc-dark" ? "afc" : "afc-dark";
+  return current === DARK_THEME ? LIGHT_THEME : DARK_THEME;
 }

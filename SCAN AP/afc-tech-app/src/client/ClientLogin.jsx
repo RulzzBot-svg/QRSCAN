@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginClient, saveClientSession } from "./api";
-import { readClientTheme } from "./theme";
+import { readClientTheme, storeClientTheme, toggleClientTheme } from "./theme";
+import ThemeToggle from "./ThemeToggle";
 
 export default function ClientLogin() {
   const navigate = useNavigate();
@@ -9,7 +10,13 @@ export default function ClientLogin() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const theme = readClientTheme();
+  const [theme, setTheme] = useState(readClientTheme);
+
+  const switchTheme = () => {
+    const next = toggleClientTheme(theme);
+    setTheme(next);
+    storeClientTheme(next);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +42,10 @@ export default function ClientLogin() {
   };
 
   return (
-    <div data-theme={theme} className="min-h-dvh bg-base-200 flex items-center justify-center px-4">
+    <div data-theme={theme} className="min-h-dvh bg-base-200 flex items-center justify-center px-4 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle theme={theme} onToggle={switchTheme} fit />
+      </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <p className="text-[11px] font-extrabold tracking-[0.22em] text-primary">ADVANCED FILTRATION CONCEPTS</p>
