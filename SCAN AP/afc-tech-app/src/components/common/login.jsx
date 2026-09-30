@@ -10,12 +10,16 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [redirectMessage, setRedirectMessage] = useState("");
+  const [hospitalQrHint, setHospitalQrHint] = useState(false);
 
   useEffect(() => {
     try {
       const post = sessionStorage.getItem("post_login_path");
       if (post) {
         setRedirectMessage("Please sign in to view the scanned AHU.");
+      }
+      if (sessionStorage.getItem("post_client_path")) {
+        setHospitalQrHint(true);
       }
     } catch (e) {
       /* ignore */
@@ -200,6 +204,7 @@ export default function Login() {
           <a className="link link-primary" href="/client/login">
             Open the hospital portal
           </a>
+          {hospitalQrHint ? " — scanned QR will open after you sign in." : ""}
         </p>
       </div>
     </div>

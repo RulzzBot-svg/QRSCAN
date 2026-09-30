@@ -100,7 +100,7 @@ export default function ClientApp() {
             </div>
           </header>
 
-          <main className="flex-1 w-full max-w-5xl mx-auto px-4 pt-4 pb-24 md:px-8 md:py-8">
+          <main className="flex-1 w-full max-w-5xl mx-auto px-4 pt-4 pb-28 md:px-8 md:py-8">
             <Outlet />
           </main>
 
@@ -142,12 +142,18 @@ function ThemeToggle({ theme, onToggle, compact }) {
   return (
     <button
       type="button"
-      className={compact ? "btn btn-ghost btn-sm btn-square" : "btn btn-ghost btn-sm w-full justify-start gap-2"}
+      className={
+        compact
+          ? "btn btn-ghost btn-sm btn-square"
+          : "btn btn-ghost btn-sm w-full justify-start"
+      }
       onClick={onToggle}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
-      {dark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
-      {compact ? null : dark ? "Light mode" : "Dark mode"}
+      <span className="inline-flex items-center gap-2 min-w-0">
+        {dark ? <SunIcon className="w-4 h-4 shrink-0" /> : <MoonIcon className="w-4 h-4 shrink-0" />}
+        {compact ? null : <span className="whitespace-nowrap">{dark ? "Light mode" : "Dark mode"}</span>}
+      </span>
     </button>
   );
 }
