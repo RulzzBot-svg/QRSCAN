@@ -349,6 +349,28 @@ def _should_start_new_ahu(current, vals):
     return False
 
 
+def _blank_closes_block(current, vals):
+    """
+    A separator row starts the next AHU when the following line is PRE, or
+    when this block already has a FINAL and the next line is an unnamed /
+    renamed FINAL (Huntington MZ after MV95 was eating the next unit's F8).
+    PRE + blank + FINAL of the same unit still stays one block.
+    """
+    if not current:
+        return False
+    if _stage_kind(vals.get("E")) == "pre":
+        return True
+    if not _block_has_post_pre_stage(current):
+        return False
+    row_ahu = clean_str(vals.get("F"))
+    block_ahu = _first_filled(current, "F")
+    if not row_ahu:
+        return True
+    if block_ahu and _norm_name(row_ahu) != _norm_name(block_ahu):
+        return True
+    return False
+
+
 def assign_block_instances(blocks):
     """Number repeated (building, name) units: first is 1, next same name is 2."""
     counts = {}
@@ -418,7 +440,9 @@ def _read_survey_letter_blocks_ws(ws):
             qty = vals.get("K")
             if qty is None or clean_str(qty) is None:
                 qty = vals.get("L")
-            part = clean_str(vals.get("H")) or clean_str(vals.get("G"))
+            part = survey_part_number(vals.get("H"), vals.get("G"))
+            if not size or not part:
+                continue
             filters.append({
                 "phase": phase,
                 "size": size,
@@ -444,7 +468,7 @@ def _read_survey_letter_blocks_ws(ws):
             pending_blank = True
             continue
         start_new = _should_start_new_ahu(current, vals)
-        if current and (start_new or (pending_blank and _stage_kind(vals.get("E")) == "pre")):
+        if current and (start_new or (pending_blank and _blank_closes_block(current, vals))):
             close_block()
         pending_blank = False
         current.append(vals)
@@ -813,7 +837,7 @@ def looks_like_filter_type(part):
     if not s:
         return True
     compact = re.sub(r"[^a-z0-9]", "", s.lower())
-    type_words = ("pleat", "vbank", "bag", "carbon", "hepa", "prefilter", "final", "panel")
+    type_words = ("pleat", "vbank", "v4bank", "bag", "carbon", "hepa", "prefilter", "final", "panel")
     # Catalog names often have spaces: "MV95 1/1 Non Recess", "FGP-CARB 1/1 G".
     model_like = bool(re.search(r"\d\s*/\s*\d", s) or len(re.findall(r"\d", s)) >= 3)
     if any(w in compact for w in type_words):
@@ -826,6 +850,39 @@ def looks_like_filter_type(part):
     if len(digits) <= 2 and "-" not in s and len(s) <= 8:
         return True
     return False
+
+
+def survey_part_number(part_cell, type_cell=None):
+    """Column H is the part number. G is filter type — never store type as a second PN."""
+    part = clean_str(part_cell)
+    if part:
+        return part
+    fallback = clean_str(type_cell)
+    if fallback and not looks_like_filter_type(fallback):
+        return fallback
+    return None
+
+
+def part_family(part):
+    """Product family so F8 V4-Bank is not treated as the same slot as MV95."""
+    compact = re.sub(r"[^A-Z0-9]", "", (clean_str(part) or "").upper())
+    if not compact:
+        return None
+    if "MV95" in compact:
+        return "mv95"
+    if compact.startswith("F8"):
+        return "f8"
+    if compact.startswith("HVP") or compact in ("HVPLEAT", "HVPLEATED"):
+        return "hvpleat"
+    return None
+
+
+def _same_filter_family(left, right):
+    a = part_family(left)
+    b = part_family(right)
+    if a and b and a != b:
+        return False
+    return True
 
 
 def prefer_catalog_part(current, incoming):
@@ -896,8 +953,9 @@ def find_matching_filters(ahu_id, phase, part_number, size):
             incoming_type = looks_like_filter_type(part_number)
             # One side is a vague type label (HV Pleat / F84V) and the other is the
             # catalog number for that same slot. Do not merge two different catalog
-            # names that happen to share phase+size (CHOC FINAL F8V4GL vs MV95 1/1).
-            if stored_type ^ incoming_type:
+            # names that happen to share phase+size (CHOC FINAL F8V4GL vs MV95 1/1),
+            # and do not treat F8 V4-Bank as the type label for an MV95 row.
+            if stored_type ^ incoming_type and _same_filter_family(f.part_number, part_number):
                 typed.append(f)
     return exact + typed
 
@@ -998,10 +1056,31 @@ def upsert_filter(
 
     f = Filter(**kwargs)
     db.session.add(f)
+    db.session.flush()
     return f
 
 
-def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map):
+def claim_filter(claimed, filt):
+    if claimed is None or filt is None or getattr(filt, "id", None) is None:
+        return
+    claimed.setdefault(filt.ahu_id, set()).add(filt.id)
+
+
+def deactivate_unclaimed_filters(claimed):
+    """Excel is the filter list for AHUs touched this import. Keep job rows; hide extras."""
+    for ahu_id, ids in (claimed or {}).items():
+        if not ids:
+            continue
+        extras = (
+            Filter.query.filter_by(ahu_id=ahu_id, is_active=True)
+            .filter(~Filter.id.in_(list(ids)))
+            .all()
+        )
+        for extra in extras:
+            extra.is_active = False
+
+
+def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map, claimed_filters=None):
     """Create/update one AHU and upsert the filter rows already parsed for it."""
     display_name = block.get("display_name")
     building = clean_str(block.get("building"))
@@ -1081,7 +1160,6 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
         qty = row.get("quantity")
         freq_raw = row.get("freq_raw")
         freq_days = parse_frequency_to_days(freq_raw)
-        part_number = row.get("part_number")
         last_service_date = row.get("last_service_date")
         is_active = True
         if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
@@ -1089,9 +1167,13 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
         if not size:
             stats["filters_skipped"] += 1
             continue
+        part_number = row.get("part_number")
+        if not clean_str(part_number):
+            stats["filters_skipped"] += 1
+            continue
         filter_excel_order = filter_order_map[ahu_id]
         filter_order_map[ahu_id] += 1
-        upsert_filter(
+        filt = upsert_filter(
             ahu_id=ahu_id,
             phase=phase,
             part_number=part_number,
@@ -1102,6 +1184,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
             is_active=is_active,
             excel_order=filter_excel_order,
         )
+        claim_filter(claimed_filters, filt)
         stats["filters_upserted"] += 1
     return next_seq
 
@@ -1160,6 +1243,7 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
         "jobs_cleared": 0,
         "buildings_cleared": 0,
         "warnings": [],
+        "claimed_filters": {},
     }
 
     if (
@@ -1219,7 +1303,13 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                 filter_order_map = {}
                 for block in letter_blocks:
                     next_seq = seed_parsed_ahu_block(
-                        hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map
+                        hospital,
+                        stats,
+                        ahu_key_to_id,
+                        next_seq,
+                        block,
+                        filter_order_map,
+                        claimed_filters=stats["claimed_filters"],
                     )
                 collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
                 continue
@@ -1296,7 +1386,7 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                 current_as_survey = [pandas_as_survey(x) for x in current_block]
                 start_new = _should_start_new_ahu(current_as_survey, survey_row)
                 if current_block and (
-                    start_new or (pending_blank and _stage_kind(survey_row.get("E")) == "pre")
+                    start_new or (pending_blank and _blank_closes_block(current_as_survey, survey_row))
                 ):
                     blocks.append(current_block)
                     current_block = []
@@ -1447,9 +1537,11 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                 freq_raw = r.get(col_freq)
                 freq_days = parse_frequency_to_days(freq_raw)
 
-                part_number = clean_str(r.get(col_part_num)) if col_part_num else None
-                if not part_number:
-                    part_number = clean_str(r.get(col_filter_type)) if col_filter_type else None
+                type_cell = r.get(col_filter_type) if col_filter_type else None
+                part_number = survey_part_number(
+                    r.get(col_part_num) if col_part_num else None,
+                    type_cell,
+                )
 
                 last_service_date = to_date(r.get(col_repl)) if col_repl else None
 
@@ -1457,14 +1549,14 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                 if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
                     is_active = False
 
-                if not size:
+                if not size or not part_number:
                     stats["filters_skipped"] += 1
                     continue
 
                 filter_excel_order = filter_order_map[ahu_id]
                 filter_order_map[ahu_id] += 1
 
-                upsert_filter(
+                filt = upsert_filter(
                     ahu_id=ahu_id,
                     phase=phase,
                     part_number=part_number,
@@ -1475,11 +1567,13 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                     is_active=is_active,
                     excel_order=filter_excel_order,
                 )
+                claim_filter(stats["claimed_filters"], filt)
                 stats["filters_upserted"] += 1
 
         collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
 
     collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
+    deactivate_unclaimed_filters(stats.get("claimed_filters"))
 
     if dry_run:
         db.session.rollback()

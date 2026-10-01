@@ -22,6 +22,7 @@ from seed_from_excel import (
     is_skip_sheet,
     looks_like_filter_type,
     normalize_filter_size,
+    part_family,
     part_match_keys,
     parse_frequency_to_days,
     pick_survey_frequency,
@@ -30,6 +31,7 @@ from seed_from_excel import (
     seed_from_excel,
     serialize_seed_stats,
     sheet_uses_survey_letters,
+    survey_part_number,
 )
 
 
@@ -200,6 +202,14 @@ def main():
     assert not looks_like_filter_type("F8V4GL-2424-GWB")
     assert_eq(prefer_catalog_part("HV Pleat", "HVP24242"), "HVP24242", "upgrade type to catalog PN")
     assert_eq(prefer_catalog_part("F8V42412-GWBB", "F8V424-GWBB"), "F8V42412-GWBB", "keep stored catalog")
+    assert looks_like_filter_type("F8 V4-Bank") and looks_like_filter_type("MV95")
+    assert_eq(survey_part_number("MV95 1/1 Non Recess", "F8 V4-Bank"), "MV95 1/1 Non Recess", "H wins over type G")
+    assert_eq(survey_part_number("MV95 1/1 Non Recess", "MV95"), "MV95 1/1 Non Recess", "H wins over MV95 type")
+    assert_eq(survey_part_number(None, "F8 V4-Bank"), None, "do not store F8 V4-Bank from G")
+    assert_eq(survey_part_number(None, "HV Pleat"), None, "do not store HV Pleat from G")
+    assert_eq(survey_part_number(None, "HVP24242"), "HVP24242", "catalog in G is still a PN")
+    assert_eq(part_family("F8 V4-Bank"), "f8", "F8 V4-Bank family")
+    assert_eq(part_family("MV95 1/1 Non Recess"), "mv95", "MV95 family")
     assert_eq(parse_frequency_to_days("2 Years"), 730, "2 Years → 730 days")
     assert_eq(parse_frequency_to_days("3 Years"), 1095, "3 Years → 1095 days")
     assert_eq(parse_frequency_to_days("2yr"), 730, "2yr → 730 days")
@@ -682,6 +692,56 @@ def main():
                 foothill_before,
                 "other hospitals are not cleared",
             )
+
+            mz_path = path + ".mz21-mv95.xlsx"
+            write_lettered_flat(
+                mz_path,
+                "Huntington Memorial",
+                [
+                    {"B": "1938 Building", "C": "Tunnel", "E": "PRE", "F": "MZ-2-1", "G": "HV Pleat", "H": "HVP24242", "J": "24x24x2", "K": 2, "M": "90 Days", "O": date(2026, 8, 11)},
+                    {"B": "1938 Building", "C": "Tunnel", "E": "FINAL", "F": "MZ-2-1", "G": "F8 V4-Bank", "H": "MV95 1/1 Non Recess", "J": "24x24x12", "K": 2, "M": "2 Years", "O": date(2026, 12, 30)},
+                    {"B": "1938 Building", "C": "Tunnel"},
+                    {"B": "1938 Building", "C": "Tunnel", "E": "FINAL", "G": "F8 V4-Bank", "H": "F8V4-2424-GWB", "J": "24x24x12", "K": 4, "M": "2 Years"},
+                    {"B": "1938 Building", "C": "Tunnel", "E": "PRE", "F": "MZ-2-2", "G": "HV Pleat", "H": "HVP24242", "J": "24x24x2", "K": 2, "M": "90 Days"},
+                ],
+                sheet="1938 Building",
+            )
+            mz_hospital = Hospital(name="Huntington MZ", active=True)
+            db.session.add(mz_hospital)
+            db.session.flush()
+            mz_hid = mz_hospital.id
+            seed_from_excel(mz_path, hospital_id=mz_hid)
+            mz21 = next(
+                a for a in AHU.query.filter_by(hospital_id=mz_hid).all()
+                if ahu_name_matches(a.name, "MZ-2-1", getattr(a.building, "name", None))
+            )
+            mz_parts = sorted(
+                f.part_number
+                for f in Filter.query.filter_by(ahu_id=mz21.id, is_active=True).all()
+            )
+            assert_eq(mz_parts, ["HVP24242", "MV95 1/1 Non Recess"], "MV95 row does not also add F8 V4-Bank")
+            leftover_f8 = Filter(
+                ahu_id=mz21.id,
+                phase="FINAL",
+                part_number="F8 V4-Bank",
+                size="24x24x12",
+                quantity=2,
+                frequency_days=730,
+                last_service_date=date(2026, 12, 30),
+                is_active=True,
+            )
+            db.session.add(leftover_f8)
+            db.session.commit()
+            seed_from_excel(mz_path, hospital_id=mz_hid)
+            mz_parts_after = sorted(
+                f.part_number
+                for f in Filter.query.filter_by(ahu_id=mz21.id, is_active=True).all()
+            )
+            assert_eq(mz_parts_after, ["HVP24242", "MV95 1/1 Non Recess"], "re-import hides leftover F8 V4-Bank")
+            try:
+                os.unlink(mz_path)
+            except OSError:
+                pass
 
             try:
                 os.unlink(hunt_path)
