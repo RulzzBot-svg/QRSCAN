@@ -6,7 +6,7 @@ import { submitJob } from "../../api/jobs";
 
 import { queueJob } from "../../offline/jobQueue";
 import { cacheAHU, getCachedAHU } from "../../offline/ahuCache";
-import { parseIsoToDate, formatDate } from "../../utils/dates";
+import { formatDate } from "../../utils/dates";
 
 function FilterInfo() {
   const navigate = useNavigate();
@@ -272,36 +272,6 @@ function FilterInfo() {
                   {ahu.status}
                 </span>
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-3">
-                <div className="font-medium">
-                  <p className="text-base-content/60 text-sm">
-                    Last Serviced Date
-                  </p>
-                  {filterRows.some((f) => f.last_service_date)
-                    ? formatDate(
-                      new Date(
-                        Math.max(
-                          ...filterRows
-                            .filter((f) => f.last_service_date)
-                            .map((f) => {
-                              const d = parseIsoToDate(f.last_service_date);
-                              // Subtract 8 hours to align UTC database time to LA time
-                              return d.getTime() - (8 * 60 * 60 * 1000);
-                            })
-                        )
-                      )
-                    )
-                    : "Never"}
-                </div>
-
-                <div>
-                  <div className="text-base-content/60">Next Due</div>
-                  <div className="font-medium">
-                    {ahu.next_due_date || "—"}
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -354,7 +324,11 @@ function FilterInfo() {
                       <div>
                         <span className="badge badge-success badge-sm max-w-full whitespace-nowrap">
                           {row.last_service_date
-                            ? formatDate(new Date(parseIsoToDate(row.last_service_date).getTime() - (8 * 60 * 60 * 1000)))
+                            ? formatDate(row.last_service_date, "en-US", {
+                                month: "2-digit",
+                                day: "2-digit",
+                                year: "numeric",
+                              })
                             : "Never"}
                         </span>
                       </div>
