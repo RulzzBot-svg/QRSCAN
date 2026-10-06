@@ -231,6 +231,7 @@ def main():
     assert_eq(payload["dry_run"], True, "dry_run flag")
     assert_eq(payload["ahus_touched"], 2, "set length is JSON-safe")
     assert_eq(payload["sheets"], [], "sheets list is JSON-safe")
+    assert isinstance(payload.get("preview_text"), str) and payload["preview_text"], "preview text is always present"
     assert_eq(format_ahu_label("Pkg Units", "HDH"), "Pkg Units — HDH", "building in AHU label")
     assert_eq(format_ahu_label("AH-1 East Building", "East Building"), "AH-1 East Building", "do not double building")
     assert_eq(format_ahu_label("AHU-2", "21 Building", 2), "AHU-2 — 21 Building #2", "second same-name unit")
@@ -793,6 +794,12 @@ def main():
                 assert bad not in stored_parts, f"type label {bad} must not be stored as a part number"
             dates = [f.last_service_date for f in Filter.query.join(AHU).filter(AHU.hospital_id == sjoc_hid).all()]
             assert all(d is not None for d in dates), "SJOC catalog rows keep replacement dates"
+            preview = sjoc_seed.get("preview_text") or ""
+            assert "AHU-1 — MAIN BLDG" in preview, preview
+            assert "HVP24242" in preview and "F8V4-2424-GWB" in preview, preview
+            assert "HVP Pleat" not in preview, preview
+            assert "SISTER ELIZABETH BLDG" in preview, preview
+            assert_eq(sjoc_seed.get("preview_issues") or [], [], "SJOC preview has no type-as-PN or missing-date issues")
             try:
                 os.unlink(sjoc_path)
             except OSError:

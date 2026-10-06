@@ -500,6 +500,124 @@ def normalize_ahu_key(display_name: str, building: str = None, instance=1) -> st
     return raw or "unnamed"
 
 
+def _date_preview(val):
+    if val is None:
+        return None
+    if hasattr(val, "isoformat"):
+        return val.isoformat()
+    return str(val)
+
+
+def preview_filter_entry(phase, part_number, size, qty, last_service_date, is_active=True):
+    part = clean_str(part_number) or ""
+    return {
+        "phase": clean_str(phase),
+        "part": part,
+        "size": normalize_filter_size(size) or clean_str(size),
+        "qty": parse_quantity(qty),
+        "date": _date_preview(last_service_date),
+        "active": bool(is_active),
+        "type_as_pn": bool(part) and looks_like_filter_type(part),
+        "missing_date": last_service_date is None,
+    }
+
+
+def record_match_preview(stats, name, building, filters):
+    stats.setdefault("match_preview", []).append({
+        "name": name,
+        "building": building,
+        "filters": list(filters or []),
+    })
+
+
+def format_match_preview(stats):
+    """Plain-text dump so Import can show every AHU, catalog PN, and date."""
+    rows = list(stats.get("match_preview") or [])
+    hospital = stats.get("hospital") or "Hospital"
+    buildings = {}
+    type_pn = 0
+    missing_active = 0
+    for ahu in rows:
+        b = ahu.get("building") or "(no building)"
+        buildings[b] = buildings.get(b, 0) + 1
+        for f in ahu.get("filters") or []:
+            if f.get("type_as_pn"):
+                type_pn += 1
+            if f.get("missing_date") and f.get("active"):
+                missing_active += 1
+
+    lines = [
+        f"{hospital} — {len(rows)} AHUs, {int(stats.get('filters_upserted') or 0)} filters",
+    ]
+    if buildings:
+        lines.append(
+            "Buildings: "
+            + ", ".join(f"{name} ({count})" for name, count in sorted(buildings.items()))
+        )
+    else:
+        lines.append("Buildings: (none)")
+    lines.append("")
+    if type_pn:
+        lines.append(f"CHECK: {type_pn} part number(s) look like a filter type (HVP Pleat / F8 4V-Bank).")
+    if missing_active:
+        lines.append(f"CHECK: {missing_active} active filter(s) have no DATE OF REPLACEMENT.")
+    if not type_pn and not missing_active:
+        lines.append("Checks: no type-as-PN rows; active filters have dates unless noted below.")
+    lines.append("")
+
+    for ahu in rows:
+        lines.append(ahu.get("name") or "Unnamed")
+        if ahu.get("building"):
+            lines.append(f"  building: {ahu['building']}")
+        filters = ahu.get("filters") or []
+        if not filters:
+            lines.append("  (no catalog filters)")
+        for f in filters:
+            bits = [
+                (f.get("phase") or "—").upper(),
+                f.get("part") or "—",
+                f.get("size") or "—",
+                f"qty {f.get('qty')}",
+                f.get("date") or "NO DATE",
+            ]
+            extra = []
+            if not f.get("active"):
+                extra.append("removed")
+            if f.get("type_as_pn"):
+                extra.append("TYPE-AS-PN")
+            line = "  " + "  ".join(str(x) for x in bits)
+            if extra:
+                line += "  [" + ", ".join(extra) + "]"
+            lines.append(line)
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _preview_issue_lines(stats):
+    issues = []
+    type_pn = 0
+    missing_active = 0
+    for ahu in stats.get("match_preview") or []:
+        for f in ahu.get("filters") or []:
+            if f.get("type_as_pn"):
+                type_pn += 1
+            if f.get("missing_date") and f.get("active"):
+                missing_active += 1
+    if type_pn:
+        issues.append(f"{type_pn} part number(s) look like a filter type")
+    if missing_active:
+        issues.append(f"{missing_active} active filter(s) missing a replacement date")
+    return issues
+
+
+def _preview_buildings(stats):
+    counts = {}
+    for ahu in stats.get("match_preview") or []:
+        b = ahu.get("building") or "(no building)"
+        counts[b] = counts.get(b, 0) + 1
+    return [{"name": name, "ahu_count": counts[name]} for name in sorted(counts)]
+
+
 def serialize_seed_stats(stats, dry_run=False):
     """JSON-safe import summary for the admin upload UI and CLI."""
     ahu_ids = stats.get("ahus") or set()
@@ -528,6 +646,9 @@ def serialize_seed_stats(stats, dry_run=False):
         "jobs_cleared": int(stats.get("jobs_cleared") or 0),
         "buildings_cleared": int(stats.get("buildings_cleared") or 0),
         "warnings": list(stats.get("warnings") or []),
+        "preview_text": format_match_preview(stats),
+        "preview_issues": _preview_issue_lines(stats),
+        "buildings": _preview_buildings(stats),
     }
 
 
@@ -1246,6 +1367,7 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
     stats["ahus"].add(ahu_id)
 
     filter_order_map.setdefault(ahu_id, 1)
+    preview_filters = []
     for row in block.get("filters") or []:
         phase = row.get("phase")
         if _looks_like_ahu_label(phase):
@@ -1276,6 +1398,10 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
             excel_order=filter_excel_order,
         )
         stats["filters_upserted"] += 1
+        preview_filters.append(
+            preview_filter_entry(phase, part_number, size, qty, last_service_date, is_active)
+        )
+    record_match_preview(stats, label or display_name, building, preview_filters)
     return next_seq
 
 
@@ -1333,6 +1459,7 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
         "jobs_cleared": 0,
         "buildings_cleared": 0,
         "warnings": [],
+        "match_preview": [],
     }
 
     if (
@@ -1641,6 +1768,7 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
 
             # Now process filters rows inside this block
             filter_order_map.setdefault(ahu_id, 1)
+            preview_filters = []
             for r in block:
                 phase = clean_str(r.get(col_stage))
                 # if the stage cell contains an AH label (header), don't treat it as a phase
@@ -1682,6 +1810,11 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                     excel_order=filter_excel_order,
                 )
                 stats["filters_upserted"] += 1
+                preview_filters.append(
+                    preview_filter_entry(phase, part_number, size, qty, last_service_date, is_active)
+                )
+
+            record_match_preview(stats, label or display_name, building, preview_filters)
 
         collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
 
@@ -1711,8 +1844,17 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
         )
     print(f"Filters upserted: {result['filters_upserted']}")
     print(f"Filters skipped (missing size): {result['filters_skipped']}")
+    if result.get("buildings"):
+        print(
+            "Buildings: "
+            + ", ".join(f"{b['name']} ({b['ahu_count']})" for b in result["buildings"])
+        )
     for warning in result["warnings"]:
         print(f"Warning: {warning}")
+    preview = (result.get("preview_text") or "").strip()
+    if preview:
+        print("\nMatch check:")
+        print(preview)
 
     ordered = sorted(list(stats["ahus"]))
     print("\nExample AHU IDs (first 15):")
