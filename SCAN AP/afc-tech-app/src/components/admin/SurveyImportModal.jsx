@@ -30,11 +30,14 @@ export default function SurveyImportModal({
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
 
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     setError("");
     setResult(null);
     setBusy(false);
+    setCopied(false);
     setReplaceExisting(false);
     setHospitalId(selectedHospitalKey ? String(selectedHospitalKey) : "");
   }, [open, selectedHospitalKey]);
@@ -54,6 +57,7 @@ export default function SurveyImportModal({
     setFile(next || null);
     setResult(null);
     setError("");
+    setCopied(false);
   };
 
   const runImport = async (dryRun) => {
@@ -75,6 +79,7 @@ export default function SurveyImportModal({
         replaceExisting,
       });
       setResult(res.data || null);
+      setCopied(false);
       if (!dryRun) {
         await onImported?.();
       }
@@ -93,7 +98,7 @@ export default function SurveyImportModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-base-100 border border-base-300 rounded-lg w-full max-w-xl max-h-[90vh] overflow-auto p-4">
+      <div className="bg-base-100 border border-base-300 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-auto p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">Import survey Excel</div>
           <button className="btn btn-sm" onClick={close} type="button" disabled={busy}>
@@ -102,9 +107,9 @@ export default function SurveyImportModal({
         </div>
 
         <p className="text-sm opacity-80 mb-3">
-          Upload the hospital workbook from Documents. Every tab is imported (FILTER / legend /
-          chart sheets are skipped). Existing AHUs are matched by name and building, and filters
-          by phase, part number, and size. Rows missing from the sheet are not deleted.
+          Upload the hospital workbook from Documents. Use <span className="font-medium">Preview</span>{" "}
+          first — it lists every AHU, catalog part number, building, and replacement date so you
+          can check the match before saving. FILTER / legend / chart sheets are skipped.
         </p>
 
         <div className="space-y-3">
@@ -202,6 +207,19 @@ export default function SurveyImportModal({
                 : ""}
               {` · rows ${stats.rows_seen ?? 0}`}
             </div>
+            {(stats.buildings || []).length ? (
+              <div>
+                Buildings:{" "}
+                {(stats.buildings || [])
+                  .map((b) => `${b.name} (${b.ahu_count})`)
+                  .join(", ")}
+              </div>
+            ) : null}
+            {(stats.preview_issues || []).map((issue) => (
+              <div key={issue} className="text-warning">
+                Check: {issue}
+              </div>
+            ))}
             {willCreateAhus ? (
               <div className="text-warning">
                 {stats.ahus_created} new AHU{stats.ahus_created === 1 ? "" : "s"} will be added.
@@ -213,6 +231,33 @@ export default function SurveyImportModal({
                 {w}
               </div>
             ))}
+            {stats.preview_text ? (
+              <div className="pt-2">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="font-medium">Match check</div>
+                  <button
+                    type="button"
+                    className="btn btn-xs"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(stats.preview_text);
+                        setCopied(true);
+                        window.setTimeout(() => setCopied(false), 1500);
+                      } catch {
+                        setCopied(false);
+                      }
+                    }}
+                  >
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  className="textarea textarea-bordered w-full font-mono text-xs leading-snug min-h-[16rem]"
+                  value={stats.preview_text}
+                />
+              </div>
+            ) : null}
             {applied ? (
               <div className="text-success">AHU list refreshed with the new survey data.</div>
             ) : null}
