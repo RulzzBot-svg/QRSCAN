@@ -1,11 +1,19 @@
 export function StatusBadge({ status }) {
+  const isCompleted = status === "Completed";
   const cls =
     status === "Overdue"
       ? "badge-error"
       : status === "Due Soon"
         ? "badge-warning"
-        : status === "Completed"
+        : isCompleted
           ? "badge-success"
           : "badge-ghost";
-  return <span className={`badge badge-sm ${cls}`}>{status || "Pending"}</span>;
+  return (
+    <span
+      className={`badge badge-sm ${cls}`}
+      style={isCompleted ? { color: "#ffffff" } : undefined}
+    >
+      {status || "Pending"}
+    </span>
+  );
 }
