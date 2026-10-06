@@ -72,7 +72,7 @@ export default function ClientHome() {
         <Link to="/client/units" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Browse units</h3>
-            <p className="text-sm text-base-content/60">Building, location, and next due date.</p>
+            <p className="text-sm text-base-content/60">Building, location, last serviced, and next due.</p>
           </div>
         </Link>
         <Link to="/client/graphs" className="card bg-base-100 border border-base-300">

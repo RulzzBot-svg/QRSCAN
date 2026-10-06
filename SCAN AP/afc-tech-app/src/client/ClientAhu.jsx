@@ -89,16 +89,16 @@ export default function ClientAhu() {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
               <div>
-                <p className="text-xs text-base-content/50">Frequency</p>
-                <p>{f.frequency_label || "—"}</p>
-              </div>
-              <div>
                 <p className="text-xs text-base-content/50">Last serviced</p>
                 <p>{prettyDate(f.last_service_date)}</p>
               </div>
               <div>
                 <p className="text-xs text-base-content/50">Next due</p>
                 <p>{prettyDate(f.next_due_date)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-base-content/50">Frequency</p>
+                <p>{f.frequency_label || "—"}</p>
               </div>
               <div>
                 <p className="text-xs text-base-content/50">

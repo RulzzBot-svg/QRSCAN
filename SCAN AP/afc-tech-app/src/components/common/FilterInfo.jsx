@@ -6,7 +6,25 @@ import { submitJob } from "../../api/jobs";
 
 import { queueJob } from "../../offline/jobQueue";
 import { cacheAHU, getCachedAHU } from "../../offline/ahuCache";
-import { formatDate } from "../../utils/dates";
+import { parseIsoToDate, formatDate } from "../../utils/dates";
+
+const SERVICE_DATE_OPTS = { month: "2-digit", day: "2-digit", year: "numeric" };
+
+function formatServiceDate(iso) {
+  return iso ? formatDate(iso, "en-US", SERVICE_DATE_OPTS) : "Never";
+}
+
+function nextDueFromFrequency(row) {
+  const last = parseIsoToDate(row.last_service_date);
+  const days = Number(row.frequency_days);
+  if (last && Number.isFinite(days) && days > 0) {
+    const next = new Date(last.getTime());
+    next.setDate(next.getDate() + days);
+    return formatDate(next, "en-US", SERVICE_DATE_OPTS);
+  }
+  if (row.next_due_date) return formatDate(row.next_due_date, "en-US", SERVICE_DATE_OPTS);
+  return "—";
+}
 
 function FilterInfo() {
   const navigate = useNavigate();
@@ -302,7 +320,7 @@ function FilterInfo() {
                 onClick={() => toggleRowExpansion(row.id)}
               >
                 <div className="flex items-start md:items-center justify-between gap-2">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 flex-1 min-w-0 text-sm md:grid-cols-5 md:gap-4">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 flex-1 min-w-0 text-sm md:grid-cols-6 md:gap-4">
                     <div className="min-w-0">
                       <div className="text-base-content/60 text-xs">Qty</div>
                       <div className="font-medium">{row.quantity}</div>
@@ -319,17 +337,19 @@ function FilterInfo() {
                       <div className="text-base-content/60 text-xs">Size</div>
                       <div className="font-medium break-words">{row.size}</div>
                     </div>
-                    <div className="min-w-0 col-span-2 md:col-span-1">
+                    <div className="min-w-0">
                       <div className="text-base-content/60 text-xs">Last Serviced</div>
                       <div>
                         <span className="badge badge-success badge-sm max-w-full whitespace-nowrap">
-                          {row.last_service_date
-                            ? formatDate(row.last_service_date, "en-US", {
-                                month: "2-digit",
-                                day: "2-digit",
-                                year: "numeric",
-                              })
-                            : "Never"}
+                          {formatServiceDate(row.last_service_date)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-base-content/60 text-xs">Next Due</div>
+                      <div>
+                        <span className="badge badge-outline badge-sm max-w-full whitespace-nowrap">
+                          {nextDueFromFrequency(row)}
                         </span>
                       </div>
                     </div>
