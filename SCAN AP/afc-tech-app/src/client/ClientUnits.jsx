@@ -80,6 +80,7 @@ export default function ClientUnits() {
               <th>AHU</th>
               <th>Building</th>
               <th>Location</th>
+              <th>Last serviced</th>
               <th>Next due</th>
               <th>Status</th>
             </tr>
@@ -94,6 +95,7 @@ export default function ClientUnits() {
                 </td>
                 <td>{a.building || "—"}</td>
                 <td>{a.location || "—"}</td>
+                <td>{prettyDate(a.last_service_date)}</td>
                 <td>{prettyDate(a.next_due_date)}</td>
                 <td>
                   <StatusBadge status={a.status} />
@@ -120,7 +122,9 @@ export default function ClientUnits() {
               </div>
               <StatusBadge status={a.status} />
             </div>
-            <p className="text-xs mt-2 text-base-content/60">Next due {prettyDate(a.next_due_date)}</p>
+            <p className="text-xs mt-2 text-base-content/60">
+              Last serviced {prettyDate(a.last_service_date)} · Next due {prettyDate(a.next_due_date)}
+            </p>
           </Link>
         ))}
       </div>
