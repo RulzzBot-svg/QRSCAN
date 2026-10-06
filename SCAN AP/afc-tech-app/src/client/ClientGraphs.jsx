@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -12,7 +12,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getClientGraphs } from "./api";
+import { getClientGraphs, readClientUser } from "./api";
+import { exportClientGraphsPdf } from "./exportGraphsPdf";
 
 const STATUS_COLORS = {
   compliant: "#15803d",
@@ -25,6 +26,7 @@ export default function ClientGraphs() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const chartsRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,9 +76,25 @@ export default function ClientGraphs() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold">Graphs</h2>
-        <p className="text-sm text-base-content/60">This hospital only. Counts, not dollars.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold">Graphs</h2>
+          <p className="text-sm text-base-content/60">This hospital only. Counts, not dollars.</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() =>
+            exportClientGraphsPdf({
+              hospitalName: readClientUser()?.hospital_name,
+              summary: data.summary,
+              frequencies: data.by_frequency,
+              chartsRoot: chartsRef.current,
+            })
+          }
+        >
+          Export PDF
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -86,7 +104,7 @@ export default function ClientGraphs() {
         <Kpi label="Due in 90 days" value={data.upcoming?.[2]?.filters || 0} />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div ref={chartsRef} className="grid lg:grid-cols-2 gap-4">
         <ChartCard title="AHU status">
           {pie.length === 0 ? (
             <p className="text-sm text-base-content/50 py-16 text-center">No unit status yet.</p>
@@ -137,7 +155,7 @@ export default function ClientGraphs() {
         </ChartCard>
 
         <ChartCard title="Filter frequencies">
-          <div className="space-y-2">
+          <div className="space-y-2 js-graph-list">
             {(data.by_frequency || []).map((row) => (
               <div key={row.days} className="flex items-center justify-between text-sm">
                 <span>{row.label}</span>
@@ -156,7 +174,7 @@ export default function ClientGraphs() {
 
 function ChartCard({ title, children }) {
   return (
-    <div className="rounded-2xl bg-base-100 border border-base-300 p-4">
+    <div className="js-graph-card rounded-2xl bg-base-100 border border-base-300 p-4">
       <h3 className="font-semibold mb-3">{title}</h3>
       {children}
     </div>

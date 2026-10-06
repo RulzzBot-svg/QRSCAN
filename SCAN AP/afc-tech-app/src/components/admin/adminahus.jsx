@@ -489,46 +489,64 @@ function AdminAHUs() {
         <section className="flex-1 w-full">
           <div className="bg-base-100 border border-base-300 rounded-lg">
             {/* Top toolbar (kept) */}
-            <div className="p-2 flex items-center justify-between gap-2 border-b">
-              <div className="flex items-center gap-2">
-                <div className="text-sm font-semibold">AHUs</div>
-                <div className="text-xs opacity-70">{filtered.length} shown</div>
-            <span className="badge badge-error badge-xs align-middle">Overdue</span> = past due,{" "}
-            <span className="badge badge-warning badge-xs align-middle">Due Soon</span> = within 14 days,{" "}
-            <span className="badge badge-info badge-xs align-middle">540 Days</span> = 18 Months,{" "}
-            <span className="badge badge-info badge-xs align-middle">2yr</span> = 730 days,{" "}
-            <span className="badge badge-info badge-xs align-middle">3yr</span> = 1095 days
+            <div className="p-2 border-b space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-sm font-semibold">AHUs</div>
+                  <div className="text-xs opacity-70">{filtered.length} shown</div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    placeholder="Search ALL AHUs..."
+                    value={ahuQuery}
+                    onChange={(e) => setAhuQuery(e.target.value)}
+                    className="input input-xs input-bordered w-72 max-w-full"
+                  />
+                  <button className="btn btn-xs" onClick={() => handleBulkAction("Export CSV")} type="button">
+                    Export
+                  </button>
+                  <button className="btn btn-xs btn-warning" onClick={() => handlePrintQr()} type="button">
+                    QR
+                  </button>
+                  <button
+                    className="btn btn-xs btn-error"
+                    onClick={() => askDeleteAhus(selectedAhus)}
+                    type="button"
+                    disabled={deleting || selectedAhus.length === 0}
+                    title={
+                      selectedAhus.length
+                        ? `Delete ${selectedAhus.length} checked AHU(s)`
+                        : "Check AHUs, then delete them"
+                    }
+                  >
+                    {selectedAhus.length ? `Delete selected (${selectedAhus.length})` : "Delete selected"}
+                  </button>
+                  <button className="btn btn-xs btn-ghost" onClick={() => setSelected({})} type="button">
+                    Clear selection
+                  </button>
+                </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  placeholder="Search ALL AHUs..."
-                  value={ahuQuery}
-                  onChange={(e) => setAhuQuery(e.target.value)}
-                  className="input input-xs input-bordered w-72"
-                />
-                <button className="btn btn-xs" onClick={() => handleBulkAction("Export CSV")} type="button">
-                  Export
-                </button>
-                <button className="btn btn-xs btn-warning" onClick={() => handlePrintQr()} type="button">
-                  QR
-                </button>
-                <button
-                  className="btn btn-xs btn-error"
-                  onClick={() => askDeleteAhus(selectedAhus)}
-                  type="button"
-                  disabled={deleting || selectedAhus.length === 0}
-                  title={
-                    selectedAhus.length
-                      ? `Delete ${selectedAhus.length} checked AHU(s)`
-                      : "Check AHUs, then delete them"
-                  }
-                >
-                  {selectedAhus.length ? `Delete selected (${selectedAhus.length})` : "Delete selected"}
-                </button>
-                <button className="btn btn-xs btn-ghost" onClick={() => setSelected({})} type="button">
-                  Clear selection
-                </button>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-normal">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  <span className="badge badge-error badge-xs">Overdue</span>
+                  = past due
+                </span>
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  <span className="badge badge-warning badge-xs">Due Soon</span>
+                  = within 14 days
+                </span>
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  <span className="badge badge-info badge-xs">540 Days</span>
+                  = 18 Months
+                </span>
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  <span className="badge badge-info badge-xs">2yr</span>
+                  = 730 days
+                </span>
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  <span className="badge badge-info badge-xs">3yr</span>
+                  = 1095 days
+                </span>
               </div>
             </div>
 
