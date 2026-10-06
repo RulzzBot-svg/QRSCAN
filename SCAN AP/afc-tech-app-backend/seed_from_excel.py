@@ -3,7 +3,7 @@ import argparse
 import os
 import re
 import sys
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 import pandas as pd
 import openpyxl
@@ -38,6 +38,14 @@ def clean_str(x):
     return s
 
 
+def one_line(s):
+    """Collapse worksheet newlines/spaces so labels stay one dashboard line."""
+    s = clean_str(s)
+    if not s:
+        return None
+    return re.sub(r"\s+", " ", s).strip() or None
+
+
 def is_placeholder(s):
     if not s:
         return True
@@ -60,8 +68,19 @@ def to_date(val):
         return val.date()
     if isinstance(val, date):
         return val
+    # Excel serials land here when the cell is a number, not a Date type.
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        n = float(val)
+        if 20000 <= n <= 80000:
+            try:
+                return (datetime(1899, 12, 30) + timedelta(days=int(n))).date()
+            except Exception:
+                return None
     try:
-        return pd.to_datetime(val).date()
+        parsed = pd.to_datetime(val, errors="coerce")
+        if pd.isna(parsed):
+            return None
+        return parsed.date()
     except Exception:
         return None
 
@@ -332,9 +351,9 @@ def _should_start_new_ahu(current, vals):
     """
     if not current:
         return False
-    row_building = clean_str(vals.get("B"))
+    row_building = normalize_building_name(vals.get("B"))
     row_ahu = clean_str(vals.get("F"))
-    block_building = _first_filled(current, "B")
+    block_building = normalize_building_name(_first_filled(current, "B"))
     block_ahu = _first_filled(current, "F")
     if row_building and block_building and _norm_name(row_building) != _norm_name(block_building):
         return True
@@ -382,13 +401,21 @@ def read_survey_letter_blocks(path, sheet_name, wb=None):
             wb.close()
 
 
-def _read_survey_letter_blocks_ws(ws):
-    start = 1
+def _read_survey_letter_blocks_ws(ws, start_row=None, row_reader=None):
     last = ws.max_row or 1
-    for r in range(1, min(last, 25) + 1):
-        if _survey_header_row(_survey_cells(ws, r)):
-            start = r + 1
-            break
+    if start_row is not None:
+        start = int(start_row)
+    else:
+        start = 1
+        for r in range(1, min(last, 25) + 1):
+            if _survey_header_row(_survey_cells(ws, r)):
+                start = r + 1
+                break
+
+    def read_row(r):
+        if row_reader is not None:
+            return row_reader(r)
+        return _survey_cells(ws, r)
 
     blocks = []
     current = []
@@ -406,19 +433,21 @@ def _read_survey_letter_blocks_ws(ws):
                 if raw and not is_placeholder(raw) and not _survey_header_row({"F": raw}):
                     display_name = raw
             if not building:
-                building = clean_str(vals.get("B"))
+                building = normalize_building_name(vals.get("B"))
             if not location:
-                location = clean_str(vals.get("C"))
+                location = one_line(vals.get("C"))
         filters = []
         for vals in current:
             phase = clean_str(vals.get("E"))
             if _looks_like_ahu_label(phase):
                 phase = None
-            size = clean_str(vals.get("J"))
+            size = one_line(vals.get("J"))
             qty = vals.get("K")
             if qty is None or clean_str(qty) is None:
                 qty = vals.get("L")
-            part = clean_str(vals.get("H")) or clean_str(vals.get("G"))
+            part = survey_part_number(vals.get("H"), vals.get("G"))
+            if not size or not part:
+                continue
             filters.append({
                 "phase": phase,
                 "size": size,
@@ -428,6 +457,9 @@ def _read_survey_letter_blocks_ws(ws):
                 "last_service_date": to_date(vals.get("O")),
                 "invoice": clean_str(vals.get("N")),
             })
+        if not filters:
+            current.clear()
+            return
         blocks.append({
             "display_name": display_name,
             "building": building,
@@ -437,7 +469,7 @@ def _read_survey_letter_blocks_ws(ws):
         current.clear()
 
     for r in range(start, last + 1):
-        vals = _survey_cells(ws, r)
+        vals = read_row(r)
         if _survey_header_row(vals):
             continue
         if not _survey_filter_row(vals):
@@ -813,7 +845,10 @@ def looks_like_filter_type(part):
     if not s:
         return True
     compact = re.sub(r"[^a-z0-9]", "", s.lower())
-    type_words = ("pleat", "vbank", "bag", "carbon", "hepa", "prefilter", "final", "panel")
+    type_words = (
+        "pleat", "vbank", "v4bank", "4vbank", "bag", "carbon", "hepa",
+        "prefilter", "final", "panel", "hvppleat",
+    )
     # Catalog names often have spaces: "MV95 1/1 Non Recess", "FGP-CARB 1/1 G".
     model_like = bool(re.search(r"\d\s*/\s*\d", s) or len(re.findall(r"\d", s)) >= 3)
     if any(w in compact for w in type_words):
@@ -823,9 +858,147 @@ def looks_like_filter_type(part):
     if " " in s:
         return not re.search(r"\d", s)
     digits = re.findall(r"\d", s)
+    if compact in ("hvp", "hvpleat", "f84v", "f74v", "m13"):
+        return True
     if len(digits) <= 2 and "-" not in s and len(s) <= 8:
         return True
     return False
+
+
+_NOT_CATALOG_PART = re.compile(
+    r"\b(shared|removed|never found|n/?a|empty|none)\b",
+    re.IGNORECASE,
+)
+
+
+def survey_part_number(part_cell, type_cell=None):
+    """Column H / PART NUMBER is the catalog PN. Never store FILTER TYPE (HVP, HV Pleat)."""
+    for raw in (part_cell, type_cell):
+        part = one_line(raw)
+        if not part or looks_like_filter_type(part):
+            continue
+        if _NOT_CATALOG_PART.search(part):
+            continue
+        return part
+    return None
+
+
+def normalize_building_name(name):
+    """MAIN BLDG #1 and MAIN BLDG are the same site; drop worksheet newlines."""
+    s = one_line(name)
+    if not s:
+        return None
+    s = re.sub(r"\s*#\d+$", "", s).strip()
+    return s or None
+
+
+def normalize_header_text(s):
+    return re.sub(r"\s+", " ", (clean_str(s) or "")).strip().lower()
+
+
+_HEADER_ALIASES = {
+    "building": ("building",),
+    "location": ("location",),
+    "floor_area": ("floor/area", "floor / area", "floor area"),
+    "stage": ("stage",),
+    "ahu": ("ahu no.", "ahu no", "ahu number", "ahu #"),
+    "filter_type": ("filter type",),
+    "part_number": ("part number", "part no.", "part no", "part #"),
+    "size": ("filter size", "size"),
+    "quantity": ("quantity", "qty"),
+    "qty4": ("qty*4", "quantity x 4", "quantityx4", "qty x 4"),
+    "frequency": ("frequency",),
+    "invoice": ("invoice number", "invoice"),
+    "last_service_date": ("date of replacement",),
+}
+
+
+def _header_field_for(key):
+    key = normalize_header_text(key)
+    if not key:
+        return None
+    for field, aliases in _HEADER_ALIASES.items():
+        if key in aliases:
+            return field
+    if key.endswith(" size"):
+        return "size"
+    if "scheduled" not in key and "date" in key and "replace" in key:
+        return "last_service_date"
+    return None
+
+
+def detect_survey_header(ws):
+    """Find the header row by names so extra columns (FLOOR/AREA, EFFICIENCY) do not shift fields."""
+    max_c = min(int(ws.max_column or 1), 40)
+    last = min(int(ws.max_row or 1), 30)
+    for r in range(1, last + 1):
+        cells = {}
+        blob = []
+        for c in range(1, max_c + 1):
+            key = normalize_header_text(ws.cell(r, c).value)
+            if not key:
+                continue
+            cells[c] = key
+            blob.append(key)
+        joined = " ".join(blob)
+        if "building" not in joined or "stage" not in joined:
+            continue
+        if "ahu" not in joined and "part" not in joined:
+            continue
+        mapping = {}
+        for col, key in cells.items():
+            field = _header_field_for(key)
+            if field and field not in mapping:
+                mapping[field] = col
+        if mapping.get("ahu") and mapping.get("stage") and mapping.get("size"):
+            return r, mapping
+    return None, {}
+
+
+def _ws_row_to_survey(ws, row, mapping):
+    def cell(field):
+        col = mapping.get(field)
+        if not col:
+            return None
+        return ws.cell(row, col).value
+
+    loc = one_line(cell("location"))
+    floor = one_line(cell("floor_area"))
+    location = loc or floor
+    return {
+        "B": normalize_building_name(cell("building")),
+        "C": location,
+        "E": cell("stage"),
+        "F": cell("ahu"),
+        "G": cell("filter_type"),
+        "H": cell("part_number"),
+        "J": cell("size"),
+        "K": cell("quantity"),
+        "L": cell("qty4"),
+        "M": cell("frequency"),
+        "N": cell("invoice"),
+        "O": cell("last_service_date"),
+    }
+
+
+def read_named_survey_blocks(path, sheet_name, wb=None):
+    close = False
+    if wb is None:
+        wb = open_survey_workbook(path)
+        close = True
+    try:
+        ws = workbook_sheet(wb, sheet_name)
+        header_row, mapping = detect_survey_header(ws)
+        if not header_row:
+            return None
+        return _read_survey_letter_blocks_ws(
+            ws,
+            start_row=header_row + 1,
+            row_reader=lambda r: _ws_row_to_survey(ws, r, mapping),
+        )
+    finally:
+        if close:
+            wb.close()
 
 
 def prefer_catalog_part(current, incoming):
@@ -1004,8 +1177,8 @@ def upsert_filter(
 def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map):
     """Create/update one AHU and upsert the filter rows already parsed for it."""
     display_name = block.get("display_name")
-    building = clean_str(block.get("building"))
-    location = clean_str(block.get("location"))
+    building = normalize_building_name(block.get("building"))
+    location = one_line(block.get("location"))
     if not display_name:
         display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
 
@@ -1081,12 +1254,12 @@ def seed_parsed_ahu_block(hospital, stats, ahu_key_to_id, next_seq, block, filte
         qty = row.get("quantity")
         freq_raw = row.get("freq_raw")
         freq_days = parse_frequency_to_days(freq_raw)
-        part_number = row.get("part_number")
+        part_number = survey_part_number(row.get("part_number"))
         last_service_date = row.get("last_service_date")
         is_active = True
         if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
             is_active = False
-        if not size:
+        if not size or not part_number:
             stats["filters_skipped"] += 1
             continue
         filter_excel_order = filter_order_map[ahu_id]
@@ -1198,6 +1371,25 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
             stats["sheets_skipped"].append({"sheet": sheet, "reason": "skip list"})
             continue
 
+        named_blocks = None
+        try:
+            named_blocks = read_named_survey_blocks(path, sheet, wb=wb)
+        except Exception as exc:
+            stats["warnings"].append(f"Named header parse failed on '{sheet}': {exc}")
+            named_blocks = None
+
+        if named_blocks is not None:
+            stats["sheets_processed"] += 1
+            stats["sheets"].append(sheet)
+            stats["rows_seen"] += sum(len(b.get("filters") or []) for b in named_blocks)
+            filter_order_map = {}
+            for block in named_blocks:
+                next_seq = seed_parsed_ahu_block(
+                    hospital, stats, ahu_key_to_id, next_seq, block, filter_order_map
+                )
+            collapse_unclaimed_ahu_duplicates(hospital.id, ahu_key_to_id.values())
+            continue
+
         try:
             uses_letters = sheet_uses_survey_letters(path, sheet, wb=wb)
         except Exception as exc:
@@ -1235,18 +1427,31 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                     return c
             return None
 
-        col_ahu = col("AHU NO.")
+        def col_contains(needle, exclude=None):
+            needle = needle.lower()
+            excl = (exclude or "").lower()
+            for c in df.columns:
+                c_norm = re.sub(r"\s+", " ", str(c)).strip().lower()
+                if needle in c_norm and (not excl or excl not in c_norm):
+                    return c
+            return None
+
+        col_ahu = col("AHU NO.") or col("AHU NUMBER")
         col_loc = col("LOCATION")
         col_stage = col("STAGE")
-        col_size = col("FILTER SIZE")
+        col_size = col("FILTER SIZE") or col("SIZE")
         col_freq = col("FREQUENCY")
         col_qty = col("QUANTITY") or col("QTY")
 
         col_building = col("BUILDING")
-        col_floor_area = col("FLOOR/AREA")
-        col_part_num = col("PART NUMBER")
+        col_floor_area = col("FLOOR/AREA") or col("FLOOR AREA")
+        col_part_num = col("PART NUMBER") or col("PART NO.")
         col_filter_type = col("FILTER TYPE")
-        col_repl = col("DATE OF REPLACEMENT")
+        col_repl = (
+            col("DATE OF REPLACEMENT")
+            or col_contains("date of replacement")
+            or col_contains("replacement", exclude="scheduled")
+        )
 
         required = [col_ahu, col_loc, col_stage, col_size, col_qty, col_freq]
         if any(x is None for x in required):
@@ -1283,8 +1488,8 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
 
         def pandas_as_survey(r):
             return {
-                "B": r.get(col_building) if col_building else None,
-                "C": r.get(col_loc) if col_loc else None,
+                "B": normalize_building_name(r.get(col_building)) if col_building else None,
+                "C": one_line(r.get(col_loc)) if col_loc else None,
                 "E": r.get(col_stage) if col_stage else None,
                 "F": r.get(col_ahu) if col_ahu else None,
             }
@@ -1331,24 +1536,24 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
             # fallback: use first row's location if no AHU number provided
             if display_name is None:
                 first = block[0]
-                location = clean_str(first.get(col_loc)) if col_loc else None
+                location = one_line(first.get(col_loc)) if col_loc else None
                 display_name = f"Unnamed — {location}" if location else f"Unnamed — {next_seq}"
 
             if location is None and col_loc:
                 for r in block:
-                    loc = clean_str(r.get(col_loc))
+                    loc = one_line(r.get(col_loc))
                     if loc:
                         location = loc
                         break
 
             # building/floor area from first row where present
             for r in block:
-                b = clean_str(r.get(col_building)) if col_building else None
+                b = normalize_building_name(r.get(col_building)) if col_building else None
                 if b:
                     building = b
                     break
             for r in block:
-                fa = clean_str(r.get(col_floor_area)) if col_floor_area else None
+                fa = one_line(r.get(col_floor_area)) if col_floor_area else None
                 if fa:
                     floor_area = fa
                     break
@@ -1361,7 +1566,7 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                     if prev_name is None:
                         prev_name = clean_str(pr.get(col_ahu))
                     if prev_building is None and col_building:
-                        prev_building = clean_str(pr.get(col_building))
+                        prev_building = normalize_building_name(pr.get(col_building))
                 if _norm_name(prev_name) == _norm_name(display_name) and _norm_name(prev_building) == _norm_name(building):
                     instance += 1
 
@@ -1447,9 +1652,10 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                 freq_raw = r.get(col_freq)
                 freq_days = parse_frequency_to_days(freq_raw)
 
-                part_number = clean_str(r.get(col_part_num)) if col_part_num else None
-                if not part_number:
-                    part_number = clean_str(r.get(col_filter_type)) if col_filter_type else None
+                part_number = survey_part_number(
+                    r.get(col_part_num) if col_part_num else None,
+                    r.get(col_filter_type) if col_filter_type else None,
+                )
 
                 last_service_date = to_date(r.get(col_repl)) if col_repl else None
 
@@ -1457,7 +1663,7 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                 if isinstance(freq_raw, str) and freq_raw.strip().lower() == "removed":
                     is_active = False
 
-                if not size:
+                if not size or not part_number:
                     stats["filters_skipped"] += 1
                     continue
 

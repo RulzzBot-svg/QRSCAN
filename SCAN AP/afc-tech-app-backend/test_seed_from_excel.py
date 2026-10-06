@@ -21,15 +21,19 @@ from seed_from_excel import (
     format_ahu_label,
     is_skip_sheet,
     looks_like_filter_type,
+    normalize_building_name,
     normalize_filter_size,
     part_match_keys,
     parse_frequency_to_days,
     pick_survey_frequency,
     prefer_catalog_part,
+    read_named_survey_blocks,
     read_survey_letter_blocks,
     seed_from_excel,
     serialize_seed_stats,
     sheet_uses_survey_letters,
+    survey_part_number,
+    to_date,
 )
 
 
@@ -134,6 +138,49 @@ def write_lettered_tabs(path, hospital, sheets):
     wb.save(path)
 
 
+def write_sjoc_survey(path, hospital, rows, sheet="MAIN BUILDING"):
+    """SJOC layout: extra FLOOR/AREA + EFFICIENCY, and newlines in invoice/date headers."""
+    headers = {
+        "B": "BUILDING",
+        "C": "LOCATION",
+        "D": "FLOOR/AREA",
+        "E": "STAGE",
+        "F": "AHU NO.",
+        "G": "FILTER TYPE",
+        "H": "PART NUMBER",
+        "I": "EFFICIENCY",
+        "J": "FILTER SIZE",
+        "K": "QUANTITY",
+        "L": "QTY*4",
+        "M": "FREQUENCY",
+        "N": "INVOICE\nNUMBER",
+        "O": "DATE OF \nREPLACEMENT",
+    }
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws["B2"] = hospital
+    for letter, header in headers.items():
+        ws[f"{letter}5"] = header
+    for i, r in enumerate(rows):
+        for letter, val in r.items():
+            ws[f"{letter}{6 + i}"] = val
+    wb.save(path)
+
+
+def sjoc_rows():
+    return [
+        {"B": "MAIN BLDG #1", "C": "BASEMENT", "D": "CHEMISTRY LAB", "E": "PRE", "F": "AHU-1", "G": "HVP", "H": "HVP24242", "I": "MERV 10", "J": "24x24x2", "K": 8, "M": "90 Days", "N": 30165, "O": date(2026, 7, 23)},
+        {"B": "MAIN BLDG #1", "C": "BASEMENT", "D": "CHEMISTRY LAB", "E": "FINAL", "F": "AHU-1", "G": "F8 4V-Bank", "H": "F8V4-2424-GWB", "I": "MERV 16", "J": "24x24x12", "K": 8, "M": "365 Days", "N": 30301, "O": date(2026, 8, 20)},
+        {"B": "MAIN BLDG #1", "C": "CVOR Roof", "E": "PRE", "F": "AH13A", "G": "HVP", "H": "HVP24244", "J": "24x24x4", "K": 9, "M": "90 Days", "O": date(2026, 7, 23)},
+        {"B": "MAIN BLDG", "C": "CVOR Roof", "E": "FINAL", "F": "AH13A", "G": "HVP Pleat", "H": "MV95 1/1 Non Recess", "J": "24x24x12", "K": 6, "M": "365 Days", "O": date(2026, 8, 20)},
+        {"B": "MAIN BLDG #1", "C": "BASEMENT", "E": "PRE", "F": "AHU-14", "G": "HVP", "H": None, "J": None, "M": "Removed"},
+        {"B": "MAIN BLDG #1", "C": "1ST FLOOR", "E": "FINAL", "F": "AHU-7", "G": "SHARED W/ 6TH", "H": None, "J": "24x24x12", "M": "Removed"},
+        {"B": "SISTER ELIZABETH\n BLDG", "C": "1ST FLOOR", "E": "PRE", "F": "AHU-65", "G": "HVP Pleat", "H": "HVP20202", "J": "20x20x2", "K": 4, "M": "90 Days", "O": "7/23/2026"},
+        {"B": "SFD BUILDING", "C": "5TH LEVEL", "E": "PRE", "F": "AH-34", "G": "HVP", "H": "HVP20252", "J": "20x25x2", "K": 4, "M": "90 Days", "O": date(2026, 7, 23)},
+    ]
+
+
 def rtu_block(ahu, fill_ahu_every_row=False):
     rows = [
         {"B": "East Building", "C": "Roof", "E": "PRE", "F": ahu, "G": "Pleated", "H": "HVP24242", "J": "24x24x2 HV", "K": 32, "L": 32, "M": "90 Days", "O": date(2026, 8, 25)},
@@ -193,11 +240,25 @@ def main():
     assert not ahu_name_matches("Pkg Units — MOB", "Pkg Units", "HDH"), "other building label does not match"
     assert is_skip_sheet("FILTER") and is_skip_sheet("Legend") and not is_skip_sheet("EAST")
     assert looks_like_filter_type("HV Pleat") and looks_like_filter_type("F84V")
+    assert looks_like_filter_type("HVP") and looks_like_filter_type("HVP Pleat")
+    assert looks_like_filter_type("F8 4V-Bank")
     assert not looks_like_filter_type("HVP24242")
     assert not looks_like_filter_type("F8V424-GWBB")
     assert not looks_like_filter_type("MV95 1/1 Non Recess"), "CHOC MV95 PN is a catalog name"
     assert not looks_like_filter_type("FGP-CARB 1/1 G"), "carbon catalog PN is not a type"
     assert not looks_like_filter_type("F8V4GL-2424-GWB")
+    assert_eq(survey_part_number("HVP24242", "HVP"), "HVP24242", "catalog PN wins over type")
+    assert_eq(survey_part_number(None, "HVP Pleat"), None, "never store HVP Pleat as PN")
+    assert_eq(survey_part_number("", "F8 4V-Bank"), None, "never store F8 type as PN")
+    assert_eq(survey_part_number(None, "SHARED W/ 6TH"), None, "skip location leftover as PN")
+    assert_eq(normalize_building_name("MAIN BLDG #1"), "MAIN BLDG", "drop #1 building suffix")
+    assert_eq(normalize_building_name("SISTER ELIZABETH\n BLDG"), "SISTER ELIZABETH BLDG", "collapse building newlines")
+    assert_eq(to_date("7/23/2026"), date(2026, 7, 23), "slash dates parse")
+    assert_eq(
+        to_date((date(2026, 7, 23) - date(1899, 12, 30)).days),
+        date(2026, 7, 23),
+        "excel serial dates parse",
+    )
     assert_eq(prefer_catalog_part("HV Pleat", "HVP24242"), "HVP24242", "upgrade type to catalog PN")
     assert_eq(prefer_catalog_part("F8V42412-GWBB", "F8V424-GWBB"), "F8V42412-GWBB", "keep stored catalog")
     assert_eq(parse_frequency_to_days("2 Years"), 730, "2 Years → 730 days")
@@ -689,6 +750,51 @@ def main():
                 pass
             try:
                 os.unlink(gapped_path)
+            except OSError:
+                pass
+
+            sjoc_path = path + ".sjoc.xlsx"
+            write_sjoc_survey(sjoc_path, "Saint Joseph Orange County", sjoc_rows())
+            sjoc_named = read_named_survey_blocks(sjoc_path, "MAIN BUILDING")
+            names = [(b["display_name"], b["building"]) for b in sjoc_named]
+            assert_eq(
+                names,
+                [
+                    ("AHU-1", "MAIN BLDG"),
+                    ("AH13A", "MAIN BLDG"),
+                    ("AHU-65", "SISTER ELIZABETH BLDG"),
+                    ("AH-34", "SFD BUILDING"),
+                ],
+                "SJOC unifies MAIN BLDG #1, keeps AH13A together, drops junk Removed AHUs",
+            )
+            ahu1 = next(b for b in sjoc_named if b["display_name"] == "AHU-1")
+            assert_eq(
+                [f["part_number"] for f in ahu1["filters"]],
+                ["HVP24242", "F8V4-2424-GWB"],
+                "SJOC keeps catalog PNs instead of HVP / F8 4V-Bank",
+            )
+            assert_eq(ahu1["filters"][0]["last_service_date"], date(2026, 7, 23), "SJOC PRE date")
+            assert_eq(ahu1["filters"][1]["last_service_date"], date(2026, 8, 20), "SJOC FINAL date")
+            ah13 = next(b for b in sjoc_named if b["display_name"] == "AH13A")
+            assert_eq(len(ah13["filters"]), 2, "AH13A PRE+FINAL stay one unit across MAIN BLDG #1 / MAIN BLDG")
+            assert_eq(ah13["filters"][1]["part_number"], "MV95 1/1 Non Recess", "AH13A FINAL is catalog PN not HVP Pleat")
+            liz = next(b for b in sjoc_named if b["display_name"] == "AHU-65")
+            assert_eq(liz["filters"][0]["part_number"], "HVP20202", "HVP Pleat type is not stored")
+            assert_eq(liz["filters"][0]["last_service_date"], date(2026, 7, 23), "slash date from SJOC header")
+
+            sjoc_seed = seed_from_excel(sjoc_path)
+            sjoc_hid = sjoc_seed["hospital_id"]
+            sjoc_ahus = AHU.query.filter_by(hospital_id=sjoc_hid).all()
+            assert_eq(len(sjoc_ahus), 4, "SJOC seed creates 4 real AHUs")
+            buildings = sorted({a.building.name for a in sjoc_ahus if a.building})
+            assert_eq(buildings, ["MAIN BLDG", "SFD BUILDING", "SISTER ELIZABETH BLDG"], "three buildings after #1 merge")
+            stored_parts = sorted({f.part_number for f in Filter.query.join(AHU).filter(AHU.hospital_id == sjoc_hid).all()})
+            for bad in ("HVP", "HVP Pleat", "F8 4V-Bank", "SHARED W/ 6TH"):
+                assert bad not in stored_parts, f"type label {bad} must not be stored as a part number"
+            dates = [f.last_service_date for f in Filter.query.join(AHU).filter(AHU.hospital_id == sjoc_hid).all()]
+            assert all(d is not None for d in dates), "SJOC catalog rows keep replacement dates"
+            try:
+                os.unlink(sjoc_path)
             except OSError:
                 pass
         finally:
