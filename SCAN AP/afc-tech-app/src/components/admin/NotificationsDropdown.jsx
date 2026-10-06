@@ -127,18 +127,23 @@ const timeAgo = (iso) => {
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2 truncate">
-                              <h4 className="text-sm font-bold text-gray-900 truncate">
-                                {n.hospital_name || n.title || 'System Alert'}
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-bold text-gray-900 leading-snug break-words">
+                                {n.hospital_name || n.title || "System Alert"}
                               </h4>
-                              {n.ahu_name && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase">
+                              {n.ahu_name ? (
+                                <div className="text-xs font-semibold text-gray-700 leading-snug break-words mt-0.5">
                                   {n.ahu_name}
-                                </span>
-                              )}
+                                </div>
+                              ) : null}
+                              {n.job_id ? (
+                                <div className="text-xs font-bold text-gray-900 mt-0.5">
+                                  Job #{n.job_id}
+                                </div>
+                              ) : null}
                             </div>
-                            <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap ml-2">
+                            <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap shrink-0">
                               {timeAgo(n.created_at)}
                             </span>
                           </div>
@@ -179,7 +184,7 @@ const timeAgo = (iso) => {
 
                         <button 
                           onClick={() => updateStatus(n.id, 'dismissed')}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-300 hover:text-gray-600"
+                          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-300 hover:text-gray-600"
                         >
                           ✕
                         </button>
