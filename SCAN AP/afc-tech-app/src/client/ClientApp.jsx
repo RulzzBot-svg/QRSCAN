@@ -12,9 +12,10 @@ import ThemeToggle from "./ThemeToggle";
 
 const NAV = [
   { to: "/client", label: "Home", end: true, icon: HomeIcon },
-  { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
   { to: "/client/units", label: "Units", icon: UnitsIcon },
+  { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
   { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
+  { to: "/client/contact", label: "Contact", icon: ContactIcon },
 ];
 
 export default function ClientApp() {
@@ -114,7 +115,7 @@ export default function ClientApp() {
           </main>
 
           <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
-            <div className="grid grid-cols-4 h-16">
+            <div className="grid grid-cols-5 h-16">
               {NAV.map((item) => (
                 <NavLink
                   key={item.to}
@@ -183,6 +184,15 @@ function GraphIcon({ className }) {
       <path d="M8 16v-5" />
       <path d="M12 16V8" />
       <path d="M16 16v-8" />
+    </svg>
+  );
+}
+
+function ContactIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M4 6h16v12H4z" />
+      <path d="m4 7 8 6 8-6" />
     </svg>
   );
 }

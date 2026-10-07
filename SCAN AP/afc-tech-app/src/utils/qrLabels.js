@@ -226,6 +226,7 @@ export function zebraHeadline(label) {
 
 export const AFC_COMPANY_NAME = "ADVANCED FILTRATION CONCEPTS";
 export const AFC_PHONE = "323.832.8316";
+export const AFC_PHONE_TEL = "+13238328316";
 
 export function hospitalLine(label) {
   const name = String(label?.hospital || "").trim();

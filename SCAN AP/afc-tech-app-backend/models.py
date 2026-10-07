@@ -153,6 +153,21 @@ class ClientUser(db.Model):
     hospital = relationship("Hospital")
 
 
+class ClientInquiry(db.Model):
+    """Contact-AFC messages from the hospital portal. Does not change survey data."""
+
+    __tablename__ = "client_inquiries"
+
+    id = Column(Integer, primary_key=True)
+    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
+    client_user_id = Column(Integer, ForeignKey("client_users.id"), nullable=False)
+    sender_name = Column(String(150))
+    sender_email = Column(String(200))
+    sender_phone = Column(String(40))
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # -------------------------
 # JOB
 # -------------------------

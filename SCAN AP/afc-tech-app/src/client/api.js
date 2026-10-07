@@ -73,3 +73,12 @@ export const getClientHospital = () => ClientAPI.get("/client/hospital");
 export const getClientAhus = () => ClientAPI.get("/client/ahus");
 export const getClientAhu = (id) => ClientAPI.get(`/client/ahus/${id}`);
 export const getClientGraphs = () => ClientAPI.get("/client/graphs");
+export const sendClientContact = (payload) => ClientAPI.post("/client/contact", payload);
+
+export function getPublicUnit(ahuId) {
+  const id = String(ahuId ?? "").replace(/[^\d]/g, "");
+  if (!id) {
+    return Promise.reject({ response: { status: 404, data: { error: "Unit not found" } } });
+  }
+  return axios.get(`${BASE}/api/public/units/${id}`);
+}

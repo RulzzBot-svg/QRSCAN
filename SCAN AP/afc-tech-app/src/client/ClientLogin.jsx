@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { loginClient, saveClientSession } from "./api";
 import { readClientTheme, storeClientTheme, toggleClientTheme, applyClientTheme } from "./theme";
 import ThemeToggle from "./ThemeToggle";
+import InstallHint from "./InstallHint";
 
 export default function ClientLogin() {
   const navigate = useNavigate();
@@ -90,6 +91,9 @@ export default function ClientLogin() {
             {loading ? <span className="loading loading-spinner loading-sm" /> : "Enter portal"}
           </button>
         </form>
+        <div className="mt-4">
+          <InstallHint />
+        </div>
         <p className="text-center text-xs text-base-content/50 mt-6">
           Technician?{" "}
           <Link className="link link-primary" to="/">

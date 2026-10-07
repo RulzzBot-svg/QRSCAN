@@ -1,7 +1,7 @@
 // main.jsx
-import React from "react";
+import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import App from "./App";
 import HospitalCards from "./components/common/HospitalCards";
 import AHU from "./components/common/AHU";
@@ -29,17 +29,26 @@ import ClientScan from "./client/ClientScan";
 import ClientUnits from "./client/ClientUnits";
 import ClientAhu from "./client/ClientAhu";
 import ClientGraphs from "./client/ClientGraphs";
+import ClientContact from "./client/ClientContact";
+import { applyPwaManifest } from "./client/pwa";
 import { registerSW } from "virtual:pwa-register";
 
 if (import.meta.env.PROD) {
-  import("virtual:pwa-register").then(({ registerSW }) => {
-    registerSW({ immediate: true });
-  });
+  registerSW({ immediate: true });
+}
+
+function PwaManifest() {
+  const location = useLocation();
+  useEffect(() => {
+    applyPwaManifest(location.pathname);
+  }, [location.pathname]);
+  return null;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
+      <PwaManifest />
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
@@ -77,6 +86,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="units" element={<ClientUnits />} />
           <Route path="ahu/:ahuId" element={<ClientAhu />} />
           <Route path="graphs" element={<ClientGraphs />} />
+          <Route path="contact" element={<ClientContact />} />
         </Route>
 
 

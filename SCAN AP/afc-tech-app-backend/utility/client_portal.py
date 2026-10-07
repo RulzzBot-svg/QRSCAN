@@ -108,6 +108,62 @@ def public_filter(f):
     }
 
 
+_STICKER_FILTER_KEYS = (
+    "phase",
+    "size",
+    "quantity",
+    "frequency_label",
+    "last_service_date",
+    "status",
+    "next_due_date",
+    "days_until_due",
+    "days_overdue",
+)
+
+
+def sticker_filter(f):
+    """QR sticker row: status only. No ids, catalog PNs, or prices."""
+    row = public_filter(f)
+    return {k: row.get(k) for k in _STICKER_FILTER_KEYS}
+
+
+def walk_sort_key(ahu):
+    building = ""
+    if getattr(ahu, "building", None) is not None:
+        building = (ahu.building.name or "").strip().lower()
+    try:
+        order = int(ahu.excel_order) if ahu.excel_order is not None else 10**9
+    except (TypeError, ValueError):
+        order = 10**9
+    try:
+        aid = int(ahu.id or 0)
+    except (TypeError, ValueError):
+        aid = 0
+    return (building, order, aid)
+
+
+def walk_sorted_ahus(ahus):
+    return sorted(list(ahus or []), key=walk_sort_key)
+
+
+def sticker_card(ahu):
+    """Logged-out QR view. Same status a label implies; nothing writable or priced."""
+    filters = active_filters(ahu)
+    st = ahu_status_from_filters(filters)
+    building = getattr(ahu, "building", None)
+    hospital = getattr(ahu, "hospital", None)
+    return {
+        "hospital": hospital.name if hospital else None,
+        "name": ahu.name,
+        "location": ahu.location,
+        "building": building.name if building else None,
+        "status": st["status"],
+        "next_due_date": st["next_due_date"],
+        "last_service_date": _latest_service(filters),
+        "filters": [sticker_filter(f) for f in filters],
+    }
+
+
 def active_filters(ahu):
     return [
         f

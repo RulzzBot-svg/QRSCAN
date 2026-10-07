@@ -4,16 +4,30 @@
     <meta charset="UTF-8" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light" />
-    <title>afc-tech-app</title>
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="AFC Tech" />
+    <title>AFC</title>
     <script>
       (function () {
         try {
-          if ((location.pathname || "").indexOf("/client") !== 0) return;
-          var t = localStorage.getItem("client_appearance");
-          document.documentElement.setAttribute("data-theme", t === "afc-dark" ? "afc-dark" : "afc");
-          document.documentElement.style.colorScheme = t === "afc-dark" ? "dark" : "light";
+          var client = (location.pathname || "").indexOf("/client") === 0;
+          if (client) {
+            var t = localStorage.getItem("client_appearance");
+            document.documentElement.setAttribute("data-theme", t === "afc-dark" ? "afc-dark" : "afc");
+            document.documentElement.style.colorScheme = t === "afc-dark" ? "dark" : "light";
+            document.title = "AFC Hospital Portal";
+            var m = document.querySelector('link[rel="manifest"]');
+            if (m) m.setAttribute("href", "/client-manifest.webmanifest");
+            var theme = document.querySelector('meta[name="theme-color"]');
+            if (theme) theme.setAttribute("content", "#0a4d8c");
+            var appTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+            if (appTitle) appTitle.setAttribute("content", "AFC Portal");
+          }
         } catch (e) {
           document.documentElement.setAttribute("data-theme", "afc");
         }

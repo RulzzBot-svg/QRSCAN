@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getClientAhus } from "./api";
+import { getClientAhus, getClientGraphs, getClientHospital } from "./api";
 import { prettyDate } from "./format";
 import { StatusBadge } from "./StatusBadge";
+import { exportInspectionPdf, groupAhusByBuilding } from "./exportInspectionPdf";
 
 export default function ClientUnits() {
   const [ahus, setAhus] = useState([]);
@@ -10,6 +11,7 @@ export default function ClientUnits() {
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +39,24 @@ export default function ClientUnits() {
     });
   }, [ahus, query, filter]);
 
+  const groups = useMemo(() => groupAhusByBuilding(shown), [shown]);
+
+  const downloadSnapshot = async () => {
+    setExporting(true);
+    try {
+      const [hospitalRes, graphsRes] = await Promise.all([getClientHospital(), getClientGraphs()]);
+      exportInspectionPdf({
+        hospitalName: hospitalRes.data?.name,
+        summary: graphsRes.data?.summary,
+        ahus,
+      });
+    } catch {
+      alert("Could not build the inspection snapshot.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -49,9 +69,16 @@ export default function ClientUnits() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold">Units</h2>
-        <p className="text-sm text-base-content/60">{ahus.length} AHUs at this hospital</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold">Units</h2>
+          <p className="text-sm text-base-content/60">
+            Grouped by building, in walk order. {ahus.length} AHUs at this hospital.
+          </p>
+        </div>
+        <button type="button" className="btn btn-outline btn-sm" onClick={downloadSnapshot} disabled={exporting}>
+          {exporting ? "Preparing…" : "Inspection PDF"}
+        </button>
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
         <input
@@ -73,61 +100,66 @@ export default function ClientUnits() {
         </select>
       </div>
 
-      <div className="hidden md:block bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>AHU</th>
-              <th>Building</th>
-              <th>Location</th>
-              <th>Last serviced</th>
-              <th>Next due</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((a) => (
-              <tr key={a.id} className="hover">
-                <td>
-                  <Link className="link link-primary font-semibold" to={`/client/ahu/${a.id}`}>
-                    {a.name}
-                  </Link>
-                </td>
-                <td>{a.building || "—"}</td>
-                <td>{a.location || "—"}</td>
-                <td>{prettyDate(a.last_service_date)}</td>
-                <td>{prettyDate(a.next_due_date)}</td>
-                <td>
-                  <StatusBadge status={a.status} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {groups.map((group) => (
+        <section key={group.building} className="space-y-2">
+          <div className="flex items-baseline justify-between gap-2 px-1">
+            <h3 className="font-semibold">{group.building}</h3>
+            <span className="text-xs text-base-content/50">{group.units.length}</span>
+          </div>
 
-      <div className="md:hidden space-y-2">
-        {shown.map((a) => (
-          <Link
-            key={a.id}
-            to={`/client/ahu/${a.id}`}
-            className="block rounded-2xl bg-base-100 border border-base-300 p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold truncate">{a.name}</p>
-                <p className="text-xs text-base-content/60 truncate">
-                  {[a.building, a.location].filter(Boolean).join(" · ") || "—"}
+          <div className="hidden md:block bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>AHU</th>
+                  <th>Location</th>
+                  <th>Last serviced</th>
+                  <th>Next due</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.units.map((a) => (
+                  <tr key={a.id} className="hover">
+                    <td>
+                      <Link className="link link-primary font-semibold" to={`/client/ahu/${a.id}`}>
+                        {a.name}
+                      </Link>
+                    </td>
+                    <td>{a.location || "—"}</td>
+                    <td>{prettyDate(a.last_service_date)}</td>
+                    <td>{prettyDate(a.next_due_date)}</td>
+                    <td>
+                      <StatusBadge status={a.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="md:hidden space-y-2">
+            {group.units.map((a) => (
+              <Link
+                key={a.id}
+                to={`/client/ahu/${a.id}`}
+                className="block rounded-2xl bg-base-100 border border-base-300 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{a.name}</p>
+                    <p className="text-xs text-base-content/60 truncate">{a.location || "—"}</p>
+                  </div>
+                  <StatusBadge status={a.status} />
+                </div>
+                <p className="text-xs mt-2 text-base-content/60">
+                  Last serviced {prettyDate(a.last_service_date)} · Next due {prettyDate(a.next_due_date)}
                 </p>
-              </div>
-              <StatusBadge status={a.status} />
-            </div>
-            <p className="text-xs mt-2 text-base-content/60">
-              Last serviced {prettyDate(a.last_service_date)} · Next due {prettyDate(a.next_due_date)}
-            </p>
-          </Link>
-        ))}
-      </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
 
       {shown.length === 0 ? (
         <p className="text-sm text-base-content/50 text-center py-8">No units match that search.</p>

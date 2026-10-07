@@ -45,6 +45,18 @@ def ensure_schema():
         )
         """,
         "CREATE INDEX IF NOT EXISTS ix_client_users_hospital_id ON client_users (hospital_id)",
+        """
+        CREATE TABLE IF NOT EXISTS client_inquiries (
+            id SERIAL PRIMARY KEY,
+            hospital_id INTEGER NOT NULL REFERENCES hospitals(id),
+            client_user_id INTEGER NOT NULL REFERENCES client_users(id),
+            sender_name VARCHAR(150),
+            sender_email VARCHAR(200),
+            sender_phone VARCHAR(40),
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
     )
     for sql in statements:
         try:
