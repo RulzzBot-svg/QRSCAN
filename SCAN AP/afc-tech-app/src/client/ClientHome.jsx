@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getClientHospital } from "./api";
+import { getClientAhus, getClientGraphs, getClientHospital } from "./api";
 import { StatusBadge } from "./StatusBadge";
+import { exportInspectionPdf } from "./exportInspectionPdf";
+import InstallHint from "./InstallHint";
 
 export default function ClientHome() {
   const [hospital, setHospital] = useState(null);
@@ -39,14 +41,33 @@ export default function ClientHome() {
 
   const summary = hospital?.summary || {};
 
+  const downloadSnapshot = async () => {
+    try {
+      const [ahusRes, graphsRes] = await Promise.all([getClientAhus(), getClientGraphs()]);
+      exportInspectionPdf({
+        hospitalName: hospital?.name,
+        summary: graphsRes.data?.summary || summary,
+        ahus: ahusRes.data,
+      });
+    } catch {
+      alert("Could not build the inspection snapshot.");
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <section>
-        <h2 className="text-2xl font-bold">{hospital?.name}</h2>
-        <p className="text-sm text-base-content/60 mt-1">
-          Filter status only — no pricing, invoices, or job notes.
-        </p>
+      <section className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold">{hospital?.name}</h2>
+          <p className="text-sm text-base-content/60 mt-1">
+            Filter status only — no pricing, invoices, or job notes.
+          </p>
+        </div>
+        <button type="button" className="btn btn-outline btn-sm shrink-0" onClick={downloadSnapshot}>
+          Inspection PDF
+        </button>
       </section>
+      <InstallHint />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="AHUs" value={summary.ahus || 0} />
@@ -79,6 +100,14 @@ export default function ClientHome() {
           <div className="card-body p-5">
             <h3 className="font-semibold">Graphs</h3>
             <p className="text-sm text-base-content/60">Compliance mix, buildings, and visits.</p>
+          </div>
+        </Link>
+        <Link to="/client/contact" className="card bg-base-100 border border-base-300 md:col-span-2">
+          <div className="card-body p-5">
+            <h3 className="font-semibold">Call or email AFC</h3>
+            <p className="text-sm text-base-content/60">
+              Phone and a short message form. Nothing here can edit units.
+            </p>
           </div>
         </Link>
       </div>

@@ -10,10 +10,11 @@ from db import db
 from extensions import limiter
 from middleware.jwt_utils import create_access_token, token_string
 from middleware.pin_utils import hash_pin
-from models import AHU, Building, ClientUser, Filter, Hospital, Job, Technician
+from models import AHU, Building, ClientInquiry, ClientUser, Filter, Hospital, Job, Technician
 from routes.admin import admin_bp
 from routes.ahu_routes import ahu_bp
 from routes.client_routes import client_bp
+from routes.job_routes import job_bp
 from routes.tech_routes import tech_bp
 from utility.client_portal import frequency_label, public_filter
 
@@ -31,6 +32,7 @@ def make_app(db_path):
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(tech_bp, url_prefix="/api")
     app.register_blueprint(ahu_bp, url_prefix="/api")
+    app.register_blueprint(job_bp, url_prefix="/api")
     with app.app_context():
         db.create_all()
     return app
@@ -52,18 +54,37 @@ def seed(app):
         db.session.add(south)
         db.session.flush()
 
+        main = Building(hospital_id=choc.id, name="MAIN BLDG")
+        db.session.add(main)
+        db.session.flush()
+
         ahu = AHU(
             hospital_id=choc.id,
             building_id=south.id,
             name="AHU-E2",
             location="Penthouse1 Roof",
+            excel_order=5,
+        )
+        ahu9 = AHU(
+            hospital_id=choc.id,
+            building_id=south.id,
+            name="AHU-9",
+            location="1ST FLOOR",
+            excel_order=1,
+        )
+        ahu_main = AHU(
+            hospital_id=choc.id,
+            building_id=main.id,
+            name="AH-10",
+            location="Roof",
+            excel_order=16,
         )
         other_ahu = AHU(
             hospital_id=other.id,
             name="AHU-1",
             location="Roof",
         )
-        db.session.add_all([ahu, other_ahu])
+        db.session.add_all([ahu, ahu9, ahu_main, other_ahu])
         db.session.flush()
 
         db.session.add_all([
@@ -115,6 +136,8 @@ def seed(app):
             "choc_id": choc.id,
             "other_id": other.id,
             "ahu_id": ahu.id,
+            "ahu9_id": ahu9.id,
+            "ahu_main_id": ahu_main.id,
             "other_ahu_id": other_ahu.id,
             "admin_id": admin.id,
             "tech_id": tech.id,
@@ -152,10 +175,16 @@ def main():
     assert_eq(me.get_json()["username"], "choc.facilities", "username")
 
     ahus = client.get("/api/client/ahus", headers=headers).get_json()
-    assert_eq(len(ahus), 1, "only this hospital's AHUs")
-    assert_eq(ahus[0]["name"], "AHU-E2", "E2 listed")
-    assert_eq(ahus[0]["building"], "South Tower", "building")
+    assert_eq(len(ahus), 3, "only this hospital's AHUs")
+    assert_eq(
+        [a["name"] for a in ahus],
+        ["AH-10", "AHU-9", "AHU-E2"],
+        "grouped by building, then walk order",
+    )
+    assert_eq(ahus[0]["building"], "MAIN BLDG", "Main first alphabetically")
+    assert_eq(ahus[1]["building"], "South Tower", "South walk: AHU-9 before E2")
     assert "unit_price" not in ahus[0], "no price on list"
+    assert "excel_order" not in ahus[0], "excel_order stays internal"
 
     detail = client.get(f"/api/client/ahus/{ids['ahu_id']}", headers=headers).get_json()
     blob = str(detail)
@@ -173,9 +202,77 @@ def main():
     assert_eq(other.status_code, 404, "other hospital AHU is hidden")
 
     graphs = client.get("/api/client/graphs", headers=headers).get_json()
-    assert_eq(graphs["summary"]["ahus"], 1, "graph ahus")
+    assert_eq(graphs["summary"]["ahus"], 3, "graph ahus")
     assert graphs["summary"]["overdue"] >= 1, "overdue in graphs"
-    assert graphs["by_building"][0]["name"] == "South Tower"
+    buildings = [b["name"] for b in graphs["by_building"]]
+    assert "South Tower" in buildings and "MAIN BLDG" in buildings
+
+    sticker = client.get(f"/api/public/units/{ids['ahu_id']}")
+    assert_eq(sticker.status_code, 200, "logged-out QR card")
+    card = sticker.get_json()
+    blob = str(card)
+    assert "SECRET-PN" not in blob and "F8V4-2424-GWB" not in blob, "sticker hides catalog PNs"
+    assert "269.50" not in blob and "unit_price" not in blob, "sticker hides prices"
+    assert "internal" not in blob and "notes" not in blob, "sticker hides notes"
+    assert "hospital_id" not in card, "sticker hides hospital id"
+    assert card["hospital"] == "CHOC", "sticker hospital name"
+    assert card["name"] == "AHU-E2", "sticker AHU name"
+    assert all("id" not in f for f in card["filters"]), "sticker filters have no db ids"
+
+    missing = client.get("/api/public/units/999999")
+    assert_eq(missing.status_code, 404, "unknown sticker id is 404")
+    named = client.get("/api/public/units/AHU-E2")
+    assert named.status_code in (404, 405), "no lookup by name"
+    wrote = client.post(f"/api/public/units/{ids['ahu_id']}", json={"status": "Completed"})
+    assert_eq(wrote.status_code, 405, "public sticker is GET only")
+    patched = client.patch(f"/api/client/ahus/{ids['ahu_id']}", headers=headers, json={"name": "hacked"})
+    assert_eq(patched.status_code, 405, "client cannot PATCH units")
+
+    contact = client.post(
+        "/api/client/contact",
+        headers=headers,
+        json={
+            "message": "Please call about AHU-9 filters this week.",
+            "phone": "714-555-0100",
+            "hospital_id": ids["other_id"],
+        },
+    )
+    assert_eq(contact.status_code, 201, "portal contact form")
+    with app.app_context():
+        stored = ClientInquiry.query.order_by(ClientInquiry.id.desc()).first()
+        assert stored is not None, "inquiry stored"
+        assert_eq(stored.hospital_id, ids["choc_id"], "inquiry hospital comes from the login, not the body")
+        inquiry_count = ClientInquiry.query.count()
+    spam = client.post(
+        "/api/client/contact",
+        headers=headers,
+        json={"message": "hack the units", "website": "https://spam.test"},
+    )
+    assert_eq(spam.status_code, 200, "honeypot accepted without storing as a real send")
+    with app.app_context():
+        assert_eq(ClientInquiry.query.count(), inquiry_count, "honeypot does not create a row")
+    anon_contact = client.post("/api/client/contact", json={"message": "please help us today now"})
+    assert_eq(anon_contact.status_code, 401, "contact requires portal login")
+
+    qr_anon = client.get(f"/api/qr/{ids['ahu_id']}")
+    assert_eq(qr_anon.status_code, 401, "tech QR payload is never public")
+    qr_as_client = client.get(f"/api/qr/{ids['ahu_id']}", headers=headers)
+    assert qr_as_client.status_code in (401, 403), "client token cannot load tech QR payload"
+    qr_blob = str(qr_as_client.get_json() or {})
+    assert "SECRET-PN" not in qr_blob and "269.50" not in qr_blob, "failed QR probe leaks nothing"
+
+    job_try = client.post(
+        "/api/jobs",
+        headers=headers,
+        json={"ahu_id": ids["ahu_id"], "filters": [{"filter_id": 1, "is_completed": True}]},
+    )
+    assert job_try.status_code in (401, 403), "client cannot submit jobs"
+    deleted = client.delete(f"/api/client/ahus/{ids['ahu_id']}", headers=headers)
+    assert_eq(deleted.status_code, 405, "client cannot DELETE units")
+    put_try = client.put(f"/api/client/ahus/{ids['ahu_id']}", headers=headers, json={"name": "hacked"})
+    assert_eq(put_try.status_code, 405, "client cannot PUT units")
+    assert "id" not in card, "sticker omits database ids"
+    assert "excel_order" not in card, "sticker omits walk-order internals"
 
     tech_headers = auth_header(app, ids["tech_id"], "technician", "tech")
     blocked = client.get("/api/client/ahus", headers=tech_headers)

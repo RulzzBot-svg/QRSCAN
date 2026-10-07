@@ -7,6 +7,7 @@ import { submitJob } from "../../api/jobs";
 import { queueJob } from "../../offline/jobQueue";
 import { cacheAHU, getCachedAHU } from "../../offline/ahuCache";
 import { parseIsoToDate, formatDate } from "../../utils/dates";
+import PublicFilterCard from "../../client/PublicFilterCard";
 
 const SERVICE_DATE_OPTS = { month: "2-digit", day: "2-digit", year: "numeric" };
 
@@ -40,6 +41,7 @@ function FilterInfo() {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [inspected, setInspected] = useState({});
   const [tech, setTech] = useState(null);
+  const [guest, setGuest] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});
   const [initialResistance, setInitialResistance] = useState({});
   const [finalResistance, setFinalResistance] = useState({});
@@ -67,7 +69,7 @@ function FilterInfo() {
     } catch {
       /* ignore */
     }
-    navigate("/");
+    setGuest(true);
   }, [navigate, ahuId]);
 
   /* ----------------------------- */
@@ -249,6 +251,18 @@ function FilterInfo() {
       );
     });
   };
+
+  if (guest) {
+    return <PublicFilterCard ahuId={ahuId} />;
+  }
+
+  if (!tech) {
+    return (
+      <div data-theme="corporate" className="min-h-screen bg-base-200 flex items-center justify-center">
+        <span className="loading loading-spinner loading-lg text-primary" />
+      </div>
+    );
+  }
 
   /* ----------------------------- */
   /* RENDER (UNCHANGED UI)         */
