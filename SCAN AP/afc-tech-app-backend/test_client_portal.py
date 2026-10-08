@@ -352,6 +352,10 @@ def main():
     assert_eq(sheet.status_code, 200, "director datasheet")
     sheet_blob = str(sheet.get_json())
     assert "SECRET-PN" not in sheet_blob and "269.50" not in sheet_blob, "datasheet has no PNs or prices"
+    assert sheet.get_json().get("buildings"), "datasheet lists buildings"
+    home = client.get("/api/client/hospital", headers=headers)
+    assert_eq(home.status_code, 200, "director hospital payload")
+    assert home.get_json().get("datasheet", {}).get("buildings"), "datasheet is also on hospital home"
 
     reset = client.patch(
         f"/api/admin/clients/{created.get_json()['id']}",

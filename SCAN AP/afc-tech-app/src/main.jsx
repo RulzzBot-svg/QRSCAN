@@ -32,6 +32,7 @@ import ClientGraphs from "./client/ClientGraphs";
 import ClientContact from "./client/ClientContact";
 import ClientHelp from "./client/ClientHelp";
 import ClientDatasheet from "./client/ClientDatasheet";
+import ClientDocs from "./client/ClientDocs";
 import { applyPwaManifest } from "./client/pwa";
 import { registerSW } from "virtual:pwa-register";
 
@@ -91,6 +92,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="contact" element={<ClientContact />} />
           <Route path="help" element={<ClientHelp />} />
           <Route path="datasheet" element={<ClientDatasheet />} />
+          <Route path="docs" element={<ClientDocs />} />
         </Route>
 
 

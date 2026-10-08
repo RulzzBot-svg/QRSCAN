@@ -15,13 +15,13 @@ const DIRECTOR_NAV = [
   { to: "/client/units", label: "Units", icon: UnitsIcon },
   { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
   { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
-  { to: "/client/help", label: "Guide", icon: HelpIcon },
+  { to: "/client/docs", label: "Docs", icon: HelpIcon },
 ];
 
 const STAFF_NAV = [
   { to: "/client/units", label: "Units", icon: UnitsIcon },
   { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
-  { to: "/client/help", label: "Guide", icon: HelpIcon },
+  { to: "/client/docs", label: "Guide", icon: HelpIcon },
 ];
 
 export default function ClientApp() {

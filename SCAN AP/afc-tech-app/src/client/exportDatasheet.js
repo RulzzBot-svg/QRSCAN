@@ -9,10 +9,10 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-export function exportTechnicalDatasheet(sheet) {
+export function datasheetHtml(sheet) {
   const hospital = sheet?.hospital || "Hospital";
   const when = new Date().toLocaleString();
-  const logoSrc = `${window.location.origin}${DEFAULT_AFC_LOGO_PATH}`;
+  const logoSrc = `${typeof window !== "undefined" ? window.location.origin : ""}${DEFAULT_AFC_LOGO_PATH}`;
   const buildings = sheet?.buildings || [];
 
   const sections = buildings
@@ -38,7 +38,7 @@ export function exportTechnicalDatasheet(sheet) {
     })
     .join("");
 
-  printHtmlDocument(`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -70,7 +70,11 @@ export function exportTechnicalDatasheet(sheet) {
   <p class="note">Filter stages, sizes, quantities, and change frequencies for this hospital only. Catalog part numbers, prices, invoices, GPS, and technician names are not included.</p>
   ${sections || "<p class='note'>No units on file.</p>"}
 </body>
-</html>`);
+</html>`;
+}
+
+export function exportTechnicalDatasheet(sheet) {
+  printHtmlDocument(datasheetHtml(sheet), "afc-technical-datasheet.html");
 }
 
 export function exportItBrief({ hospitalName }) {

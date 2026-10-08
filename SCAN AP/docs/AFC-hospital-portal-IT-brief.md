@@ -44,4 +44,17 @@ Logins are a username and PIN issued by AFC. Each login is bound to **one hospit
 
 The datasheet lists each AHU’s filter stages, sizes, quantities, and change frequencies for Joint Commission / facilities files. It does not include catalog part numbers or commercial terms.
 
+## Where to open this in the app
+
+Directors: sign in at `/client/login`, then open **Docs**. Tabs:
+
+- How to use
+- Datasheet (equipment list)
+- IT brief (this document)
+- Technical docs (architecture and APIs)
+
+Hospital technicians only see How to use.
+
+The same files live in the repo under `SCAN AP/docs/`.
+
 Questions: AFC, 323.832.8316.
