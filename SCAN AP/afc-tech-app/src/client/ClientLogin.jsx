@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { loginClient, saveClientSession } from "./api";
+import { isClientDirector, loginClient, saveClientSession } from "./api";
 import { readClientTheme, storeClientTheme, toggleClientTheme, applyClientTheme } from "./theme";
 import ThemeToggle from "./ThemeToggle";
 import InstallHint from "./InstallHint";
@@ -31,13 +31,24 @@ export default function ClientLogin() {
     try {
       const res = await loginClient(username.trim(), pin);
       saveClientSession(res.data);
-      let next = "/client";
+      const director = isClientDirector(res.data);
+      let next = director ? "/client" : "/client/units";
       try {
         const stored = sessionStorage.getItem("post_client_path");
         if (stored && stored.startsWith("/client")) next = stored;
         sessionStorage.removeItem("post_client_path");
       } catch {
         /* ignore */
+      }
+      if (
+        !director &&
+        (next === "/client" ||
+          next === "/client/" ||
+          next.startsWith("/client/graphs") ||
+          next.startsWith("/client/contact") ||
+          next.startsWith("/client/datasheet"))
+      ) {
+        next = "/client/units";
       }
       navigate(next, { replace: true });
     } catch (err) {

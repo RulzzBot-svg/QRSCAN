@@ -149,6 +149,8 @@ class ClientUser(db.Model):
     username = Column(String(80), nullable=False, unique=True)
     pin = Column(String(128), nullable=False)
     active = Column(Boolean, default=True)
+    # director = full portal; tech = hospital staff, scan + units only
+    role = Column(String(20), default="director", nullable=False)
 
     hospital = relationship("Hospital")
 

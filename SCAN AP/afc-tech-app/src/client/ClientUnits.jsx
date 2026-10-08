@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getClientAhus, getClientGraphs, getClientHospital } from "./api";
+import { getClientAhus, getClientGraphs, getClientHospital, isClientDirector } from "./api";
 import { prettyDate } from "./format";
 import { StatusBadge } from "./StatusBadge";
 import { exportInspectionPdf, groupAhusByBuilding } from "./exportInspectionPdf";
@@ -76,9 +76,11 @@ export default function ClientUnits() {
             Grouped by building, in walk order. {ahus.length} AHUs at this hospital.
           </p>
         </div>
-        <button type="button" className="btn btn-outline btn-sm" onClick={downloadSnapshot} disabled={exporting}>
-          {exporting ? "Preparing…" : "Inspection PDF"}
-        </button>
+        {isClientDirector() ? (
+          <button type="button" className="btn btn-outline btn-sm" onClick={downloadSnapshot} disabled={exporting}>
+            {exporting ? "Preparing…" : "Inspection PDF"}
+          </button>
+        ) : null}
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
         <input

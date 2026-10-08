@@ -21,14 +21,14 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
   const [error, setError] = useState(null);
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState(null);
-  const [newClient, setNewClient] = useState({ name: "", username: "", pin: "" });
+  const [newClient, setNewClient] = useState({ name: "", username: "", pin: "", role: "director" });
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!hospital || !open) return;
     setError(null);
     setClientsError(null);
-    setNewClient({ name: "", username: "", pin: "" });
+    setNewClient({ name: "", username: "", pin: "", role: "director" });
     const applyHospital = (data) => {
       setForm({
         estimate_number: data.estimate_number || "",
@@ -86,7 +86,7 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
     try {
       const res = await createHospitalClient(hospital.id, newClient);
       setClients((prev) => [...prev, res.data]);
-      setNewClient({ name: "", username: "", pin: "" });
+      setNewClient({ name: "", username: "", pin: "", role: "director" });
     } catch (err) {
       setClientsError(err?.response?.data?.error || "Could not create portal login");
     } finally {
@@ -199,7 +199,7 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
 
         <div className="divider my-4">Hospital portal</div>
         <p className="text-xs text-base-content/60 mb-3">
-          These logins see this hospital only: unit status, next due, and graphs. No prices or invoices.
+          Director logins see the full portal. Hospital tech logins only get Scan and Units. No prices or invoices.
           Share <code className="text-[11px]">/client/login</code> with them.
         </p>
 
@@ -213,6 +213,9 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
               <div>
                 <span className="font-medium">{row.name}</span>
                 <span className="text-base-content/50 ml-2">{row.username}</span>
+                <span className="badge badge-ghost badge-xs ml-2">
+                  {row.role === "tech" ? "hospital tech" : "director"}
+                </span>
               </div>
               <div className="flex gap-1 shrink-0">
                 <button type="button" className="btn btn-xs btn-ghost" onClick={() => resetClientPin(row)}>
@@ -255,6 +258,14 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
             onChange={(e) => setNewClient((p) => ({ ...p, pin: e.target.value }))}
             required
           />
+          <select
+            className="select select-xs select-bordered col-span-2"
+            value={newClient.role}
+            onChange={(e) => setNewClient((p) => ({ ...p, role: e.target.value }))}
+          >
+            <option value="director">Director — full portal</option>
+            <option value="tech">Hospital tech — scan and units only</option>
+          </select>
           <button type="submit" className="btn btn-xs btn-outline col-span-2" disabled={creating}>
             {creating ? "Saving…" : "Add portal login"}
           </button>

@@ -10,7 +10,7 @@ from db import db
 from extensions import limiter
 from middleware.jwt_utils import create_access_token, token_string
 from middleware.pin_utils import hash_pin
-from models import AHU, Building, ClientInquiry, ClientUser, Filter, Hospital, Job, Technician
+from models import AHU, Building, ClientInquiry, ClientUser, Filter, Hospital, Job, JobFilter, Technician
 from routes.admin import admin_bp
 from routes.ahu_routes import ahu_bp
 from routes.client_routes import client_bp
@@ -127,10 +127,31 @@ def seed(app):
             username="choc.facilities",
             pin=hash_pin("2468"),
             active=True,
+            role="director",
         )
-        db.session.add_all([admin, tech, client])
+        floor = ClientUser(
+            hospital_id=choc.id,
+            name="CHOC Floor",
+            username="choc.floor",
+            pin=hash_pin("1357"),
+            active=True,
+            role="tech",
+        )
+        db.session.add_all([admin, tech, client, floor])
         db.session.flush()
-        db.session.add(Job(ahu_id=ahu.id, tech_id=tech.id, overall_notes="internal"))
+        job = Job(ahu_id=ahu.id, tech_id=tech.id, overall_notes="internal")
+        db.session.add(job)
+        db.session.flush()
+        pre = Filter.query.filter_by(ahu_id=ahu.id, phase="PRE").first()
+        db.session.add(
+            JobFilter(
+                job_id=job.id,
+                filter_id=pre.id,
+                is_completed=False,
+                is_inspected=True,
+                note="No access — held for next visit.",
+            )
+        )
         db.session.commit()
         return {
             "choc_id": choc.id,
@@ -142,6 +163,7 @@ def seed(app):
             "admin_id": admin.id,
             "tech_id": tech.id,
             "client_id": client.id,
+            "floor_id": floor.id,
         }
 
 
@@ -169,6 +191,7 @@ def main():
     token = login.get_json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
     assert_eq(login.get_json()["hospital_name"], "CHOC", "login names the hospital")
+    assert_eq(login.get_json()["role"], "director", "facilities login is director")
 
     me = client.get("/api/client/me", headers=headers)
     assert_eq(me.status_code, 200, "me")
@@ -191,6 +214,10 @@ def main():
     assert "269.50" not in blob and "unit_price" not in blob, "no prices in detail"
     assert "SECRET-PN" not in blob, "part numbers stay off the client payload"
     assert "internal" not in blob, "job notes stay off"
+    comments = detail.get("comments") or []
+    assert comments, "held-filter comments are on the unit page"
+    assert any("No access" in (c.get("text") or "") for c in comments), "skip reason is visible"
+    assert all("tech_id" not in c and "technician" not in c for c in comments), "comments hide tech identity"
     phases = sorted(f["phase"] for f in detail["filters"])
     assert_eq(phases, ["FINAL", "PRE"], "both filters")
     labels = {f["phase"]: f["frequency_label"] for f in detail["filters"]}
@@ -213,7 +240,9 @@ def main():
     blob = str(card)
     assert "SECRET-PN" not in blob and "F8V4-2424-GWB" not in blob, "sticker hides catalog PNs"
     assert "269.50" not in blob and "unit_price" not in blob, "sticker hides prices"
-    assert "internal" not in blob and "notes" not in blob, "sticker hides notes"
+    assert "internal" not in blob, "sticker hides job notes"
+    assert "No access" not in blob, "sticker hides skip comments"
+    assert "comments" not in card, "sticker has no comment list"
     assert "hospital_id" not in card, "sticker hides hospital id"
     assert card["hospital"] == "CHOC", "sticker hospital name"
     assert card["name"] == "AHU-E2", "sticker AHU name"
@@ -299,7 +328,30 @@ def main():
         f"/api/admin/hospitals/{ids['choc_id']}/clients",
         headers=admin_headers,
     ).get_json()
-    assert_eq(len(listed), 2, "two portal logins")
+    assert_eq(len(listed), 3, "director, floor tech, and new login")
+
+    staff_login = client.post("/api/client/login", json={"username": "choc.floor", "pin": "1357"})
+    assert_eq(staff_login.status_code, 200, "hospital tech login")
+    assert_eq(staff_login.get_json()["role"], "tech", "floor login is hospital tech")
+    staff_headers = {"Authorization": f"Bearer {staff_login.get_json()['token']}"}
+    staff_ahus = client.get("/api/client/ahus", headers=staff_headers)
+    assert_eq(staff_ahus.status_code, 200, "hospital tech can list units")
+    staff_detail = client.get(f"/api/client/ahus/{ids['ahu_id']}", headers=staff_headers)
+    assert_eq(staff_detail.status_code, 200, "hospital tech can open a unit")
+    assert any("No access" in (c.get("text") or "") for c in staff_detail.get_json().get("comments") or []), "hospital tech sees skip comments"
+    assert_eq(client.get("/api/client/graphs", headers=staff_headers).status_code, 403, "hospital tech cannot graphs")
+    assert_eq(client.get("/api/client/hospital", headers=staff_headers).status_code, 403, "hospital tech cannot director home")
+    assert_eq(client.get("/api/client/datasheet", headers=staff_headers).status_code, 403, "hospital tech cannot datasheet")
+    staff_contact = client.post(
+        "/api/client/contact",
+        headers=staff_headers,
+        json={"message": "please let me change the filters now"},
+    )
+    assert_eq(staff_contact.status_code, 403, "hospital tech cannot send director contact")
+    sheet = client.get("/api/client/datasheet", headers=headers)
+    assert_eq(sheet.status_code, 200, "director datasheet")
+    sheet_blob = str(sheet.get_json())
+    assert "SECRET-PN" not in sheet_blob and "269.50" not in sheet_blob, "datasheet has no PNs or prices"
 
     reset = client.patch(
         f"/api/admin/clients/{created.get_json()['id']}",

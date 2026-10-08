@@ -73,6 +73,8 @@ def _authenticate_client():
         g.current_client = client
         g.current_client_id = client.id
         g.current_hospital_id = client.hospital_id
+        role = str(getattr(client, "role", None) or "director").strip().lower()
+        g.current_client_role = "tech" if role in ("tech", "technician", "staff") else "director"
     except Exception:
         return jsonify({"error": "Authentication failed"}), 401
 
@@ -115,6 +117,21 @@ def require_client(f):
         err = _authenticate_client()
         if err is not None:
             return err
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def require_director(f):
+    """Hospital director only. Hospital-tech logins cannot use graphs, contact, or exports."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        err = _authenticate_client()
+        if err is not None:
+            return err
+        if getattr(g, "current_client_role", "director") != "director":
+            return jsonify({"error": "Director access required"}), 403
         return f(*args, **kwargs)
 
     return decorated_function

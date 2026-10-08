@@ -6,12 +6,14 @@ from .auth import (
     require_admin,
     require_auth,
     require_client,
+    require_director,
 )
 
 __all__ = [
     "require_auth",
     "require_admin",
     "require_client",
+    "require_director",
     "current_tech_id",
     "current_hospital_id",
     "is_admin",
