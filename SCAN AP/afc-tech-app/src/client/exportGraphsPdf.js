@@ -1,4 +1,5 @@
 import { AFC_COMPANY_NAME, DEFAULT_AFC_LOGO_PATH } from "../utils/qrLabels";
+import { printHtmlDocument } from "./printHtml";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -33,13 +34,7 @@ export function exportClientGraphsPdf({ hospitalName, summary, frequencies, char
     ["Overdue", summary?.overdue ?? "—"],
   ];
 
-  const win = window.open("", "_blank", "noopener,noreferrer,width=1024,height=768");
-  if (!win) {
-    alert("Allow pop-ups to export the PDF.");
-    return;
-  }
-
-  win.document.write(`<!DOCTYPE html>
+  printHtmlDocument(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -100,12 +95,6 @@ export function exportClientGraphsPdf({ hospitalName, summary, frequencies, char
       })
       .join("")}
   </div>
-  <script>
-    window.addEventListener("load", function () {
-      setTimeout(function () { window.print(); }, 400);
-    });
-  </script>
 </body>
 </html>`);
-  win.document.close();
 }

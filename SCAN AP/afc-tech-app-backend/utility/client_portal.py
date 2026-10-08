@@ -2,7 +2,9 @@
 from collections import defaultdict
 from datetime import date, timedelta
 
-from models import AHU, Job
+import re
+
+from models import AHU, Filter, Job, JobFilter
 from utility.status import compute_filter_status
 
 
@@ -193,7 +195,105 @@ def public_ahu_detail(ahu):
     filters = active_filters(ahu)
     payload = public_ahu_summary(ahu)
     payload["filters"] = [public_filter(f) for f in filters]
+    payload["comments"] = ahu_service_comments(ahu)
     return payload
+
+
+def _sanitize_comment(value, max_len=800):
+    s = re.sub(r"<[^>]*>", " ", str(value or ""))
+    s = re.sub(r"\s+", " ", s).strip()
+    if not s:
+        return None
+    return s[:max_len]
+
+
+def ahu_service_comments(ahu, limit=20):
+    """Tech notes on why a filter was held / not replaced. No tech names, GPS, or prices."""
+    if ahu is None or not getattr(ahu, "id", None):
+        return []
+    from db import db
+
+    rows = (
+        db.session.query(JobFilter, Job, Filter)
+        .join(Job, Job.id == JobFilter.job_id)
+        .join(Filter, Filter.id == JobFilter.filter_id)
+        .filter(Job.ahu_id == ahu.id)
+        .filter(JobFilter.is_completed.is_(False))
+        .filter(JobFilter.note.isnot(None))
+        .order_by(Job.completed_at.desc(), JobFilter.id.desc())
+        .limit(80)
+        .all()
+    )
+    out = []
+    for jf, job, filt in rows:
+        text = _sanitize_comment(jf.note)
+        if not text:
+            continue
+        when = job.completed_at
+        if when is not None and hasattr(when, "date"):
+            when = when.date().isoformat()
+        elif when is not None:
+            when = str(when)[:10]
+        else:
+            when = None
+        out.append({
+            "at": when,
+            "filter": filt.phase if filt else None,
+            "held": not bool(jf.is_completed),
+            "text": text,
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def hospital_overview(ahus):
+    """Director dashboard extras: still status-only, no catalog or money."""
+    overdue = []
+    due_soon = []
+    for ahu in ahus or []:
+        row = public_ahu_summary(ahu)
+        if row["status"] == "Overdue":
+            overdue.append(row)
+        elif row["status"] == "Due Soon":
+            due_soon.append(row)
+    ahus_n = len(ahus or [])
+    compliant = sum(1 for a in (ahus or []) if public_ahu_summary(a)["status"] == "Completed")
+    return {
+        "compliance_pct": int(round((100.0 * compliant / ahus_n))) if ahus_n else 0,
+        "overdue_units": overdue[:12],
+        "due_soon_units": due_soon[:12],
+    }
+
+
+def hospital_datasheet(hospital, ahus):
+    """Technical equipment sheet: sizes, qty, frequencies. No PNs, prices, or comments."""
+    groups = []
+    index = {}
+    for ahu in ahus or []:
+        bname = ahu.building.name if ahu.building else "Unassigned"
+        if bname not in index:
+            index[bname] = len(groups)
+            groups.append({"building": bname, "units": []})
+        groups[index[bname]]["units"].append({
+            "name": ahu.name,
+            "location": ahu.location,
+            "status": ahu_status_from_filters(active_filters(ahu))["status"],
+            "filters": [
+                {
+                    "phase": f.phase,
+                    "size": f.size,
+                    "quantity": f.quantity,
+                    "frequency_label": frequency_label(f.frequency_days),
+                }
+                for f in active_filters(ahu)
+            ],
+        })
+    return {
+        "hospital": hospital.name if hospital else None,
+        "city": getattr(hospital, "city", None) if hospital else None,
+        "buildings": groups,
+    }
 
 
 def _latest_service(filters):

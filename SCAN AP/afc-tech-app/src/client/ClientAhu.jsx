@@ -116,6 +116,33 @@ export default function ClientAhu() {
       </div>
       )}
 
+      <section className="space-y-2 pt-2">
+        <h3 className="font-semibold">Technician comments</h3>
+        <p className="text-xs text-base-content/60">
+          Reasons AFC recorded when a filter was not replaced. You can read these; you cannot edit them.
+        </p>
+        {(ahu.comments || []).length === 0 ? (
+          <textarea
+            className="textarea textarea-bordered w-full min-h-24 bg-base-100"
+            readOnly
+            value="No comments on this unit."
+          />
+        ) : (
+          (ahu.comments || []).map((c, i) => (
+            <label key={`${c.at || "c"}-${i}`} className="form-control">
+              <span className="label-text text-xs text-base-content/50">
+                {[c.filter, c.held ? "not replaced" : "note", prettyDate(c.at)].filter(Boolean).join(" · ")}
+              </span>
+              <textarea
+                className="textarea textarea-bordered w-full min-h-24 bg-base-100"
+                readOnly
+                value={c.text || ""}
+              />
+            </label>
+          ))
+        )}
+      </section>
+
       <div className="flex gap-2 pt-2">
         <Link className="btn btn-ghost" to="/client/units">
           All units

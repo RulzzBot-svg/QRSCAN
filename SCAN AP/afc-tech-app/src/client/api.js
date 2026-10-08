@@ -33,6 +33,11 @@ ClientAPI.interceptors.response.use(
   }
 );
 
+export function isClientDirector(user = readClientUser()) {
+  const role = String(user?.role || "director").toLowerCase();
+  return role !== "tech" && role !== "technician" && role !== "staff";
+}
+
 export function readClientUser() {
   try {
     const raw = localStorage.getItem(CLIENT_USER_KEY);
@@ -74,6 +79,7 @@ export const getClientAhus = () => ClientAPI.get("/client/ahus");
 export const getClientAhu = (id) => ClientAPI.get(`/client/ahus/${id}`);
 export const getClientGraphs = () => ClientAPI.get("/client/graphs");
 export const sendClientContact = (payload) => ClientAPI.post("/client/contact", payload);
+export const getClientDatasheet = () => ClientAPI.get("/client/datasheet");
 
 export function getPublicUnit(ahuId) {
   const id = String(ahuId ?? "").replace(/[^\d]/g, "");

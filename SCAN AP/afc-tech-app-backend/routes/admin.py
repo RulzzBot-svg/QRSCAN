@@ -775,6 +775,13 @@ def import_surveys():
             pass
 
 
+def _portal_role(raw):
+    role = str(raw or "director").strip().lower()
+    if role in ("tech", "technician", "staff"):
+        return "tech"
+    return "director"
+
+
 def _client_admin_dict(c):
     return {
         "id": c.id,
@@ -782,6 +789,7 @@ def _client_admin_dict(c):
         "name": c.name,
         "username": c.username,
         "active": bool(c.active),
+        "role": _portal_role(getattr(c, "role", None)),
     }
 
 
@@ -830,6 +838,7 @@ def create_hospital_client(hospital_id):
         username=username,
         pin=hash_pin(pin),
         active=True,
+        role=_portal_role(data.get("role")),
     )
     db.session.add(client)
     db.session.commit()
@@ -850,6 +859,8 @@ def update_hospital_client(client_id):
             client.name = name
     if "active" in data:
         client.active = bool(data["active"])
+    if "role" in data and data["role"] is not None:
+        client.role = _portal_role(data["role"])
     if "pin" in data and data["pin"]:
         pin = str(data["pin"])
         if len(pin) < 4:

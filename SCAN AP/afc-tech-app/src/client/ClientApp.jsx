@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { clearClientSession, hasClientToken, readClientUser } from "./api";
+import { clearClientSession, hasClientToken, isClientDirector, readClientUser } from "./api";
 import {
   applyClientTheme,
   clearDocumentTheme,
@@ -10,12 +10,18 @@ import {
 } from "./theme";
 import ThemeToggle from "./ThemeToggle";
 
-const NAV = [
+const DIRECTOR_NAV = [
   { to: "/client", label: "Home", end: true, icon: HomeIcon },
   { to: "/client/units", label: "Units", icon: UnitsIcon },
   { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
   { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
-  { to: "/client/contact", label: "Contact", icon: ContactIcon },
+  { to: "/client/help", label: "Guide", icon: HelpIcon },
+];
+
+const STAFF_NAV = [
+  { to: "/client/units", label: "Units", icon: UnitsIcon },
+  { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
+  { to: "/client/help", label: "Guide", icon: HelpIcon },
 ];
 
 export default function ClientApp() {
@@ -42,9 +48,26 @@ export default function ClientApp() {
     return () => clearDocumentTheme();
   }, [theme]);
 
+  useEffect(() => {
+    if (!hasClientToken() || !user) return;
+    if (isClientDirector(user)) return;
+    const path = location.pathname;
+    if (
+      path === "/client" ||
+      path === "/client/" ||
+      path.startsWith("/client/graphs") ||
+      path.startsWith("/client/contact") ||
+      path.startsWith("/client/datasheet")
+    ) {
+      navigate("/client/units", { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
+
   if (!hasClientToken() || !user) return null;
 
   const hospital = user.hospital_name || "Hospital portal";
+  const director = isClientDirector(user);
+  const nav = director ? DIRECTOR_NAV : STAFF_NAV;
 
   return (
     <div data-theme={theme} className="min-h-dvh bg-base-200 text-base-content">
@@ -54,9 +77,12 @@ export default function ClientApp() {
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-primary">AFC</p>
             <h1 className="font-bold text-lg leading-tight mt-1">Hospital Portal</h1>
             <p className="text-sm text-base-content/60 mt-1">{hospital}</p>
+            <p className="text-[11px] text-base-content/50 mt-1">
+              {director ? "Director" : "Hospital technician"} · read-only
+            </p>
           </div>
           <nav className="flex-1 p-3 space-y-1">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -115,8 +141,8 @@ export default function ClientApp() {
           </main>
 
           <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
-            <div className="grid grid-cols-5 h-16">
-              {NAV.map((item) => (
+            <div className={`grid h-16 ${director ? "grid-cols-5" : "grid-cols-3"}`}>
+              {nav.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
@@ -188,11 +214,12 @@ function GraphIcon({ className }) {
   );
 }
 
-function ContactIcon({ className }) {
+function HelpIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 6h16v12H4z" />
-      <path d="m4 7 8 6 8-6" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.8.4-1.2.9-1.2 1.6V14" />
+      <path d="M12 17h.01" />
     </svg>
   );
 }

@@ -1,5 +1,6 @@
 import { AFC_COMPANY_NAME, DEFAULT_AFC_LOGO_PATH } from "../utils/qrLabels";
 import { prettyDate } from "./format";
+import { printHtmlDocument } from "./printHtml";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -40,12 +41,6 @@ export function exportInspectionPdf({ hospitalName, summary, ahus }) {
     ["Overdue", summary?.overdue ?? "—"],
   ];
 
-  const win = window.open("", "_blank", "noopener,noreferrer,width=1024,height=768");
-  if (!win) {
-    alert("Allow pop-ups to export the PDF.");
-    return;
-  }
-
   const tables = groups
     .map((group) => {
       const rows = group.units
@@ -77,7 +72,7 @@ export function exportInspectionPdf({ hospitalName, summary, ahus }) {
     })
     .join("");
 
-  win.document.write(`<!DOCTYPE html>
+  printHtmlDocument(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -124,14 +119,8 @@ export function exportInspectionPdf({ hospitalName, summary, ahus }) {
       .join("")}
   </div>
   ${tables || "<p class='note'>No units on file for this hospital.</p>"}
-  <script>
-    window.addEventListener("load", function () {
-      setTimeout(function () { window.print(); }, 400);
-    });
-  </script>
 </body>
 </html>`);
-  win.document.close();
 }
 
 export function groupAhusByBuilding(ahus) {

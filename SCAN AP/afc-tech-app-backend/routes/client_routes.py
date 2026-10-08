@@ -6,12 +6,14 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from db import db
 from extensions import limiter
-from middleware.auth import require_client
+from middleware.auth import require_client, require_director
 from middleware.jwt_utils import create_access_token, token_string
 from middleware.pin_utils import hash_pin, is_hashed, verify_pin
 from models import AHU, ClientInquiry, ClientUser, Hospital
 from utility.client_portal import (
+    hospital_datasheet,
     hospital_graphs,
+    hospital_overview,
     public_ahu_detail,
     public_ahu_summary,
     sticker_card,
@@ -22,6 +24,13 @@ from utility.http import internal_error
 client_bp = Blueprint("client", __name__)
 
 
+def _portal_role(client):
+    role = str(getattr(client, "role", None) or "director").strip().lower()
+    if role in ("tech", "technician", "staff"):
+        return "tech"
+    return "director"
+
+
 def _client_dict(client):
     hospital = client.hospital
     return {
@@ -30,6 +39,7 @@ def _client_dict(client):
         "username": client.username,
         "hospital_id": client.hospital_id,
         "hospital_name": hospital.name if hospital else None,
+        "role": _portal_role(client),
     }
 
 
@@ -97,18 +107,22 @@ def _clean_text(value, max_len):
 
 
 @client_bp.route("/client/hospital", methods=["GET"])
-@require_client
+@require_director
 def client_hospital():
     hospital = db.session.get(Hospital, g.current_hospital_id)
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
     ahus = _hospital_ahus(hospital.id)
     graphs = hospital_graphs(hospital.id, ahus)
+    overview = hospital_overview(ahus)
     return jsonify({
         "id": hospital.id,
         "name": hospital.name,
         "city": hospital.city,
         "summary": graphs["summary"],
+        "compliance_pct": overview["compliance_pct"],
+        "overdue_units": overview["overdue_units"],
+        "due_soon_units": overview["due_soon_units"],
     }), 200
 
 
@@ -152,10 +166,20 @@ def client_ahu(ahu_id):
 
 
 @client_bp.route("/client/graphs", methods=["GET"])
-@require_client
+@require_director
 def client_graphs():
     ahus = _hospital_ahus(g.current_hospital_id)
     return jsonify(hospital_graphs(g.current_hospital_id, ahus)), 200
+
+
+@client_bp.route("/client/datasheet", methods=["GET"])
+@require_director
+def client_datasheet():
+    hospital = db.session.get(Hospital, g.current_hospital_id)
+    if not hospital:
+        return jsonify({"error": "Hospital not found"}), 404
+    ahus = _hospital_ahus(hospital.id)
+    return jsonify(hospital_datasheet(hospital, ahus)), 200
 
 
 @client_bp.route("/public/units/<int:ahu_id>", methods=["GET"])
@@ -180,7 +204,7 @@ def public_unit_sticker(ahu_id):
 
 
 @client_bp.route("/client/contact", methods=["POST"])
-@require_client
+@require_director
 @limiter.limit("5 per hour")
 def client_contact():
     data = request.get_json(silent=True) or {}

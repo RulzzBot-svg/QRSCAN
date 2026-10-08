@@ -69,11 +69,12 @@ export default function ClientHome() {
       </section>
       <InstallHint />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat label="AHUs" value={summary.ahus || 0} />
         <Stat label="On schedule" value={summary.compliant || 0} tone="success" />
         <Stat label="Due soon" value={summary.due_soon || 0} tone="warning" />
         <Stat label="Overdue" value={summary.overdue || 0} tone="error" />
+        <Stat label="Compliance" value={`${hospital?.compliance_pct ?? 0}%`} />
       </div>
 
       <Link
@@ -102,7 +103,13 @@ export default function ClientHome() {
             <p className="text-sm text-base-content/60">Compliance mix, buildings, and visits.</p>
           </div>
         </Link>
-        <Link to="/client/contact" className="card bg-base-100 border border-base-300 md:col-span-2">
+        <Link to="/client/datasheet" className="card bg-base-100 border border-base-300">
+          <div className="card-body p-5">
+            <h3 className="font-semibold">Technical datasheet</h3>
+            <p className="text-sm text-base-content/60">Sizes, quantities, frequencies — plus an IT brief to print.</p>
+          </div>
+        </Link>
+        <Link to="/client/contact" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Call or email AFC</h3>
             <p className="text-sm text-base-content/60">
@@ -110,7 +117,32 @@ export default function ClientHome() {
             </p>
           </div>
         </Link>
+        <Link to="/client/help" className="card bg-base-100 border border-base-300 md:col-span-2">
+          <div className="card-body p-5">
+            <h3 className="font-semibold">How to use</h3>
+            <p className="text-sm text-base-content/60">Short guide for directors and hospital staff.</p>
+          </div>
+        </Link>
       </div>
+
+      {(hospital?.overdue_units || []).length ? (
+        <section className="rounded-2xl bg-base-100 border border-base-300 p-5">
+          <h3 className="font-semibold mb-3">Needs attention</h3>
+          <ul className="space-y-2">
+            {hospital.overdue_units.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+                <Link className="link link-primary font-medium" to={`/client/ahu/${a.id}`}>
+                  {a.name}
+                </Link>
+                <span className="text-xs text-base-content/50 truncate">
+                  {[a.building, a.location].filter(Boolean).join(" · ")}
+                </span>
+                <StatusBadge status={a.status} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="flex items-center gap-2 text-xs text-base-content/50">
         <StatusBadge status="Completed" />

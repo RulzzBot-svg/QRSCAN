@@ -45,6 +45,7 @@ def ensure_schema():
         )
         """,
         "CREATE INDEX IF NOT EXISTS ix_client_users_hospital_id ON client_users (hospital_id)",
+        "ALTER TABLE client_users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'director'",
         """
         CREATE TABLE IF NOT EXISTS client_inquiries (
             id SERIAL PRIMARY KEY,
