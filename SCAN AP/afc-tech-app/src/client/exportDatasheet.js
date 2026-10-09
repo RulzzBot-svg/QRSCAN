@@ -106,7 +106,7 @@ export function exportItBrief({ hospitalName }) {
   <p>AFC’s hospital portal is a read-only website (and optional home-screen app) that shows filter status for <strong>this hospital only</strong>. It is not a work-order system. Hospital users cannot add, edit, or delete air-handler or filter records.</p>
   <h2>Accounts</h2>
   <ul>
-    <li><strong>Director</strong> — dashboard, graphs, inspection PDF, technical datasheet, contact AFC, how-to, and unit/scan views.</li>
+    <li><strong>Director</strong> — dashboard, graphs PDF, technical datasheet, technical packet, contact AFC, how-to, and unit/scan views.</li>
     <li><strong>Hospital technician</strong> — camera scan and unit list only, plus the how-to page. No graphs, exports, or contact form.</li>
   </ul>
   <p>Logins use a username and PIN issued by AFC. Sessions expire automatically. A director login cannot see another hospital. A hospital technician login cannot use director tools.</p>

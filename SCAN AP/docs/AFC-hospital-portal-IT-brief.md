@@ -1,60 +1,43 @@
 # AFC Hospital Portal — information for hospital IT
 
 Advanced Filtration Concepts (AFC)  
-323.832.8316
+323.832.8316  
+Document: **AFC-HP-TIP-001** v2.0
 
-This brief describes the **hospital client portal** only. It is a read-only status site for the hospital that holds the login. It is not AFC’s technician job app and it cannot change survey data.
+This brief is the cover sheet. The full control mapping, API inventory, and residual-risk statement are in `hospital-portal-architecture.md` and in the in-app **Technical packet PDF** (Docs → Technical packet → Download PDF).
 
-## Purpose
+## What to file
 
-Facilities directors and hospital technicians can see filter status, due dates, and (when recorded) why a filter was not replaced. They can print an inspection snapshot and a technical datasheet. They cannot edit air handlers, filters, prices, or jobs.
+Hospital IS / Privacy typically want, for a non-clinical vendor:
+
+1. System description and data-flow / tenant isolation  
+2. **HIPAA determination** — does it create, receive, maintain, or transmit PHI? (45 CFR 160.103; HHS business-associate guidance)  
+3. Technical safeguards analogous to **45 CFR 164.312**, mapped via **NIST SP 800-66r2**  
+4. IAM (unique IDs, authenticator, session timeout, RBAC, SSO/MFA status)  
+5. API inventory and public endpoints  
+6. Transport (TLS, CORS, security headers) and rate limits  
+7. Logging honesty (this is not an ePHI audit log)  
+8. Residual risk (no SAML/MFA; sticker GET is unauthenticated equipment status)
+
+## Determination (short)
+
+The portal shows HVAC equipment and filter PM status for one hospital. It does **not** store patient identifiers or clinical information. For this application AFC is not acting as a HIPAA business associate. Hospital counsel decides whether any other AFC relationship still needs a BAA.
 
 ## Accounts
 
-| Role | What they can do |
+| Role | Access |
 | --- | --- |
-| **Director** | Home dashboard, unit list, QR scan, graphs, inspection PDF, technical datasheet, IT brief, how-to, contact AFC |
-| **Hospital technician** | Unit list, QR scan, filter pages (including read-only comments), how-to |
+| **Director** | Home, units, scan, graphs (PDF export), datasheet (PDF), technical packet (PDF), contact |
+| **Hospital technician** | Units, scan, how-to |
 
-Logins are a username and PIN issued by AFC. Each login is bound to **one hospital**. A session token expires automatically. Portal tokens are rejected by AFC technician and admin APIs.
+Username + PIN issued by AFC, bcrypt stored, JWT `typ=client` expires in 12 hours. Role is enforced on the server.
 
-## Data shown
+## Facilities note
 
-- AHU name, building, location
-- Filter stage, size, quantity, change frequency
-- Last serviced, next due, on-schedule / due soon / overdue
-- Read-only technician comments when a filter was held or not replaced
+Filter frequencies support facilities operations in the spirit of **ANSI/ASHRAE/ASHE 170** and **Guideline 43-2025**. The portal is **not** a Joint Commission inspection record. Graph PDF is a status chart only.
 
-## Data not shown and not writable
+## Network (short)
 
-- No prices, invoices, purchase orders, or catalog part numbers
-- No GPS, AFC technician names, or internal job files
-- No ability to add, edit, or delete units or filters
-- Logged-out QR stickers show status only (no comments, no login, no writes)
-
-## Access model
-
-- HTTPS web application; optional Add to Home Screen (PWA) for the portal path
-- Hospital-scoped API
-- Login and public sticker endpoints are rate-limited
-- Public sticker is GET-only
-- No protected health information is stored in this portal
-
-## Technical datasheet
-
-The datasheet lists each AHU’s filter stages, sizes, quantities, and change frequencies for Joint Commission / facilities files. It does not include catalog part numbers or commercial terms.
-
-## Where to open this in the app
-
-Directors: sign in at `/client/login`, then open **Docs**. Tabs:
-
-- How to use
-- Datasheet (equipment list)
-- IT brief (this document)
-- Technical docs (architecture and APIs)
-
-Hospital technicians only see How to use.
-
-The same files live in the repo under `SCAN AP/docs/`.
+HTTPS, CORS allowlist, `X-Frame-Options: DENY`, login 5/15 min, public sticker GET 30/min, contact 5/hour. No catalog PNs, prices, GPS, or writes.
 
 Questions: AFC, 323.832.8316.

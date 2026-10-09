@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getClientAhus, getClientGraphs, getClientHospital, isClientDirector } from "./api";
+import { getClientAhus } from "./api";
 import { prettyDate } from "./format";
 import { StatusBadge } from "./StatusBadge";
-import { exportInspectionPdf, groupAhusByBuilding } from "./exportInspectionPdf";
+import { groupAhusByBuilding } from "./groupAhus";
 
 export default function ClientUnits() {
   const [ahus, setAhus] = useState([]);
@@ -11,7 +11,6 @@ export default function ClientUnits() {
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,22 +40,6 @@ export default function ClientUnits() {
 
   const groups = useMemo(() => groupAhusByBuilding(shown), [shown]);
 
-  const downloadSnapshot = async () => {
-    setExporting(true);
-    try {
-      const [hospitalRes, graphsRes] = await Promise.all([getClientHospital(), getClientGraphs()]);
-      exportInspectionPdf({
-        hospitalName: hospitalRes.data?.name,
-        summary: graphsRes.data?.summary,
-        ahus,
-      });
-    } catch {
-      alert("Could not build the inspection snapshot.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -69,18 +52,11 @@ export default function ClientUnits() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">Units</h2>
-          <p className="text-sm text-base-content/60">
-            Grouped by building, in walk order. {ahus.length} AHUs at this hospital.
-          </p>
-        </div>
-        {isClientDirector() ? (
-          <button type="button" className="btn btn-outline btn-sm" onClick={downloadSnapshot} disabled={exporting}>
-            {exporting ? "Preparing…" : "Inspection PDF"}
-          </button>
-        ) : null}
+      <div>
+        <h2 className="text-xl font-bold">Units</h2>
+        <p className="text-sm text-base-content/60">
+          Grouped by building, in walk order. {ahus.length} AHUs at this hospital.
+        </p>
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
         <input
