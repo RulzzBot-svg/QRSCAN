@@ -1,7 +1,7 @@
 // main.jsx
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import App from "./App";
 import HospitalCards from "./components/common/HospitalCards";
 import AHU from "./components/common/AHU";
@@ -31,7 +31,6 @@ import ClientAhu from "./client/ClientAhu";
 import ClientGraphs from "./client/ClientGraphs";
 import ClientContact from "./client/ClientContact";
 import ClientHelp from "./client/ClientHelp";
-import ClientDatasheet from "./client/ClientDatasheet";
 import ClientDocs from "./client/ClientDocs";
 import { applyPwaManifest } from "./client/pwa";
 import { registerSW } from "virtual:pwa-register";
@@ -91,7 +90,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="graphs" element={<ClientGraphs />} />
           <Route path="contact" element={<ClientContact />} />
           <Route path="help" element={<ClientHelp />} />
-          <Route path="datasheet" element={<ClientDatasheet />} />
+          <Route path="datasheet" element={<Navigate to="/client" replace />} />
           <Route path="docs" element={<ClientDocs />} />
         </Route>
 

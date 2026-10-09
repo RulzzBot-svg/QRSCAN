@@ -45,8 +45,8 @@ export default function ClientHome() {
       <section>
         <h2 className="text-2xl font-bold">{hospital?.name}</h2>
         <p className="text-sm text-base-content/60 mt-1">
-          Filter status only — no pricing, invoices, or job notes. Export graphs from Graphs; the
-          technical packet PDF is under Docs.
+          Filter status only — no pricing, invoices, or job notes. Graphs export and the technical
+          packet PDF are under Graphs and Docs.
         </p>
       </section>
       <InstallHint />
@@ -85,12 +85,6 @@ export default function ClientHome() {
             <p className="text-sm text-base-content/60">Compliance mix, buildings, and visits.</p>
           </div>
         </Link>
-        <Link to="/client/docs?tab=datasheet" className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h3 className="font-semibold">Technical datasheet</h3>
-            <p className="text-sm text-base-content/60">Stages, sizes, quantities, frequencies — downloadable PDF.</p>
-          </div>
-        </Link>
         <Link to="/client/contact" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Call or email AFC</h3>
@@ -102,15 +96,7 @@ export default function ClientHome() {
         <Link to="/client/docs" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Documentation</h3>
-            <p className="text-sm text-base-content/60">How to use, datasheet, and the hospital-IT technical packet (PDF).</p>
-          </div>
-        </Link>
-        <Link to="/client/docs?tab=tech" className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h3 className="font-semibold">Technical packet (PDF)</h3>
-            <p className="text-sm text-base-content/60">
-              Architecture, HIPAA determination, 45 CFR 164.312 mapping, APIs — for hospital IT / IS.
-            </p>
+            <p className="text-sm text-base-content/60">How to use, and a download button for the hospital-IT PDF.</p>
           </div>
         </Link>
       </div>

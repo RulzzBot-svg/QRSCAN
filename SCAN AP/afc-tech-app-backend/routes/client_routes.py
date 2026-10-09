@@ -11,7 +11,6 @@ from middleware.jwt_utils import create_access_token, token_string
 from middleware.pin_utils import hash_pin, is_hashed, verify_pin
 from models import AHU, ClientInquiry, ClientUser, Hospital
 from utility.client_portal import (
-    hospital_datasheet,
     hospital_graphs,
     hospital_overview,
     public_ahu_detail,
@@ -123,7 +122,6 @@ def client_hospital():
         "compliance_pct": overview["compliance_pct"],
         "overdue_units": overview["overdue_units"],
         "due_soon_units": overview["due_soon_units"],
-        "datasheet": hospital_datasheet(hospital, ahus),
     }), 200
 
 
@@ -171,16 +169,6 @@ def client_ahu(ahu_id):
 def client_graphs():
     ahus = _hospital_ahus(g.current_hospital_id)
     return jsonify(hospital_graphs(g.current_hospital_id, ahus)), 200
-
-
-@client_bp.route("/client/datasheet", methods=["GET"])
-@require_director
-def client_datasheet():
-    hospital = db.session.get(Hospital, g.current_hospital_id)
-    if not hospital:
-        return jsonify({"error": "Hospital not found"}), 404
-    ahus = _hospital_ahus(hospital.id)
-    return jsonify(hospital_datasheet(hospital, ahus)), 200
 
 
 @client_bp.route("/public/units/<int:ahu_id>", methods=["GET"])

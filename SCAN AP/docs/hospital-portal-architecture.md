@@ -2,7 +2,7 @@
 
 Version 2.0. Vendor documentation for hospital Information Security, Privacy, Clinical Engineering, and Facilities. **Not PHI. Not legal advice. Not an accreditation instrument.**
 
-The same packet is generated as PDF from the portal: **Docs → Technical packet → Download PDF**.
+The same packet is generated as PDF from the portal: **Docs → Download PDF**. It is not rendered on the website.
 
 ## Purpose and scope
 
@@ -40,7 +40,7 @@ Tenant isolation: `g.current_hospital_id` from the authenticated row, not from J
 | POST | `/api/client/login` | Public | 5 / 15 min |
 | GET | `/api/client/me` | Portal | default |
 | GET | `/api/client/ahus`, `/ahus/<id>` | Portal | default |
-| GET | `/api/client/hospital`, `/graphs`, `/datasheet` | Director | default |
+| GET | `/api/client/hospital`, `/graphs` | Director | default |
 | POST | `/api/client/contact` | Director | 5 / hour |
 | GET | `/api/public/units/<id>` | Public GET | 30 / min |
 

@@ -341,21 +341,17 @@ def main():
     assert any("No access" in (c.get("text") or "") for c in staff_detail.get_json().get("comments") or []), "hospital tech sees skip comments"
     assert_eq(client.get("/api/client/graphs", headers=staff_headers).status_code, 403, "hospital tech cannot graphs")
     assert_eq(client.get("/api/client/hospital", headers=staff_headers).status_code, 403, "hospital tech cannot director home")
-    assert_eq(client.get("/api/client/datasheet", headers=staff_headers).status_code, 403, "hospital tech cannot datasheet")
+    assert_eq(client.get("/api/client/datasheet", headers=staff_headers).status_code, 404, "no portal datasheet dump")
     staff_contact = client.post(
         "/api/client/contact",
         headers=staff_headers,
         json={"message": "please let me change the filters now"},
     )
     assert_eq(staff_contact.status_code, 403, "hospital tech cannot send director contact")
-    sheet = client.get("/api/client/datasheet", headers=headers)
-    assert_eq(sheet.status_code, 200, "director datasheet")
-    sheet_blob = str(sheet.get_json())
-    assert "SECRET-PN" not in sheet_blob and "269.50" not in sheet_blob, "datasheet has no PNs or prices"
-    assert sheet.get_json().get("buildings"), "datasheet lists buildings"
+    assert_eq(client.get("/api/client/datasheet", headers=headers).status_code, 404, "director has no datasheet dump")
     home = client.get("/api/client/hospital", headers=headers)
     assert_eq(home.status_code, 200, "director hospital payload")
-    assert home.get_json().get("datasheet", {}).get("buildings"), "datasheet is also on hospital home"
+    assert "datasheet" not in home.get_json(), "hospital home does not include a full datasheet dump"
 
     reset = client.patch(
         f"/api/admin/clients/{created.get_json()['id']}",
