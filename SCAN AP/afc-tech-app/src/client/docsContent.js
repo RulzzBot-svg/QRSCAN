@@ -29,7 +29,7 @@ export const TECH_PACKET = {
       ],
       bullets: [
         "In scope: authentication, authorization, tenant isolation, data elements, APIs, transport security, rate limits, residual risk.",
-        "Out of scope: AFC technician job submission, catalog pricing, QuickBooks, admin import tools, and any write path against the survey.",
+        "Out of scope: AFC technician job submission, catalog pricing, admin import tools, and any write path.",
       ],
     },
     {
