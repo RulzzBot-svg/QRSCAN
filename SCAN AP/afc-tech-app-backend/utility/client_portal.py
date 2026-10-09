@@ -1,6 +1,6 @@
 """Read-only hospital portal payloads. No prices, invoices, GPS, or tech names."""
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import re
 
@@ -263,7 +263,74 @@ def hospital_overview(ahus):
         "compliance_pct": int(round((100.0 * compliant / ahus_n))) if ahus_n else 0,
         "overdue_units": overdue[:12],
         "due_soon_units": due_soon[:12],
+        "recent_changeouts": recent_changeouts(ahus),
     }
+
+
+def _as_date(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return None
+
+
+def recent_changeouts(ahus, limit=3):
+    """Last completed replacements at this hospital. No tech names, PNs, or prices."""
+    buckets = {}
+
+    def add(ahu, when, phase):
+        day = _as_date(when)
+        if ahu is None or day is None:
+            return
+        key = (ahu.id, day.isoformat())
+        row = buckets.get(key)
+        if row is None:
+            summary = public_ahu_summary(ahu)
+            row = {
+                "id": ahu.id,
+                "name": ahu.name,
+                "building": summary.get("building"),
+                "location": ahu.location,
+                "serviced_at": day.isoformat(),
+                "stages": [],
+                "status": summary.get("status"),
+            }
+            buckets[key] = row
+        label = (phase or "Filter").strip() or "Filter"
+        if label not in row["stages"]:
+            row["stages"].append(label)
+
+    for ahu in ahus or []:
+        for filt in active_filters(ahu):
+            add(ahu, getattr(filt, "last_service_date", None), getattr(filt, "phase", None))
+
+    hospital_id = None
+    for ahu in ahus or []:
+        hospital_id = getattr(ahu, "hospital_id", None)
+        if hospital_id is not None:
+            break
+    if hospital_id is not None:
+        from db import db
+
+        rows = (
+            db.session.query(Job, JobFilter, Filter, AHU)
+            .join(JobFilter, JobFilter.job_id == Job.id)
+            .join(Filter, Filter.id == JobFilter.filter_id)
+            .join(AHU, AHU.id == Job.ahu_id)
+            .filter(AHU.hospital_id == hospital_id)
+            .filter(JobFilter.is_completed.is_(True))
+            .filter(Job.completed_at.isnot(None))
+            .order_by(Job.completed_at.desc(), JobFilter.id.desc())
+            .limit(80)
+            .all()
+        )
+        for job, _jf, filt, ahu in rows:
+            add(ahu, job.completed_at, getattr(filt, "phase", None))
+
+    return sorted(buckets.values(), key=lambda r: r["serviced_at"], reverse=True)[:limit]
 
 
 def hospital_datasheet(hospital, ahus):
