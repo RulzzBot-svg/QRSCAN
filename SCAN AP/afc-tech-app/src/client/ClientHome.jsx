@@ -85,7 +85,7 @@ export default function ClientHome() {
             <p className="text-sm text-base-content/60">Compliance mix, buildings, and visits.</p>
           </div>
         </Link>
-        <Link to="/client/docs?tab=datasheet" className="card bg-base-100 border border-base-300">
+        <Link to="/client/datasheet" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Technical datasheet</h3>
             <p className="text-sm text-base-content/60">Stages, sizes, quantities, frequencies — downloadable PDF.</p>
@@ -102,14 +102,14 @@ export default function ClientHome() {
         <Link to="/client/docs" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Documentation</h3>
-            <p className="text-sm text-base-content/60">How to use, datasheet, and the hospital-IT technical packet (PDF).</p>
+            <p className="text-sm text-base-content/60">How to use, plus a download of the hospital-IT technical packet (PDF).</p>
           </div>
         </Link>
-        <Link to="/client/docs?tab=tech" className="card bg-base-100 border border-base-300">
+        <Link to="/client/docs" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Technical packet (PDF)</h3>
             <p className="text-sm text-base-content/60">
-              Architecture, HIPAA determination, 45 CFR 164.312 mapping, APIs — for hospital IT / IS.
+              Download AFC-HP-TIP-001 for hospital IT / IS. The packet is not shown in the portal.
             </p>
           </div>
         </Link>

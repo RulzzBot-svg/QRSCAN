@@ -4,7 +4,7 @@ Advanced Filtration Concepts (AFC)
 323.832.8316  
 Document: **AFC-HP-TIP-001** v2.0
 
-This brief is the cover sheet. The full control mapping, API inventory, and residual-risk statement are in `hospital-portal-architecture.md` and in the in-app **Technical packet PDF** (Docs → Technical packet → Download PDF).
+This brief is the cover sheet. The full control mapping, API inventory, and residual-risk statement are in `hospital-portal-architecture.md` and in the downloadable **Technical packet PDF** (Docs → Download PDF). The packet is not rendered in the portal.
 
 ## What to file
 

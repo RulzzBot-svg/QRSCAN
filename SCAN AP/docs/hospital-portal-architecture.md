@@ -2,7 +2,7 @@
 
 Version 2.0. Vendor documentation for hospital Information Security, Privacy, Clinical Engineering, and Facilities. **Not PHI. Not legal advice. Not an accreditation instrument.**
 
-The same packet is generated as PDF from the portal: **Docs → Technical packet → Download PDF**.
+The same packet is generated as PDF from the portal: **Docs → Download PDF**. It is not rendered on the website.
 
 ## Purpose and scope
 

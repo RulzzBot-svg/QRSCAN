@@ -186,18 +186,10 @@ export const TECH_PACKET = {
       id: "10",
       title: "10. Contacts and document control",
       paragraphs: [
-        "Vendor: Advanced Filtration Concepts. Voice: 323.832.8316. Document ID AFC-HP-TIP-001, version 2.0. Classification: vendor documentation / not PHI. This file is generated from the portal (Docs -> Technical packet) for the hospital named on the cover.",
-        "In-app: directors open Docs. Hospital technicians see How to use only. Repo copies live under SCAN AP/docs/ (markdown) and this generated PDF.",
+        "Vendor: Advanced Filtration Concepts. Voice: 323.832.8316. Document ID AFC-HP-TIP-001, version 2.0. Classification: vendor documentation / not PHI. This file is generated from Docs -> Download PDF for the hospital named on the cover. The packet is not rendered in the portal.",
+        "Hospital technicians see How to use only. Repo copies live under SCAN AP/docs/ (markdown) and this generated PDF.",
       ],
     },
   ],
 };
 
-export function packetSectionsForScreen() {
-  return TECH_PACKET.sections.map((s) => ({
-    title: s.title,
-    paragraphs: [...(s.paragraphs || []), ...(s.paragraphsAfter || [])],
-    bullets: s.bullets || [],
-    table: s.table || null,
-  }));
-}
