@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getClientHospital } from "./api";
+import { prettyDate } from "./format";
 import { StatusBadge } from "./StatusBadge";
 import InstallHint from "./InstallHint";
 
@@ -58,6 +59,40 @@ export default function ClientHome() {
         <Stat label="Overdue" value={summary.overdue || 0} tone="error" />
         <Stat label="Compliance" value={`${hospital?.compliance_pct ?? 0}%`} />
       </div>
+
+      {(hospital?.recent_changeouts || []).length ? (
+        <section className="rounded-2xl bg-base-100 border border-success/30 p-5">
+          <h3 className="font-semibold">Most recently replaced</h3>
+          <p className="text-xs text-base-content/50 mt-0.5 mb-3">
+            Last {hospital.recent_changeouts.length} changeouts at this hospital. Tap a unit to open it.
+          </p>
+          <ul className="space-y-2">
+            {hospital.recent_changeouts.map((a) => (
+              <li key={`${a.id}-${a.serviced_at}`}>
+                <Link
+                  to={`/client/ahu/${a.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 -mx-2 hover:bg-base-200 active:scale-[0.99] transition"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{a.name}</p>
+                    <p className="text-xs text-base-content/50 truncate">
+                      {[a.building, a.location, (a.stages || []).join(", ")].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium text-success shrink-0 tabular-nums">
+                    {prettyDate(a.serviced_at)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <section className="rounded-2xl bg-base-100 border border-base-300 p-5">
+          <h3 className="font-semibold">Most recently replaced</h3>
+          <p className="text-sm text-base-content/50 mt-2">No changeouts on file for this hospital yet.</p>
+        </section>
+      )}
 
       <Link
         to="/client/scan"

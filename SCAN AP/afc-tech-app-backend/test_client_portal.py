@@ -352,6 +352,13 @@ def main():
     home = client.get("/api/client/hospital", headers=headers)
     assert_eq(home.status_code, 200, "director hospital payload")
     assert "datasheet" not in home.get_json(), "hospital home does not include a full datasheet dump"
+    recent = home.get_json().get("recent_changeouts") or []
+    assert recent, "director home lists recent changeouts"
+    assert recent[0]["name"] == "AHU-E2", "most recent CHOC changeout is AHU-E2"
+    assert recent[0]["id"] == ids["ahu_id"], "recent changeout links to the unit"
+    home_blob = str(home.get_json())
+    assert "SECRET-PN" not in home_blob and "269.50" not in home_blob, "recent changeouts have no PNs or prices"
+    assert "Tech" not in str(recent), "recent changeouts have no tech names"
 
     reset = client.patch(
         f"/api/admin/clients/{created.get_json()['id']}",
