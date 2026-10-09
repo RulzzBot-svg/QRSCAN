@@ -27,7 +27,7 @@ The portal shows HVAC equipment and filter PM status for one hospital. It does *
 
 | Role | Access |
 | --- | --- |
-| **Director** | Home, units, scan, graphs (PDF export), datasheet (PDF), technical packet (PDF), contact |
+| **Director** | Home, units, scan, graphs (PDF export), technical packet (PDF download), contact |
 | **Hospital technician** | Units, scan, how-to |
 
 Username + PIN issued by AFC, bcrypt stored, JWT `typ=client` expires in 12 hours. Role is enforced on the server.

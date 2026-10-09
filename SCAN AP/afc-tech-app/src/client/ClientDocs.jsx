@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { isClientDirector, readClientUser } from "./api";
 import { exportTechPacketPdf } from "./exportTechPacketPdf";
 import { AFC_PHONE, AFC_PHONE_TEL } from "../utils/qrLabels";
@@ -11,9 +10,7 @@ export default function ClientDocs() {
     <div className="space-y-5 max-w-3xl">
       <div>
         <h2 className="text-xl font-bold">Documentation</h2>
-        <p className="text-sm text-base-content/60">
-          How to use the portal. Directors can download the hospital-IT technical packet as a PDF.
-        </p>
+        <p className="text-sm text-base-content/60">How to use the portal.</p>
       </div>
 
       <DocCard title="Scan a unit">
@@ -34,36 +31,19 @@ export default function ClientDocs() {
       </DocCard>
 
       {director ? (
-        <DocCard title="Technical packet (PDF)">
-          <p>
-            AFC-HP-TIP-001 for hospital IT / IS: architecture, HIPAA determination, 45 CFR 164.312
-            mapping, APIs, and residual risk. Download the PDF — it is not shown in the portal.
-          </p>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm mt-2"
-            onClick={() => exportTechPacketPdf({ hospitalName: hospital })}
-          >
-            Download PDF
-          </button>
-        </DocCard>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => exportTechPacketPdf({ hospitalName: hospital })}
+        >
+          Download technical packet PDF
+        </button>
       ) : (
         <DocCard title="Hospital technician access">
           This login can scan and view every unit at this hospital. It cannot open graphs, exports,
           or the contact form, and it cannot change filters.
         </DocCard>
       )}
-
-      {director ? (
-        <div className="flex flex-wrap gap-2">
-          <Link className="btn btn-sm btn-outline" to="/client/graphs">
-            Graphs
-          </Link>
-          <Link className="btn btn-sm btn-outline" to="/client/contact">
-            Contact
-          </Link>
-        </div>
-      ) : null}
 
       <p className="text-sm text-base-content/60">
         Need AFC?{" "}

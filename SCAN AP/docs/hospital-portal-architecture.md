@@ -40,7 +40,7 @@ Tenant isolation: `g.current_hospital_id` from the authenticated row, not from J
 | POST | `/api/client/login` | Public | 5 / 15 min |
 | GET | `/api/client/me` | Portal | default |
 | GET | `/api/client/ahus`, `/ahus/<id>` | Portal | default |
-| GET | `/api/client/hospital`, `/graphs`, `/datasheet` | Director | default |
+| GET | `/api/client/hospital`, `/graphs` | Director | default |
 | POST | `/api/client/contact` | Director | 5 / hour |
 | GET | `/api/public/units/<id>` | Public GET | 30 / min |
 
