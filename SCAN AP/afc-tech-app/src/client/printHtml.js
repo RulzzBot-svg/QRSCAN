@@ -1,63 +1,43 @@
-/** Print an HTML document without a blank popup. window.open+noopener was emptying the export. */
+/** Open a printable HTML document. Zero-size iframes print blank; noopener popups were empty. */
 
-export function printHtmlDocument(html) {
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.setAttribute("title", "Print");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!doc) {
-    iframe.remove();
-    downloadHtml(html);
+export function printHtmlDocument(html, filename = "afc-export.html") {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  let win = null;
+  try {
+    win = window.open(url, "_blank");
+  } catch {
+    win = null;
+  }
+  if (!win) {
+    downloadUrl(url, filename);
     return;
   }
-
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  const cleanup = () => {
-    setTimeout(() => {
-      try {
-        iframe.remove();
-      } catch {
-        /* ignore */
-      }
-    }, 1500);
-  };
-
-  const runPrint = () => {
+  const tryPrint = () => {
     try {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
+      win.focus();
+      win.print();
     } catch {
-      downloadHtml(html);
-    } finally {
-      cleanup();
+      /* user can print from the opened tab */
     }
   };
-
-  iframe.contentWindow.addEventListener("afterprint", cleanup);
-  setTimeout(runPrint, 500);
+  setTimeout(tryPrint, 600);
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 
-function downloadHtml(html) {
-  try {
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "afc-export.html";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-  } catch {
-    alert("Could not open the print dialog. Try another browser.");
-  }
+export function downloadHtml(html, filename = "afc-export.html") {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  downloadUrl(url, filename);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function downloadUrl(url, filename) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }

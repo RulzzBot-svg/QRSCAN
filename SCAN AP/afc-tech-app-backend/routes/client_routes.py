@@ -123,6 +123,7 @@ def client_hospital():
         "compliance_pct": overview["compliance_pct"],
         "overdue_units": overview["overdue_units"],
         "due_soon_units": overview["due_soon_units"],
+        "datasheet": hospital_datasheet(hospital, ahus),
     }), 200
 
 

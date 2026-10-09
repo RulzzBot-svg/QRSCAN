@@ -103,7 +103,7 @@ export default function ClientHome() {
             <p className="text-sm text-base-content/60">Compliance mix, buildings, and visits.</p>
           </div>
         </Link>
-        <Link to="/client/datasheet" className="card bg-base-100 border border-base-300">
+        <Link to="/client/docs?tab=datasheet" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Technical datasheet</h3>
             <p className="text-sm text-base-content/60">Sizes, quantities, frequencies — plus an IT brief to print.</p>
@@ -117,10 +117,16 @@ export default function ClientHome() {
             </p>
           </div>
         </Link>
-        <Link to="/client/help" className="card bg-base-100 border border-base-300 md:col-span-2">
+        <Link to="/client/docs" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
-            <h3 className="font-semibold">How to use</h3>
-            <p className="text-sm text-base-content/60">Short guide for directors and hospital staff.</p>
+            <h3 className="font-semibold">Documentation</h3>
+            <p className="text-sm text-base-content/60">How to use, datasheet, IT brief, and technical docs.</p>
+          </div>
+        </Link>
+        <Link to="/client/docs?tab=code" className="card bg-base-100 border border-base-300">
+          <div className="card-body p-5">
+            <h3 className="font-semibold">Technical / coding docs</h3>
+            <p className="text-sm text-base-content/60">Architecture, auth, and APIs for hospital IT.</p>
           </div>
         </Link>
       </div>

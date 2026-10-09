@@ -81,6 +81,63 @@ export const getClientGraphs = () => ClientAPI.get("/client/graphs");
 export const sendClientContact = (payload) => ClientAPI.post("/client/contact", payload);
 export const getClientDatasheet = () => ClientAPI.get("/client/datasheet");
 
+export function buildDatasheetFromAhus(hospital, details) {
+  const groups = [];
+  const index = new Map();
+  for (const ahu of details || []) {
+    const bname = ahu.building || "Unassigned";
+    if (!index.has(bname)) {
+      index.set(bname, groups.length);
+      groups.push({ building: bname, units: [] });
+    }
+    groups[index.get(bname)].units.push({
+      name: ahu.name,
+      location: ahu.location,
+      status: ahu.status,
+      filters: (ahu.filters || []).map((f) => ({
+        phase: f.phase,
+        size: f.size,
+        quantity: f.quantity,
+        frequency_label: f.frequency_label,
+      })),
+    });
+  }
+  return {
+    hospital: hospital?.name || hospital?.hospital || null,
+    city: hospital?.city || null,
+    buildings: groups,
+  };
+}
+
+/** Load the equipment sheet even if /client/datasheet is not deployed yet. */
+export async function loadClientDatasheet() {
+  try {
+    const res = await getClientDatasheet();
+    if (Array.isArray(res.data?.buildings)) return res.data;
+  } catch {
+    /* older API without /client/datasheet */
+  }
+  let hospital = null;
+  try {
+    const hospitalRes = await getClientHospital();
+    hospital = hospitalRes.data;
+    if (Array.isArray(hospital?.datasheet?.buildings)) return hospital.datasheet;
+  } catch {
+    /* fall through to unit list */
+  }
+  const listRes = await getClientAhus();
+  const list = Array.isArray(listRes.data) ? listRes.data : [];
+  const details = [];
+  for (let i = 0; i < list.length; i += 6) {
+    const chunk = list.slice(i, i + 6);
+    const rows = await Promise.all(
+      chunk.map((a) => getClientAhu(a.id).then((r) => r.data).catch(() => a))
+    );
+    details.push(...rows);
+  }
+  return buildDatasheetFromAhus(hospital, details);
+}
+
 export function getPublicUnit(ahuId) {
   const id = String(ahuId ?? "").replace(/[^\d]/g, "");
   if (!id) {
