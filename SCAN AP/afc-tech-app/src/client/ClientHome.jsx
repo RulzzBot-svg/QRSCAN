@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getClientAhus, getClientGraphs, getClientHospital } from "./api";
+import { getClientHospital } from "./api";
 import { StatusBadge } from "./StatusBadge";
-import { exportInspectionPdf } from "./exportInspectionPdf";
 import InstallHint from "./InstallHint";
 
 export default function ClientHome() {
@@ -41,31 +40,14 @@ export default function ClientHome() {
 
   const summary = hospital?.summary || {};
 
-  const downloadSnapshot = async () => {
-    try {
-      const [ahusRes, graphsRes] = await Promise.all([getClientAhus(), getClientGraphs()]);
-      exportInspectionPdf({
-        hospitalName: hospital?.name,
-        summary: graphsRes.data?.summary || summary,
-        ahus: ahusRes.data,
-      });
-    } catch {
-      alert("Could not build the inspection snapshot.");
-    }
-  };
-
   return (
     <div className="space-y-5">
-      <section className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold">{hospital?.name}</h2>
-          <p className="text-sm text-base-content/60 mt-1">
-            Filter status only — no pricing, invoices, or job notes.
-          </p>
-        </div>
-        <button type="button" className="btn btn-outline btn-sm shrink-0" onClick={downloadSnapshot}>
-          Inspection PDF
-        </button>
+      <section>
+        <h2 className="text-2xl font-bold">{hospital?.name}</h2>
+        <p className="text-sm text-base-content/60 mt-1">
+          Filter status only — no pricing, invoices, or job notes. Export graphs from Graphs; the
+          technical packet PDF is under Docs.
+        </p>
       </section>
       <InstallHint />
 
@@ -106,7 +88,7 @@ export default function ClientHome() {
         <Link to="/client/docs?tab=datasheet" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Technical datasheet</h3>
-            <p className="text-sm text-base-content/60">Sizes, quantities, frequencies — plus an IT brief to print.</p>
+            <p className="text-sm text-base-content/60">Stages, sizes, quantities, frequencies — downloadable PDF.</p>
           </div>
         </Link>
         <Link to="/client/contact" className="card bg-base-100 border border-base-300">
@@ -120,13 +102,15 @@ export default function ClientHome() {
         <Link to="/client/docs" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Documentation</h3>
-            <p className="text-sm text-base-content/60">How to use, datasheet, IT brief, and technical docs.</p>
+            <p className="text-sm text-base-content/60">How to use, datasheet, and the hospital-IT technical packet (PDF).</p>
           </div>
         </Link>
-        <Link to="/client/docs?tab=code" className="card bg-base-100 border border-base-300">
+        <Link to="/client/docs?tab=tech" className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
-            <h3 className="font-semibold">Technical / coding docs</h3>
-            <p className="text-sm text-base-content/60">Architecture, auth, and APIs for hospital IT.</p>
+            <h3 className="font-semibold">Technical packet (PDF)</h3>
+            <p className="text-sm text-base-content/60">
+              Architecture, HIPAA determination, 45 CFR 164.312 mapping, APIs — for hospital IT / IS.
+            </p>
           </div>
         </Link>
       </div>

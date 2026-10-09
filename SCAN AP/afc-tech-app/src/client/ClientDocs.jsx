@@ -1,23 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isClientDirector, loadClientDatasheet, readClientUser } from "./api";
-import { CODE_SECTIONS, IT_SECTIONS } from "./docsContent";
-import { datasheetHtml, exportItBrief, exportTechnicalDatasheet } from "./exportDatasheet";
-import { downloadHtml } from "./printHtml";
+import { packetSectionsForScreen } from "./docsContent";
+import { exportDatasheetPdf, exportTechPacketPdf } from "./exportTechPacketPdf";
 import { AFC_PHONE, AFC_PHONE_TEL } from "../utils/qrLabels";
 
 const DIRECTOR_TABS = [
   { id: "guide", label: "How to use" },
   { id: "datasheet", label: "Datasheet" },
-  { id: "it", label: "IT brief" },
-  { id: "code", label: "Technical docs" },
+  { id: "tech", label: "Technical packet" },
 ];
+
+function normalizeTab(requested, director) {
+  if (!director) return "guide";
+  if (requested === "it" || requested === "code") return "tech";
+  if (requested === "datasheet" || requested === "tech") return requested;
+  return "guide";
+}
 
 export default function ClientDocs() {
   const director = isClientDirector(readClientUser());
   const [params, setParams] = useSearchParams();
-  const requested = params.get("tab") || "guide";
-  const tab = director || requested === "guide" ? requested : "guide";
+  const tab = normalizeTab(params.get("tab") || "guide", director);
 
   const setTab = (id) => {
     const next = new URLSearchParams(params);
@@ -31,7 +35,8 @@ export default function ClientDocs() {
       <div>
         <h2 className="text-xl font-bold">Documentation</h2>
         <p className="text-sm text-base-content/60">
-          How to use the portal, the equipment datasheet, and pages you can hand to hospital IT.
+          How to use the portal, the equipment datasheet, and a technical packet you can download as
+          PDF for hospital IT / IS.
         </p>
       </div>
 
@@ -52,8 +57,7 @@ export default function ClientDocs() {
 
       {tab === "guide" ? <GuideTab director={director} /> : null}
       {tab === "datasheet" && director ? <DatasheetTab /> : null}
-      {tab === "it" && director ? <ItTab /> : null}
-      {tab === "code" && director ? <CodeTab /> : null}
+      {tab === "tech" && director ? <TechTab /> : null}
     </div>
   );
 }
@@ -79,17 +83,17 @@ function GuideTab({ director }) {
       </DocCard>
       {director ? (
         <DocCard title="Director tools">
-          Home and Graphs are counts only. The datasheet and IT / technical tabs on this page are
-          for walk-throughs and hospital IT. Contact AFC from Home.
+          Graphs can be exported as PDF. The datasheet and technical packet on this page download as
+          PDF for hospital IT. This portal is not an inspection form.
           <div className="flex flex-wrap gap-2 mt-3">
             <Link className="btn btn-sm btn-outline" to="/client/docs?tab=datasheet">
               Datasheet
             </Link>
-            <Link className="btn btn-sm btn-outline" to="/client/docs?tab=it">
-              IT brief
+            <Link className="btn btn-sm btn-outline" to="/client/docs?tab=tech">
+              Technical packet
             </Link>
-            <Link className="btn btn-sm btn-outline" to="/client/docs?tab=code">
-              Technical docs
+            <Link className="btn btn-sm btn-outline" to="/client/graphs">
+              Graphs
             </Link>
             <Link className="btn btn-sm btn-outline" to="/client/contact">
               Contact
@@ -156,18 +160,9 @@ function DatasheetTab() {
           {sheet.hospital || "Hospital"} — {unitCount} units. Stages, sizes, quantities, and change
           frequencies. No catalog part numbers or prices.
         </p>
-        <div className="flex gap-2">
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => exportTechnicalDatasheet(sheet)}>
-            Print
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => downloadHtml(datasheetHtml(sheet), "afc-technical-datasheet.html")}
-          >
-            Download HTML
-          </button>
-        </div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => exportDatasheetPdf(sheet)}>
+          Download PDF
+        </button>
       </div>
       {(sheet.buildings || []).length === 0 ? (
         <p className="text-sm text-base-content/50">No units on file for this hospital.</p>
@@ -217,54 +212,58 @@ function DatasheetTab() {
   );
 }
 
-function ItTab() {
+function TechTab() {
   const hospital = readClientUser()?.hospital_name || "Hospital";
+  const sections = packetSectionsForScreen();
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => exportItBrief({ hospitalName: hospital })}>
-          Print IT brief
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="text-sm text-base-content/60">
+          AFC-HP-TIP-001 — architecture, HIPAA determination (45 CFR 160.103), Security Rule mapping
+          (45 CFR 164.312 / NIST SP 800-66r2), and API inventory.
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm shrink-0"
+          onClick={() => exportTechPacketPdf({ hospitalName: hospital })}
+        >
+          Download PDF
         </button>
       </div>
-      {IT_SECTIONS.map((s) => (
+      {sections.map((s) => (
         <DocCard key={s.title} title={s.title}>
-          {s.body.length === 1 ? (
-            s.body[0]
-          ) : (
+          {s.paragraphs.map((p) => (
+            <p key={p.slice(0, 80)}>{p}</p>
+          ))}
+          {s.table ? (
+            <div className="overflow-x-auto">
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    {s.table.headers.map((h) => (
+                      <th key={h}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {s.table.rows.map((row) => (
+                    <tr key={row.join("|")}>
+                      {row.map((cell, i) => (
+                        <td key={`${row[0]}-${i}`}>{cell}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          {s.bullets.length ? (
             <ul className="list-disc pl-5 space-y-1">
-              {s.body.map((line) => (
+              {s.bullets.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
-          )}
-        </DocCard>
-      ))}
-    </div>
-  );
-}
-
-function CodeTab() {
-  const hospital = readClientUser()?.hospital_name || "Hospital";
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          className="btn btn-outline btn-sm"
-          onClick={() =>
-            downloadHtml(codeDocHtml(hospital), "afc-hospital-portal-technical-docs.html")
-          }
-        >
-          Download HTML
-        </button>
-      </div>
-      {CODE_SECTIONS.map((s) => (
-        <DocCard key={s.title} title={s.title}>
-          <ul className="list-disc pl-5 space-y-1">
-            {s.body.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+          ) : null}
         </DocCard>
       ))}
     </div>
@@ -278,19 +277,4 @@ function DocCard({ title, children }) {
       <div className="text-sm text-base-content/70 space-y-2">{children}</div>
     </section>
   );
-}
-
-function codeDocHtml(hospital) {
-  const esc = (s) =>
-    String(s || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  const blocks = CODE_SECTIONS.map(
-    (s) =>
-      `<h2>${esc(s.title)}</h2><ul>${s.body.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`
-  ).join("");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>AFC portal technical docs</title>
-  <style>body{font-family:Arial,Helvetica,sans-serif;margin:28px;color:#0b1f33;max-width:720px}h1{font-size:20px}h2{font-size:14px;color:#0a4d8c;margin-top:22px}li{font-size:13px;line-height:1.45}</style>
-  </head><body><h1>AFC hospital portal — technical documentation</h1><p>${esc(hospital)}</p>${blocks}</body></html>`;
 }

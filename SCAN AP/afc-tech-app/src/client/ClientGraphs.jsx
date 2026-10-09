@@ -12,9 +12,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getClientAhus, getClientGraphs, readClientUser } from "./api";
+import { getClientGraphs, readClientUser } from "./api";
 import { exportClientGraphsPdf } from "./exportGraphsPdf";
-import { exportInspectionPdf } from "./exportInspectionPdf";
 
 const STATUS_COLORS = {
   compliant: "#15803d",
@@ -82,40 +81,20 @@ export default function ClientGraphs() {
           <h2 className="text-xl font-bold">Graphs</h2>
           <p className="text-sm text-base-content/60">This hospital only. Counts, not dollars.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={async () => {
-              try {
-                const ahusRes = await getClientAhus();
-                exportInspectionPdf({
-                  hospitalName: readClientUser()?.hospital_name,
-                  summary: data.summary,
-                  ahus: ahusRes.data,
-                });
-              } catch {
-                alert("Could not build the inspection snapshot.");
-              }
-            }}
-          >
-            Inspection PDF
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={() =>
-              exportClientGraphsPdf({
-                hospitalName: readClientUser()?.hospital_name,
-                summary: data.summary,
-                frequencies: data.by_frequency,
-                chartsRoot: chartsRef.current,
-              })
-            }
-          >
-            Graphs PDF
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm shrink-0"
+          onClick={() =>
+            exportClientGraphsPdf({
+              hospitalName: readClientUser()?.hospital_name,
+              summary: data.summary,
+              frequencies: data.by_frequency,
+              chartsRoot: chartsRef.current,
+            })
+          }
+        >
+          Export graphs PDF
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
