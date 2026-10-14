@@ -329,15 +329,17 @@ def _stage_kind(val):
     return "other"
 
 
-def _block_has_post_pre_stage(rows):
-    for vals in rows:
-        if _stage_kind(vals.get("E")) in ("final", "other"):
-            return True
-    return False
-
-
 def _block_has_pre_stage(rows):
     return any(_stage_kind(vals.get("E")) == "pre" for vals in rows)
+
+
+def _block_has_final_stage(rows):
+    return any(_stage_kind(vals.get("E")) == "final" for vals in rows)
+
+
+def _completed_pre_final_cycle(rows):
+    """PRE + FINAL already on this block. A new PRE is the next physical unit."""
+    return _block_has_pre_stage(rows) and _block_has_final_stage(rows)
 
 
 def _should_start_new_ahu(current, vals):
@@ -348,6 +350,8 @@ def _should_start_new_ahu(current, vals):
 
     Do not split when FINAL rows come first and PRE is listed later
     (CHOC AHU-E2 / AHU-E3: Mini Pleat + Carbon FINAL, then PRE, then more FINAL).
+    Do not split on Gas Phase / PRE First Stage / extra PRE rows of the same
+    unit — those are more banks on one AHU, not a second AC-1 #2.
     """
     if not current:
         return False
@@ -359,13 +363,31 @@ def _should_start_new_ahu(current, vals):
         return True
     if row_ahu and block_ahu and _norm_name(row_ahu) != _norm_name(block_ahu):
         return True
-    if (
-        _stage_kind(vals.get("E")) == "pre"
-        and _block_has_post_pre_stage(current)
-        and _block_has_pre_stage(current)
-    ):
+    if _stage_kind(vals.get("E")) == "pre" and _completed_pre_final_cycle(current):
         return True
     return False
+
+
+def _blank_starts_new_ahu(current, vals):
+    """
+    Blank then PRE of a different name starts the next unit.
+    Blank then PRE of the same name only splits after PRE+FINAL already closed
+    (Huntington #2). Gas Phase + PRE First Stage, blank, PRE stays one AC-1.
+    """
+    if not current:
+        return False
+    if _stage_kind(vals.get("E")) != "pre":
+        return False
+    row_ahu = clean_str(vals.get("F"))
+    block_ahu = _first_filled(current, "F")
+    same_ahu = (
+        not row_ahu
+        or not block_ahu
+        or _norm_name(row_ahu) == _norm_name(block_ahu)
+    )
+    if same_ahu:
+        return _completed_pre_final_cycle(current)
+    return True
 
 
 def assign_block_instances(blocks):
@@ -385,8 +407,10 @@ def read_survey_letter_blocks(path, sheet_name, wb=None):
     - column F writes a different AHU name
     - PRE after a block that already had PRE then FINAL (second AHU-2 on the same floor)
     FINAL-first then PRE on the same AHU name stays one unit (CHOC AHU-E2).
+    Gas Phase + PRE First Stage + PRE + FINAL on the same name stays one unit.
     A blank / building-only row does not split PRE from FINAL of the same unit.
-    A blank before a new PRE does split (next unit).
+    A blank before a new PRE splits when the name changes, or when PRE+FINAL
+    already closed (next unit / Huntington #2).
     Quantity is column K (per changeout). L is the yearly total (K x 4 for 90-day).
     Frequency is column M, or L/N if M is a unit price instead of '2 Years'.
     """
@@ -476,7 +500,7 @@ def _read_survey_letter_blocks_ws(ws, start_row=None, row_reader=None):
             pending_blank = True
             continue
         start_new = _should_start_new_ahu(current, vals)
-        if current and (start_new or (pending_blank and _stage_kind(vals.get("E")) == "pre")):
+        if current and (start_new or (pending_blank and _blank_starts_new_ahu(current, vals))):
             close_block()
         pending_blank = False
         current.append(vals)
@@ -1628,7 +1652,7 @@ def _seed_from_open_workbook(path, wb, selected_sheet=None, dry_run=False, hospi
                 current_as_survey = [pandas_as_survey(x) for x in current_block]
                 start_new = _should_start_new_ahu(current_as_survey, survey_row)
                 if current_block and (
-                    start_new or (pending_blank and _stage_kind(survey_row.get("E")) == "pre")
+                    start_new or (pending_blank and _blank_starts_new_ahu(current_as_survey, survey_row))
                 ):
                     blocks.append(current_block)
                     current_block = []

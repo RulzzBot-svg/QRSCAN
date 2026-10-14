@@ -13,7 +13,7 @@ from openpyxl import Workbook
 
 from db import db
 import models  # noqa: F401 — register tables
-from models import Hospital, AHU, Filter
+from models import Hospital, AHU, Building, Filter
 from datetime import date
 
 from seed_from_excel import (
@@ -192,6 +192,16 @@ def rtu_block(ahu, fill_ahu_every_row=False):
         for r in rows:
             r["F"] = ahu
     return rows
+
+
+def surgery_ac1_rows():
+    """One Roof Surgery Rooms AC-1 with Gas Phase, two PREs, and FINAL."""
+    return [
+        {"B": "Main Building", "C": "Roof Surgery Rooms", "E": "Gas Phase", "F": "AC-1", "G": "Media", "H": "LH07590", "J": "24x28x2", "K": 1, "M": "30 Days", "O": date(2026, 9, 23)},
+        {"B": "Main Building", "C": "Roof Surgery Rooms", "E": "PRE First Stage", "F": "AC-1", "G": "HXM MERV 10 Pleat", "H": "HVP20252XM", "J": "20x25x2", "K": 1, "M": "90 Days", "O": date(2026, 10, 9)},
+        {"B": "Main Building", "C": "Roof Surgery Rooms", "E": "PRE", "F": "AC-1", "G": "HXM MERV 10 Pleat", "H": "HVP24242XM", "J": "24x24x2", "K": 1, "M": "90 Days", "O": date(2026, 10, 9)},
+        {"B": "Main Building", "C": "Roof Surgery Rooms", "E": "FINAL", "F": "AC-1", "G": "FB, 4V-Bank Filter", "H": "F8V4-2424-GWB", "J": "24x24x12", "K": 1, "M": "365 Days", "O": date(2026, 2, 3)},
+    ]
 
 
 def sample_rows(qty_pre=2, location="Roof"):
@@ -616,6 +626,84 @@ def main():
             assert_eq(tab_names, ["RTU-9 — East Building", "RTU-9 — MOB"], "each tab keeps its building in the name")
             try:
                 os.unlink(tabs_path)
+            except OSError:
+                pass
+
+            surgery_path = path + ".surgery-ac1.xlsx"
+            write_lettered_flat(surgery_path, "Surgery Roof", surgery_ac1_rows(), sheet="MAIN BUILDING")
+            surgery_blocks = read_survey_letter_blocks(surgery_path, "MAIN BUILDING")
+            assert_eq(len(surgery_blocks), 1, "Gas Phase + PRE First Stage + PRE + FINAL is one AC-1")
+            assert_eq(surgery_blocks[0]["display_name"], "AC-1", "Surgery block is AC-1")
+            assert_eq(surgery_blocks[0]["location"], "Roof Surgery Rooms", "same roof location")
+            assert_eq(len(surgery_blocks[0]["filters"]), 4, "all four banks stay on one unit")
+            assert_eq(surgery_blocks[0]["instance"], 1, "not numbered #2")
+
+            surgery_gapped = []
+            for i, row in enumerate(surgery_ac1_rows()):
+                if i:
+                    surgery_gapped.append({"B": row["B"], "C": row["C"]})
+                surgery_gapped.append(row)
+            gapped_surgery_path = path + ".surgery-ac1-gaps.xlsx"
+            write_lettered_flat(gapped_surgery_path, "Surgery Roof", surgery_gapped, sheet="MAIN BUILDING")
+            gapped_surgery = read_survey_letter_blocks(gapped_surgery_path, "MAIN BUILDING")
+            assert_eq(len(gapped_surgery), 1, "blank rows between AC-1 banks do not make #2")
+            assert_eq(len(gapped_surgery[0]["filters"]), 4, "gapped AC-1 still has 4 filters")
+
+            surgery_hospital = Hospital(name="Surgery Roof", active=True)
+            db.session.add(surgery_hospital)
+            db.session.flush()
+            surgery_hid = surgery_hospital.id
+            split_building = Building(hospital_id=surgery_hid, name="Main Building", active=True)
+            db.session.add(split_building)
+            db.session.flush()
+            first_half = AHU(
+                hospital_id=surgery_hid,
+                building_id=split_building.id,
+                name="AC-1 — Main Building",
+                location="Roof Surgery Rooms",
+            )
+            second_half = AHU(
+                hospital_id=surgery_hid,
+                building_id=split_building.id,
+                name="AC-1 — Main Building #2",
+                location="Roof Surgery Rooms",
+            )
+            db.session.add_all([first_half, second_half])
+            db.session.flush()
+            db.session.add_all([
+                Filter(ahu_id=first_half.id, phase="Gas Phase", part_number="LH07590", size="24x28x2", quantity=1, frequency_days=30, last_service_date=date(2026, 9, 23), is_active=True),
+                Filter(ahu_id=first_half.id, phase="PRE First Stage", part_number="HVP20252XM", size="20x25x2", quantity=1, frequency_days=90, last_service_date=date(2026, 10, 9), is_active=True),
+                Filter(ahu_id=second_half.id, phase="PRE", part_number="HVP24242XM", size="24x24x2", quantity=1, frequency_days=90, last_service_date=date(2026, 10, 9), is_active=True),
+                Filter(ahu_id=second_half.id, phase="FINAL", part_number="F8V4-2424-GWB", size="24x24x12", quantity=1, frequency_days=365, last_service_date=date(2026, 2, 3), is_active=True),
+            ])
+            db.session.commit()
+            seed_from_excel(surgery_path, hospital_id=surgery_hid)
+            surgery_ahus = [
+                a for a in AHU.query.filter_by(hospital_id=surgery_hid).all()
+                if a.building and a.building.name == "Main Building"
+            ]
+            assert_eq(len(surgery_ahus), 1, "re-import collapses AC-1 #2 into one unit")
+            assert_eq(surgery_ahus[0].name, "AC-1 — Main Building", "kept the unnumbered AC-1")
+            surgery_parts = sorted(
+                (f.phase or "", f.part_number)
+                for f in Filter.query.filter_by(ahu_id=surgery_ahus[0].id, is_active=True).all()
+            )
+            assert_eq(
+                surgery_parts,
+                [
+                    ("FINAL", "F8V4-2424-GWB"),
+                    ("Gas Phase", "LH07590"),
+                    ("PRE", "HVP24242XM"),
+                    ("PRE First Stage", "HVP20252XM"),
+                ],
+                "one AC-1 keeps Gas Phase, both PREs, and FINAL",
+            )
+            try:
+                os.unlink(surgery_path)
+            except OSError:
+                pass
+            try:
+                os.unlink(gapped_surgery_path)
             except OSError:
                 pass
 
