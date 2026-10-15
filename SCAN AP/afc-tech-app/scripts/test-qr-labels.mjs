@@ -150,7 +150,10 @@ assert(isZebraLayout("zebra-mark") && isZebraLayout("zebra-banner") && isZebraLa
 assert(!isZebraLayout("sheet") && !isZebraLayout("single"), "paper layouts are not zebra");
 assert(resolveQrLayout("zebra-banner") === QR_LAYOUTS.zebraBanner, "unknown-safe resolve keeps banner");
 assert(resolveQrLayout("nope") === QR_LAYOUTS.sheet, "unknown layout falls back to sheet");
-assert(QR_CENTER_LOGO_RATIO >= 0.55, "center AFC mark should fill the QR quiet zone");
+assert(
+  QR_CENTER_LOGO_RATIO >= 0.32 && QR_CENTER_LOGO_RATIO <= 0.4,
+  "center AFC mark stays circular but small enough for the QR to scan"
+);
 assert(usesQrCenterLogo(QR_LAYOUTS.zebraMark), "logo-in-QR design overlays the mark");
 assert(usesQrCenterLogo(QR_LAYOUTS.zebraBanner), "banner design overlays the mark in the QR");
 assert(!usesQrCenterLogo(QR_LAYOUTS.zebra), "split design does not overlay the QR");

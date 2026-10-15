@@ -4,8 +4,8 @@ export const DEFAULT_QR_BASE_URL = "https://qrscan-lyart.vercel.app/FilterInfo";
 export const QR_LOGO_STORAGE_KEY = "qrLabelLogo";
 export const DEFAULT_AFC_LOGO_PATH = "/afc-logo-bw.png";
 export const DEFAULT_AFC_MARK_PATH = "/afc-mark-bw.png";
-/** Center-of-QR mark size vs QR width. ~0.58 fills the quiet zone without a hard rectangle. */
-export const QR_CENTER_LOGO_RATIO = 0.58;
+/** Center-of-QR mark size vs QR width. Small enough to scan, still a clear circular AFC mark. */
+export const QR_CENTER_LOGO_RATIO = 0.36;
 export const QR_LAYOUTS = {
   sheet: "sheet",
   single: "single",
@@ -215,7 +215,7 @@ export async function overlayLogoOnQr(qrDataUrl, logoDataUrl, { logoRatio = QR_C
   const lw = iw * fit;
   const lh = ih * fit;
   const pad = Math.max(4, Math.round(Math.min(lw, lh) * 0.06));
-  const plate = Math.min(size * 0.72, Math.max(lw, lh) + pad * 2);
+  const plate = Math.min(size * 0.46, Math.max(lw, lh) + pad * 2);
   const cx = size / 2;
   const cy = size / 2;
   ctx.fillStyle = "#ffffff";
