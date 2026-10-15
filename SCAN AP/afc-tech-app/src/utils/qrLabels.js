@@ -4,11 +4,40 @@ export const DEFAULT_QR_BASE_URL = "https://qrscan-lyart.vercel.app/FilterInfo";
 export const QR_LOGO_STORAGE_KEY = "qrLabelLogo";
 export const DEFAULT_AFC_LOGO_PATH = "/afc-logo-bw.png";
 export const DEFAULT_AFC_MARK_PATH = "/afc-mark-bw.png";
-export const QR_LAYOUTS = { sheet: "sheet", single: "single", zebra: "zebra" };
+export const QR_LAYOUTS = {
+  sheet: "sheet",
+  single: "single",
+  zebra: "zebra",
+  zebraMark: "zebra-mark",
+  zebraBanner: "zebra-banner",
+  zebraFlip: "zebra-flip",
+};
+
+export const QR_LAYOUT_OPTIONS = [
+  { id: QR_LAYOUTS.zebra, label: "Zebra 4×2 — split", hint: "QR left, name right" },
+  { id: QR_LAYOUTS.zebraMark, label: "Zebra 4×2 — logo in QR", hint: "AFC mark in the center of the QR" },
+  { id: QR_LAYOUTS.zebraBanner, label: "Zebra 4×2 — banner", hint: "Black top bar with AFC and phone" },
+  { id: QR_LAYOUTS.zebraFlip, label: "Zebra 4×2 — QR right", hint: "Name left, QR on the right" },
+  { id: QR_LAYOUTS.sheet, label: "Sheet (3 per page)", hint: "Letter page, 3 labels" },
+  { id: QR_LAYOUTS.single, label: "One AHU per page", hint: "One AHU per printed page" },
+];
+
+export function isZebraLayout(layout) {
+  return String(layout || "").startsWith("zebra");
+}
 
 export function resolveQrLayout(layout) {
-  if (layout === QR_LAYOUTS.single || layout === QR_LAYOUTS.zebra) return layout;
+  const ids = new Set(Object.values(QR_LAYOUTS));
+  if (ids.has(layout)) return layout;
   return QR_LAYOUTS.sheet;
+}
+
+export function usesQrCenterLogo(layout) {
+  return layout === QR_LAYOUTS.zebraMark;
+}
+
+export function usesSideLogo(layout) {
+  return layout === QR_LAYOUTS.zebra || layout === QR_LAYOUTS.zebraFlip;
 }
 
 export function escapeHtml(value) {
@@ -233,29 +262,56 @@ export function hospitalLine(label) {
   return name ? name.toUpperCase() : "";
 }
 
-function labelCardHtml(label, options = {}) {
-  const layout = resolveQrLayout(options.layout);
-  const sideLogo = options.sideLogoDataUrl || "";
-  const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
-  if (layout === QR_LAYOUTS.zebra) {
-    const headline = zebraHeadline(label);
-    const hospital = hospitalLine(label);
-    return `
-    <article class="label">
-      <div class="qr-wrap">
-        <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(headline)}" />
-      </div>
-      <div class="copy">
+function zebraIdentityHtml(label, { sideLogo = "", footer = true } = {}) {
+  const headline = zebraHeadline(label);
+  const hospital = hospitalLine(label);
+  return `
         ${sideLogo ? `<img class="logo" src="${sideLogo}" alt="AFC" />` : ""}
         <div class="identity">
           <div class="name">${escapeHtml(headline)}</div>
           ${hospital ? `<div class="hospital">${escapeHtml(hospital)}</div>` : ""}
         </div>
-        <div class="footer">
+        ${
+          footer
+            ? `<div class="footer">
           <div class="rule"></div>
           <div class="company">${escapeHtml(AFC_COMPANY_NAME)}</div>
           <div class="phone">${escapeHtml(AFC_PHONE)}</div>
+        </div>`
+            : ""
+        }`;
+}
+
+function labelCardHtml(label, options = {}) {
+  const layout = resolveQrLayout(options.layout);
+  const sideLogo = usesSideLogo(layout) ? options.sideLogoDataUrl || "" : "";
+  const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
+  if (isZebraLayout(layout)) {
+    const headline = zebraHeadline(label);
+    const qr = `<div class="qr-wrap">
+        <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(headline)}" />
+      </div>`;
+    if (layout === QR_LAYOUTS.zebraBanner) {
+      return `
+    <article class="label">
+      <div class="band">
+        <span class="company">${escapeHtml(AFC_COMPANY_NAME)}</span>
+        <span class="phone">${escapeHtml(AFC_PHONE)}</span>
+      </div>
+      <div class="body">
+        ${qr}
+        <div class="copy">
+          ${zebraIdentityHtml(label, { footer: false })}
         </div>
+      </div>
+    </article>
+  `;
+    }
+    return `
+    <article class="label">
+      ${qr}
+      <div class="copy">
+        ${zebraIdentityHtml(label, { sideLogo, footer: true })}
       </div>
     </article>
   `;
@@ -272,14 +328,13 @@ function labelCardHtml(label, options = {}) {
 
 export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = {}) {
   const layout = resolveQrLayout(options.layout);
-  const pageCss =
-    layout === QR_LAYOUTS.zebra
-      ? "@page { size: 4in 2in; margin: 0; }"
-      : "@page { size: letter; margin: 0.4in; }";
-  const hint =
-    layout === QR_LAYOUTS.zebra
-      ? `${labels.length} label${labels.length === 1 ? "" : "s"} — 4×2 in Zebra ZD220 · black & white · scan opens FilterInfo`
-      : `${labels.length} label${labels.length === 1 ? "" : "s"} — scan opens FilterInfo for that AHU`;
+  const zebra = isZebraLayout(layout);
+  const pageCss = zebra
+    ? "@page { size: 4in 2in; margin: 0; }"
+    : "@page { size: letter; margin: 0.4in; }";
+  const hint = zebra
+    ? `${labels.length} label${labels.length === 1 ? "" : "s"} — 4×2 in Zebra ZD220 · black & white · scan opens FilterInfo`
+    : `${labels.length} label${labels.length === 1 ? "" : "s"} — scan opens FilterInfo for that AHU`;
   const cards = labels.map((label) => labelCardHtml(label, options)).join("");
   return `<!DOCTYPE html>
 <html lang="en">
@@ -352,11 +407,11 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       width: 2.2in;
       height: 2.2in;
     }
-    .grid.layout-zebra {
+    .grid.zebra-page {
       display: block;
       padding: 0;
     }
-    .layout-zebra .label {
+    .zebra-page .label {
       width: 4in;
       height: 2in;
       display: flex;
@@ -372,21 +427,21 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       print-color-adjust: exact;
       -webkit-print-color-adjust: exact;
     }
-    .layout-zebra .label:last-child {
+    .zebra-page .label:last-child {
       page-break-after: auto;
       break-after: auto;
     }
-    .layout-zebra .qr-wrap {
+    .zebra-page .qr-wrap {
       flex: 0 0 1.62in;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .layout-zebra .label img.qr {
+    .zebra-page .label img.qr {
       width: 1.28in;
       height: 1.28in;
     }
-    .layout-zebra .copy {
+    .zebra-page .copy {
       flex: 1;
       min-width: 0;
       border-left: 2px solid #000;
@@ -395,7 +450,7 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       flex-direction: column;
       position: relative;
     }
-    .layout-zebra .logo {
+    .zebra-page .logo {
       position: absolute;
       top: 0.08in;
       right: 0.1in;
@@ -404,7 +459,7 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       max-width: 0.95in;
       object-fit: contain;
     }
-    .layout-zebra .identity {
+    .zebra-page .identity {
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -413,45 +468,98 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       padding-right: 0.12in;
       min-height: 0;
     }
-    .layout-zebra .name {
-      font-size: 24pt;
+    .zebra-page .name {
+      font-size: 14pt;
       font-weight: 800;
-      line-height: 0.92;
-      letter-spacing: -0.03em;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
       margin: 0;
+      overflow-wrap: anywhere;
     }
-    .layout-zebra .hospital {
+    .zebra-page .hospital {
       font-size: 8pt;
       font-weight: 700;
       letter-spacing: 0.14em;
       margin: 0.06in 0 0;
       text-transform: uppercase;
     }
-    .layout-zebra .footer {
+    .zebra-page .footer {
       margin-top: auto;
     }
-    .layout-zebra .rule {
+    .zebra-page .rule {
       border-top: 1.5px solid #000;
       margin: 0 0 0.05in;
     }
-    .layout-zebra .company {
+    .zebra-page .company {
       font-size: 7pt;
       font-weight: 800;
       letter-spacing: 0.05em;
       line-height: 1.15;
       text-transform: uppercase;
     }
-    .layout-zebra .phone {
+    .zebra-page .phone {
       font-size: 8pt;
       font-weight: 800;
       letter-spacing: 0.08em;
       line-height: 1.15;
       margin-top: 0.02in;
     }
+    .layout-zebra-flip .label {
+      flex-direction: row-reverse;
+    }
+    .layout-zebra-flip .copy {
+      border-left: 0;
+      border-right: 2px solid #000;
+    }
+    .layout-zebra-flip .logo {
+      right: auto;
+      left: 0.1in;
+    }
+    .layout-zebra-banner .label {
+      flex-direction: column;
+    }
+    .layout-zebra-banner .band {
+      flex: 0 0 0.32in;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 0.12in;
+      background: #000;
+      color: #fff;
+    }
+    .layout-zebra-banner .band .company,
+    .layout-zebra-banner .band .phone {
+      color: #fff;
+      margin: 0;
+    }
+    .layout-zebra-banner .body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+    }
+    .layout-zebra-banner .qr-wrap {
+      flex-basis: 1.55in;
+    }
+    .layout-zebra-banner .label img.qr {
+      width: 1.22in;
+      height: 1.22in;
+    }
+    .layout-zebra-banner .copy {
+      border-left: 2px solid #000;
+      justify-content: center;
+    }
+    .layout-zebra-banner .identity,
+    .layout-zebra-mark .identity {
+      padding-top: 0.04in;
+      padding-right: 0;
+    }
     @media print {
       .toolbar { display: none !important; }
       .grid { padding: 0; gap: 10px; }
-      .grid.layout-zebra { padding: 0; }
+      .grid.zebra-page { padding: 0; }
     }
   </style>
 </head>
@@ -463,7 +571,7 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     </div>
     <button type="button" onclick="window.print()">Print</button>
   </div>
-  <div class="grid layout-${layout}">
+  <div class="grid layout-${layout}${zebra ? " zebra-page" : ""}">
     ${cards}
   </div>
 </body>
@@ -478,8 +586,8 @@ export function printQrLabels(labels, title, options = {}) {
   iframe.style.position = "fixed";
   iframe.style.left = "-10000px";
   iframe.style.top = "0";
-  iframe.style.width = layout === QR_LAYOUTS.zebra ? "4in" : "8.5in";
-  iframe.style.height = layout === QR_LAYOUTS.zebra ? "2in" : "11in";
+  iframe.style.width = isZebraLayout(layout) ? "4in" : "8.5in";
+  iframe.style.height = isZebraLayout(layout) ? "2in" : "11in";
   iframe.style.border = "0";
   document.body.appendChild(iframe);
 

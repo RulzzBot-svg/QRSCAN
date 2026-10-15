@@ -5,6 +5,11 @@ import {
   escapeHtml,
   zebraHeadline,
   hospitalLine,
+  isZebraLayout,
+  resolveQrLayout,
+  usesQrCenterLogo,
+  usesSideLogo,
+  QR_LAYOUTS,
 } from "../src/utils/qrLabels.js";
 
 function assert(cond, message) {
@@ -92,7 +97,9 @@ assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print 
 assert(zebra.includes("img class=\"qr\""), "zebra QR should keep a dedicated class");
 assert(zebra.includes("Zebra ZD220"), "zebra hint should mention the printer");
 assert(zebra.includes("AHU-1 — 21 Building"), "zebra headline should keep building already in the AHU name");
-assert(zebra.includes("font-size: 24pt"), "zebra name should use the larger wrapping type");
+assert(zebra.includes("font-size: 14pt"), "zebra name should use the smaller wrapping type");
+assert(!zebra.includes("font-size: 24pt"), "zebra name should no longer be 24pt");
+assert(zebra.includes("zebra-page"), "zebra print CSS should share the 4x2 page class");
 assert(!zebra.includes("ID 128"), "zebra labels should not show the internal ID");
 assert(!zebra.includes("class=\"id\""), "zebra labels should not include an ID row");
 assert(!zebra.includes("6th Floor"), "zebra service layout should not print location");
@@ -126,5 +133,72 @@ assert(short.includes("AHU-012 — Main"), "print HTML should use the building h
 assert(short.includes("323.832.8316"), "short-name labels should still show the company phone");
 assert(!short.includes("[FOOTHILL]"), "short-name labels should not show a bracketed hospital");
 assert(short.includes(">FOOTHILL<"), "short-name labels should still show the hospital name");
+
+assert(isZebraLayout("zebra-mark") && isZebraLayout("zebra-banner") && isZebraLayout("zebra-flip"), "all 4x2 designs are zebra layouts");
+assert(!isZebraLayout("sheet") && !isZebraLayout("single"), "paper layouts are not zebra");
+assert(resolveQrLayout("zebra-banner") === QR_LAYOUTS.zebraBanner, "unknown-safe resolve keeps banner");
+assert(resolveQrLayout("nope") === QR_LAYOUTS.sheet, "unknown layout falls back to sheet");
+assert(usesQrCenterLogo(QR_LAYOUTS.zebraMark), "logo-in-QR design overlays the mark");
+assert(!usesQrCenterLogo(QR_LAYOUTS.zebra), "split design does not overlay the QR");
+assert(usesSideLogo(QR_LAYOUTS.zebra) && usesSideLogo(QR_LAYOUTS.zebraFlip), "split and flip keep a side mark");
+assert(!usesSideLogo(QR_LAYOUTS.zebraMark) && !usesSideLogo(QR_LAYOUTS.zebraBanner), "mark and banner do not use a corner logo");
+
+const mark = buildQrPrintDocument(
+  [
+    {
+      id: 128,
+      name: "AHU-1 — 21 Building",
+      hospital: "Huntington",
+      building: "21 Building",
+      url: "https://qrscan-lyart.vercel.app/FilterInfo/128",
+      qrDataUrl: "data:image/png;base64,AAA",
+    },
+  ],
+  "QR Codes — Huntington",
+  { layout: "zebra-mark" }
+);
+assert(mark.includes("layout-zebra-mark"), "logo-in-QR design should set its layout class");
+assert(mark.includes("size: 4in 2in"), "logo-in-QR design stays 4x2");
+assert(mark.includes("font-size: 14pt"), "logo-in-QR name stays the smaller type");
+assert(!mark.includes("img class=\"logo\""), "logo-in-QR design should not also print a corner logo");
+
+const banner = buildQrPrintDocument(
+  [
+    {
+      id: 128,
+      name: "AHU-1 — 21 Building",
+      hospital: "Huntington",
+      building: "21 Building",
+      url: "https://qrscan-lyart.vercel.app/FilterInfo/128",
+      qrDataUrl: "data:image/png;base64,AAA",
+    },
+  ],
+  "QR Codes — Huntington",
+  { layout: "zebra-banner" }
+);
+assert(banner.includes("layout-zebra-banner"), "banner design should set its layout class");
+assert(banner.includes("class=\"band\""), "banner design should use a top bar");
+assert(banner.includes("ADVANCED FILTRATION CONCEPTS"), "banner still names the company");
+assert(banner.includes("323.832.8316"), "banner still shows the phone");
+assert(banner.includes("font-size: 14pt"), "banner name stays the smaller type");
+
+const flip = buildQrPrintDocument(
+  [
+    {
+      id: 128,
+      name: "AHU-1 — 21 Building",
+      hospital: "Huntington",
+      building: "21 Building",
+      url: "https://qrscan-lyart.vercel.app/FilterInfo/128",
+      qrDataUrl: "data:image/png;base64,AAA",
+    },
+  ],
+  "QR Codes — Huntington",
+  { layout: "zebra-flip", sideLogoDataUrl: "data:image/png;base64,LOGO" }
+);
+assert(flip.includes("layout-zebra-flip"), "QR-right design should set its layout class");
+assert(flip.includes("flex-direction: row-reverse"), "QR-right design should flip the row");
+assert(flip.includes("data:image/png;base64,LOGO"), "QR-right design still prints the side mark");
+assert(flip.includes("font-size: 14pt"), "QR-right name stays the smaller type");
 
 console.log("qrLabels tests passed");
