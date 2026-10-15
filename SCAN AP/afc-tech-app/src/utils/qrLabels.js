@@ -255,6 +255,7 @@ export async function buildQrLabels(ahus, baseUrlOrOptions = getQrBaseUrl()) {
       name: ahuDisplayName(ahu),
       location: ahu.location || "",
       hospital: ahu.hospital || "",
+      building: ahu.building || "",
       url,
       qrDataUrl,
     });
@@ -276,7 +277,13 @@ export async function applyLogoToLabels(labels, logoDataUrl) {
 }
 
 export function zebraHeadline(label) {
-  return String(label?.name || "").trim();
+  const name = String(label?.name || "").trim();
+  const building = String(label?.building || "").trim();
+  if (!building) return name;
+  const haystack = name.toLowerCase();
+  const needle = building.toLowerCase();
+  if (haystack.includes(needle)) return name;
+  return name ? `${name} — ${building}` : building;
 }
 
 export const AFC_COMPANY_NAME = "ADVANCED FILTRATION CONCEPTS";
@@ -300,14 +307,7 @@ function hospitalNameOnly(hospital, building) {
 export function hospitalLine(label) {
   const building = String(label?.building || "").trim();
   const hospital = hospitalNameOnly(label?.hospital, building);
-  if (hospital && building) {
-    if (hospital.toLowerCase().includes(building.toLowerCase())) {
-      return hospital.toUpperCase();
-    }
-    return `${hospital.toUpperCase()} - ${building}`;
-  }
-  if (hospital) return hospital.toUpperCase();
-  return building;
+  return hospital ? hospital.toUpperCase() : "";
 }
 
 function zebraIdentityHtml(label, { sideLogo = "", footer = true } = {}) {
