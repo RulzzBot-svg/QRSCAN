@@ -7,10 +7,16 @@ import {
   applyLogoToLabels,
   printQrLabels,
   QR_LAYOUTS,
+  QR_LAYOUT_OPTIONS,
+  isZebraLayout,
+  usesQrCenterLogo,
+  usesSideLogo,
   storeQrLogo,
   toBlackAndWhiteDataUrl,
   zebraHeadline,
   hospitalLine,
+  AFC_COMPANY_NAME,
+  AFC_PHONE,
 } from "../../utils/qrLabels";
 
 export default function QrLabelPrintModal({
@@ -55,18 +61,24 @@ export default function QrLabelPrintModal({
     };
   }, [logoDataUrl]);
 
+  const zebraLogo = bwLogoDataUrl || logoDataUrl || afcLogoDataUrl;
+  const centerLogo = usesQrCenterLogo(layout)
+    ? zebraLogo
+    : !isZebraLayout(layout)
+      ? logoDataUrl
+      : "";
+
   useEffect(() => {
     let cancelled = false;
     const source = Array.isArray(labels) ? labels : [];
-    const overlay = layout !== QR_LAYOUTS.zebra && logoDataUrl;
-    if (!overlay) {
+    if (!centerLogo) {
       setDisplayLabels(source);
       return undefined;
     }
     setLogoBusy(true);
     (async () => {
       try {
-        const next = await applyLogoToLabels(source, logoDataUrl);
+        const next = await applyLogoToLabels(source, centerLogo);
         if (!cancelled) setDisplayLabels(next);
       } catch (err) {
         console.error("Logo overlay failed", err);
@@ -78,25 +90,20 @@ export default function QrLabelPrintModal({
     return () => {
       cancelled = true;
     };
-  }, [labels, logoDataUrl, layout]);
+  }, [labels, centerLogo]);
 
-  const zebraLogo = bwLogoDataUrl || logoDataUrl || afcLogoDataUrl;
   const printOptions = useMemo(
     () => ({
       layout,
-      sideLogoDataUrl: layout === QR_LAYOUTS.zebra ? zebraLogo : "",
+      sideLogoDataUrl: usesSideLogo(layout) ? zebraLogo : "",
     }),
     [layout, zebraLogo]
   );
 
   const count = displayLabels?.length || 0;
-  const hint = useMemo(() => {
-    if (layout === QR_LAYOUTS.zebra) {
-      return "4×2 in Zebra ZD220 thermal labels (black & white)";
-    }
-    if (layout === QR_LAYOUTS.single) return "One AHU per printed page";
-    return "3 labels per letter page";
-  }, [layout]);
+  const selected = QR_LAYOUT_OPTIONS.find((opt) => opt.id === layout);
+  const hint = selected?.hint || "Scan opens FilterInfo";
+  const zebra = isZebraLayout(layout);
 
   if (!open) return null;
 
@@ -160,7 +167,7 @@ export default function QrLabelPrintModal({
           {logoDataUrl ? (
             <>
               <img
-                src={layout === QR_LAYOUTS.zebra ? zebraLogo : logoDataUrl}
+                src={zebra ? zebraLogo : logoDataUrl}
                 alt="QR logo"
                 className="h-6 object-contain border bg-white"
               />
@@ -170,21 +177,27 @@ export default function QrLabelPrintModal({
             </>
           ) : (
             <span className="text-xs opacity-70">
-              {layout === QR_LAYOUTS.zebra
-                ? "AFC mark top-right, hospital name under the AHU, company and phone in the footer"
-                : "Optional company logo sits in the center of each QR"}
+              {layout === QR_LAYOUTS.zebraMark
+                ? "AFC mark sits in the center of the QR"
+                : layout === QR_LAYOUTS.zebraBanner
+                  ? "Black bar with company name and phone, AHU name below"
+                  : zebra
+                    ? "AFC mark on the label, hospital under the AHU name"
+                    : "Optional company logo sits in the center of each QR"}
             </span>
           )}
           <div className="ml-auto flex items-center gap-2 text-xs">
-            <span className="opacity-70">Layout</span>
+            <span className="opacity-70">Design</span>
             <select
-              className="select select-xs select-bordered"
+              className="select select-xs select-bordered max-w-[16rem]"
               value={layout}
               onChange={(e) => setLayout(e.target.value)}
             >
-              <option value={QR_LAYOUTS.zebra}>Zebra 4×2 in</option>
-              <option value={QR_LAYOUTS.sheet}>Sheet (3 per page)</option>
-              <option value={QR_LAYOUTS.single}>One AHU per page</option>
+              {QR_LAYOUT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -204,25 +217,21 @@ export default function QrLabelPrintModal({
             <div className="text-center py-12 opacity-70">No AHUs to print.</div>
           )}
 
-          {!loading && !error && count > 0 && layout === QR_LAYOUTS.zebra && (
+          {!loading && !error && count > 0 && zebra && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {displayLabels.map((label) => (
                 <ZebraPreviewCard
                   key={label.id}
                   label={label}
-                  logoSrc={zebraLogo}
-                  onPrint={() =>
-                    printQrLabels([label], label.name, {
-                      layout: QR_LAYOUTS.zebra,
-                      sideLogoDataUrl: zebraLogo,
-                    })
-                  }
+                  layout={layout}
+                  logoSrc={usesSideLogo(layout) ? zebraLogo : ""}
+                  onPrint={() => printQrLabels([label], label.name, printOptions)}
                 />
               ))}
             </div>
           )}
 
-          {!loading && !error && count > 0 && layout !== QR_LAYOUTS.zebra && (
+          {!loading && !error && count > 0 && !zebra && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {displayLabels.map((label) => (
                 <div
@@ -262,47 +271,78 @@ export default function QrLabelPrintModal({
   );
 }
 
-function ZebraPreviewCard({ label, logoSrc, onPrint }) {
+function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
   const headline = zebraHeadline(label);
   const hospital = hospitalLine(label);
+  const flip = layout === QR_LAYOUTS.zebraFlip;
+  const banner = layout === QR_LAYOUTS.zebraBanner;
+
+  const copy = (
+    <div
+      className={`flex-1 min-w-0 pl-3 pr-2 py-2 flex flex-col relative ${
+        flip ? "border-r-2 border-black" : "border-l-2 border-black"
+      }`}
+    >
+      {logoSrc ? (
+        <img
+          src={logoSrc}
+          alt="AFC"
+          className={`absolute top-1 h-7 w-auto max-w-[40%] object-contain ${
+            flip ? "left-2" : "right-2"
+          }`}
+        />
+      ) : null}
+      <div className={`flex-1 flex flex-col justify-center pt-2 ${logoSrc ? "pr-6" : ""}`}>
+        <div className="font-extrabold text-lg leading-tight tracking-tight break-words">
+          {headline}
+        </div>
+        {hospital ? (
+          <div className="text-[10px] font-bold tracking-[0.14em] uppercase mt-1.5">
+            {hospital}
+          </div>
+        ) : null}
+      </div>
+      {!banner ? (
+        <div className="mt-auto">
+          <div className="border-t border-black mb-1.5" />
+          <div className="text-[9px] font-extrabold uppercase tracking-wide leading-tight">
+            {AFC_COMPANY_NAME}
+          </div>
+          <div className="text-[10px] font-extrabold tracking-wide leading-tight mt-0.5">
+            {AFC_PHONE}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const qr = (
+    <div className={`${banner ? "w-[38%]" : "w-[40%]"} flex items-center justify-center shrink-0`}>
+      <img
+        src={label.qrDataUrl}
+        alt={`QR for ${headline}`}
+        className="h-[72%] w-auto aspect-square"
+      />
+    </div>
+  );
+
   return (
     <div className="border border-base-300 rounded bg-white text-black p-2">
       <div
-        className="flex items-stretch bg-white overflow-hidden"
+        className="flex flex-col bg-white overflow-hidden"
         style={{ aspectRatio: "2 / 1" }}
       >
-        <div className="w-[40%] flex items-center justify-center shrink-0">
-          <img
-            src={label.qrDataUrl}
-            alt={`QR for ${headline}`}
-            className="h-[72%] w-auto aspect-square"
-          />
-        </div>
-        <div className="flex-1 min-w-0 border-l-2 border-black pl-3 pr-2 py-2 flex flex-col relative">
-          {logoSrc ? (
-            <img
-              src={logoSrc}
-              alt="AFC"
-              className="absolute top-1 right-2 h-7 w-auto max-w-[40%] object-contain"
-            />
-          ) : null}
-          <div className="flex-1 flex flex-col justify-center pr-6 pt-3">
-            <div className="font-extrabold text-3xl leading-none tracking-tight">{headline}</div>
-            {hospital ? (
-              <div className="text-[10px] font-bold tracking-[0.14em] uppercase mt-2">
-                {hospital}
-              </div>
-            ) : null}
+        {banner ? (
+          <div className="bg-black text-white flex items-center justify-between gap-2 px-2 py-1 shrink-0">
+            <span className="text-[8px] font-extrabold uppercase tracking-wide truncate">
+              {AFC_COMPANY_NAME}
+            </span>
+            <span className="text-[9px] font-extrabold shrink-0">{AFC_PHONE}</span>
           </div>
-          <div className="mt-auto">
-            <div className="border-t border-black mb-1.5" />
-            <div className="text-[9px] font-extrabold uppercase tracking-wide leading-tight">
-              Advanced Filtration Concepts
-            </div>
-            <div className="text-[10px] font-extrabold tracking-wide leading-tight mt-0.5">
-              323.832.8316
-            </div>
-          </div>
+        ) : null}
+        <div className={`flex items-stretch flex-1 min-h-0 ${flip ? "flex-row-reverse" : ""}`}>
+          {qr}
+          {copy}
         </div>
       </div>
       <button className="btn btn-xs mt-2" type="button" onClick={onPrint}>
