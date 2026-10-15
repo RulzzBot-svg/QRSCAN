@@ -255,7 +255,6 @@ export async function buildQrLabels(ahus, baseUrlOrOptions = getQrBaseUrl()) {
       name: ahuDisplayName(ahu),
       location: ahu.location || "",
       hospital: ahu.hospital || "",
-      building: ahu.building || "",
       url,
       qrDataUrl,
     });
