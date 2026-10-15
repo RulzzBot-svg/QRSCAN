@@ -74,12 +74,12 @@ export default function QRScanner() {
 
               // If not logged in, save intended path and send user to login
               const tech = localStorage.getItem("tech");
-              if (!tech) {
+              const token = localStorage.getItem("auth_token");
+              if (!tech || !token) {
                 const target = `/FilterInfo/${encodeURIComponent(ahuId)}`;
                 try {
                   sessionStorage.setItem("post_login_path", target);
                 } catch {}
-                // navigate to login (full reload is fine)
                 window.location.assign(`/`);
                 return;
               }

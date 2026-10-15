@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { clearClientSession, hasClientToken, isClientDirector, readClientUser } from "./api";
+import { clearTechSession } from "../api/api";
 import {
   applyClientTheme,
   clearDocumentTheme,
@@ -105,6 +106,7 @@ export default function ClientApp() {
               className="btn btn-ghost btn-sm w-full justify-start"
               onClick={() => {
                 clearClientSession();
+                clearTechSession();
                 navigate("/client/login");
               }}
             >
@@ -127,6 +129,7 @@ export default function ClientApp() {
                   className="btn btn-ghost btn-sm"
                   onClick={() => {
                     clearClientSession();
+                    clearTechSession();
                     navigate("/client/login");
                   }}
                 >

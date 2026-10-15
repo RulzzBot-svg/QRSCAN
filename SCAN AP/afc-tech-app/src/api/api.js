@@ -74,3 +74,21 @@ export function hasAuthToken() {
     return false;
   }
 }
+
+export function hasTechSession() {
+  try {
+    return Boolean(localStorage.getItem("auth_token") && localStorage.getItem("tech"));
+  } catch {
+    return false;
+  }
+}
+
+export function clearTechSession() {
+  try {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("tech");
+    localStorage.removeItem("offline_tech");
+  } catch {
+    /* ignore */
+  }
+}
