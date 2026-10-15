@@ -16,7 +16,7 @@ from routes.ahu_routes import ahu_bp
 from routes.client_routes import client_bp
 from routes.job_routes import job_bp
 from routes.tech_routes import tech_bp
-from utility.client_portal import frequency_label, public_filter
+from utility.client_portal import filter_type_label, frequency_label, public_filter
 
 
 def make_app(db_path):
@@ -109,6 +109,24 @@ def seed(app):
                 last_service_date=date.today() - timedelta(days=400),
             ),
             Filter(
+                ahu_id=ahu9.id,
+                phase="PRE First Stage",
+                part_number="HVP20252XM",
+                size="20x25x2",
+                quantity=8,
+                frequency_days=90,
+                last_service_date=date.today() - timedelta(days=30),
+            ),
+            Filter(
+                ahu_id=ahu9.id,
+                phase="Gas Phase",
+                part_number="LH07590",
+                size="24x28x2",
+                quantity=4,
+                frequency_days=365,
+                last_service_date=date.today() - timedelta(days=30),
+            ),
+            Filter(
                 ahu_id=other_ahu.id,
                 phase="PRE",
                 part_number="OTHER",
@@ -176,6 +194,12 @@ def auth_header(app, subject_id, role, token_type="tech"):
 def main():
     assert_eq(frequency_label(730), "2 years", "2yr label")
     assert_eq(frequency_label(1095), "3 years", "3yr label")
+    assert_eq(filter_type_label("PRE First Stage"), "PRE", "first stage is PRE")
+    assert_eq(filter_type_label("FINAL"), "FINAL", "final")
+    assert_eq(filter_type_label("Gas Phase"), "Gas Phase", "gas phase")
+    assert_eq(filter_type_label("CARBON"), "Gas Phase", "carbon is gas phase")
+    assert_eq(filter_type_label("HEPA"), "HEPA", "hepa")
+    assert_eq(filter_type_label(""), "Other", "blank phase")
 
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
@@ -235,6 +259,11 @@ def main():
     assert graphs["summary"]["overdue"] >= 1, "overdue in graphs"
     buildings = [b["name"] for b in graphs["by_building"]]
     assert "South Tower" in buildings and "MAIN BLDG" in buildings
+    phases = {r["phase"]: r["quantity"] for r in graphs["by_phase"]}
+    assert_eq(phases.get("PRE"), 63, "PRE qty includes first stage")
+    assert_eq(phases.get("FINAL"), 20, "FINAL qty on graphs")
+    assert_eq(phases.get("Gas Phase"), 4, "Gas Phase qty on graphs")
+    assert_eq([r["phase"] for r in graphs["by_phase"]], ["PRE", "FINAL", "Gas Phase"], "type order")
 
     sticker = client.get(f"/api/public/units/{ids['ahu_id']}")
     assert_eq(sticker.status_code, 200, "logged-out QR card")

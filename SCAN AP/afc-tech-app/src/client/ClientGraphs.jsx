@@ -22,6 +22,16 @@ const STATUS_COLORS = {
   pending: "#64748b",
 };
 
+const PHASE_COLORS = {
+  PRE: "#0a4d8c",
+  FINAL: "#15803d",
+  "Gas Phase": "#7c3aed",
+  HEPA: "#0f766e",
+  Other: "#64748b",
+};
+
+const PHASE_FALLBACK = ["#0369a1", "#c2410c", "#a16207", "#be185d"];
+
 export default function ClientGraphs() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -74,6 +84,12 @@ export default function ClientGraphs() {
     Visits: v.jobs,
   }));
 
+  const types = (data.by_phase || []).map((row, i) => ({
+    name: row.phase,
+    value: row.quantity,
+    color: PHASE_COLORS[row.phase] || PHASE_FALLBACK[i % PHASE_FALLBACK.length],
+  }));
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -88,7 +104,6 @@ export default function ClientGraphs() {
             exportClientGraphsPdf({
               hospitalName: readClientUser()?.hospital_name,
               summary: data.summary,
-              frequencies: data.by_frequency,
               chartsRoot: chartsRef.current,
             })
           }
@@ -154,18 +169,29 @@ export default function ClientGraphs() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Filter frequencies">
-          <div className="space-y-2 js-graph-list">
-            {(data.by_frequency || []).map((row) => (
-              <div key={row.days} className="flex items-center justify-between text-sm">
-                <span>{row.label}</span>
-                <span className="font-semibold tabular-nums">{row.count}</span>
-              </div>
-            ))}
-            {(data.by_frequency || []).length === 0 ? (
-              <p className="text-sm text-base-content/50">No filter rows yet.</p>
-            ) : null}
-          </div>
+        <ChartCard title="Filter types">
+          {types.length === 0 ? (
+            <p className="text-sm text-base-content/50 py-16 text-center">No filter types yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie data={types} dataKey="value" nameKey="name" innerRadius={52} outerRadius={80}>
+                  {types.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value, name) => [`${value} qty`, name]}
+                />
+                <Legend
+                  formatter={(value) => {
+                    const row = types.find((t) => t.name === value);
+                    return `${value} (${row?.value ?? 0})`;
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </ChartCard>
       </div>
     </div>
