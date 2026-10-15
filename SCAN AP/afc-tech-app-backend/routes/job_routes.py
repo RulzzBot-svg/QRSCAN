@@ -7,6 +7,7 @@ from dateutil.parser import isoparse
 from sqlalchemy.orm import joinedload
 from middleware.auth import require_admin, require_auth, is_admin
 from utility.http import internal_error, validate_signature_payload
+from utility.resistance import previous_dps_for_jobs
 
 job_bp = Blueprint("jobs", __name__)
 
@@ -23,7 +24,8 @@ def _job_query_with_relations():
     )
 
 
-def _serialize_job_summary(j):
+def _serialize_job_summary(j, previous_dps=None):
+    previous_dps = previous_dps or {}
     return {
         "id": j.id,
         "ahu_id": j.ahu_id,
@@ -37,17 +39,25 @@ def _serialize_job_summary(j):
         "filters": [
             {
                 "filter_id": jf.filter_id,
-                "phase": jf.filter.phase,
-                "part_number": jf.filter.part_number,
-                "size": jf.filter.size,
+                "phase": jf.filter.phase if jf.filter else None,
+                "part_number": jf.filter.part_number if jf.filter else None,
+                "size": jf.filter.size if jf.filter else None,
                 "is_completed": jf.is_completed,
                 "note": jf.note,
                 "initial_resistance": jf.initial_resistance,
                 "final_resistance": jf.final_resistance,
+                "previous_initial_resistance": (previous_dps.get((j.id, jf.filter_id)) or {}).get("initial_resistance"),
+                "previous_final_resistance": (previous_dps.get((j.id, jf.filter_id)) or {}).get("final_resistance"),
+                "previous_dps_at": (previous_dps.get((j.id, jf.filter_id)) or {}).get("completed_at"),
             }
             for jf in j.job_filters
         ],
     }
+
+
+def _serialize_jobs(jobs):
+    previous = previous_dps_for_jobs(jobs)
+    return [_serialize_job_summary(j, previous) for j in jobs]
 
 
 @job_bp.route("/jobs", methods=["POST"])
@@ -162,6 +172,7 @@ def get_job(job_id):
     if not is_admin() and job.tech_id != g.current_tech_id:
         return jsonify({"error": "Forbidden"}), 403
 
+    previous = previous_dps_for_jobs([job])
     filters = [
         {
             "job_filter_id": jf.id,
@@ -173,6 +184,9 @@ def get_job(job_id):
             "note": jf.note,
             "initial_resistance": jf.initial_resistance,
             "final_resistance": jf.final_resistance,
+            "previous_initial_resistance": (previous.get((job.id, jf.filter_id)) or {}).get("initial_resistance"),
+            "previous_final_resistance": (previous.get((job.id, jf.filter_id)) or {}).get("final_resistance"),
+            "previous_dps_at": (previous.get((job.id, jf.filter_id)) or {}).get("completed_at"),
         }
         for jf in job.job_filters
     ]
@@ -197,7 +211,7 @@ def get_all_jobs():
         q = q.filter(Job.tech_id == g.current_tech_id)
 
     jobs = q.order_by(Job.completed_at.desc()).all()
-    return jsonify([_serialize_job_summary(j) for j in jobs]), 200
+    return jsonify(_serialize_jobs(jobs)), 200
 
 
 @job_bp.route("/admin/jobs", methods=["GET"])
@@ -212,7 +226,7 @@ def admin_get_all_jobs():
             pass
 
     jobs = q.order_by(Job.completed_at.desc()).all()
-    return jsonify([_serialize_job_summary(j) for j in jobs]), 200
+    return jsonify(_serialize_jobs(jobs)), 200
 
 
 @job_bp.route("/technicians/<int:tech_id>/jobs", methods=["GET"])

@@ -101,6 +101,25 @@ function AdminJobs() {
                       </span>
                     </div>
 
+                    <div className="mt-2 text-sm tabular-nums">
+                      <div>
+                        Initial DPS:{" "}
+                        {f.initial_resistance == null ? "—" : f.initial_resistance}
+                        {" · "}
+                        Final DPS:{" "}
+                        {f.final_resistance == null ? "—" : f.final_resistance}
+                      </div>
+                      <div className="text-xs opacity-70 mt-0.5">
+                        Last DPS:{" "}
+                        {f.previous_initial_resistance == null && f.previous_final_resistance == null
+                          ? "none on file"
+                          : `${f.previous_initial_resistance ?? "—"} / ${f.previous_final_resistance ?? "—"}`}
+                        {f.previous_dps_at
+                          ? ` · ${formatDate(f.previous_dps_at, "en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}`
+                          : ""}
+                      </div>
+                    </div>
+
                     {f.note && (
                       <div className="mt-2 text-sm italic text-base-content/70">
                         “{f.note}”

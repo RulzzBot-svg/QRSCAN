@@ -15,6 +15,7 @@ from utility.admin_filters import (
     parse_ahu_ids,
 )
 from utility.ahu_delete import AHU_DELETE_LIMIT, delete_ahus_by_ids, normalize_ahu_ids
+from utility.resistance import last_dps_by_filter_ids
 
 ahu_bp = Blueprint("ahu", __name__)
 
@@ -205,9 +206,11 @@ def get_ahu_by_qr(ahu_id):
             .all()
         )
 
+        last_dps = last_dps_by_filter_ids([f.id for f in active_filters])
         filters_payload = []
         for f in active_filters:
             st = safe_filter_status(f)
+            prev = last_dps.get(f.id) or {}
             filters_payload.append({
                 "id": f.id,
                 "phase": f.phase,
@@ -219,6 +222,9 @@ def get_ahu_by_qr(ahu_id):
                     f.last_service_date.isoformat()
                     if getattr(f, "last_service_date", None) else None
                 ),
+                "previous_initial_resistance": prev.get("initial_resistance"),
+                "previous_final_resistance": prev.get("final_resistance"),
+                "previous_dps_at": prev.get("completed_at"),
                 **{k: v for k, v in st.items() if v is not None}
             })
 

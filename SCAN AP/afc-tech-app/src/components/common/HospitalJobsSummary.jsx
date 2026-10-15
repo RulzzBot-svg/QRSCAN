@@ -168,6 +168,41 @@ export default function HospitalJobsSummary({
                             .join(", ")
                         : "—"}
                     </div>
+                    {job.filters?.some(
+                      (f) => f.initial_resistance != null || f.final_resistance != null
+                    ) ? (
+                      <div className="text-xs mt-1 tabular-nums opacity-80">
+                        DPS:{" "}
+                        {job.filters
+                          .map((f) => {
+                            if (f.initial_resistance == null && f.final_resistance == null) return null;
+                            return `${f.phase || "Filter"} ${f.initial_resistance ?? "—"}/${f.final_resistance ?? "—"}`;
+                          })
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    ) : null}
+                    {job.filters?.some(
+                      (f) =>
+                        f.previous_initial_resistance != null ||
+                        f.previous_final_resistance != null
+                    ) ? (
+                      <div className="text-xs mt-0.5 tabular-nums opacity-60">
+                        Last DPS:{" "}
+                        {job.filters
+                          .map((f) => {
+                            if (
+                              f.previous_initial_resistance == null &&
+                              f.previous_final_resistance == null
+                            ) {
+                              return null;
+                            }
+                            return `${f.phase || "Filter"} ${f.previous_initial_resistance ?? "—"}/${f.previous_final_resistance ?? "—"}`;
+                          })
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

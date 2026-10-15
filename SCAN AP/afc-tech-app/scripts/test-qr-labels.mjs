@@ -141,6 +141,7 @@ assert(resolveQrLayout("zebra-banner") === QR_LAYOUTS.zebraBanner, "unknown-safe
 assert(resolveQrLayout("nope") === QR_LAYOUTS.sheet, "unknown layout falls back to sheet");
 assert(QR_CENTER_LOGO_RATIO >= 0.42, "center AFC mark should read about 90px on the 4x2 preview");
 assert(usesQrCenterLogo(QR_LAYOUTS.zebraMark), "logo-in-QR design overlays the mark");
+assert(usesQrCenterLogo(QR_LAYOUTS.zebraBanner), "banner design overlays the mark in the QR");
 assert(!usesQrCenterLogo(QR_LAYOUTS.zebra), "split design does not overlay the QR");
 assert(usesSideLogo(QR_LAYOUTS.zebra) && usesSideLogo(QR_LAYOUTS.zebraFlip), "split and flip keep a side mark");
 assert(!usesSideLogo(QR_LAYOUTS.zebraMark) && !usesSideLogo(QR_LAYOUTS.zebraBanner), "mark and banner do not use a corner logo");
@@ -180,6 +181,9 @@ const banner = buildQrPrintDocument(
 );
 assert(banner.includes("layout-zebra-banner"), "banner design should set its layout class");
 assert(banner.includes("class=\"band\""), "banner design should use a top bar");
+assert(banner.includes("flex: 0 0 0.2in"), "banner bar is shorter than the old 0.32in strip");
+assert(banner.includes("width: 4in"), "banner bar spans the full 4in label with no side gaps");
+assert(banner.includes("min-width: 4in"), "banner bar cannot shrink narrower than the label");
 assert(banner.includes("ADVANCED FILTRATION CONCEPTS"), "banner still names the company");
 assert(banner.includes("323.832.8316"), "banner still shows the phone");
 assert(banner.includes("font-size: 14pt"), "banner name stays the smaller type");
