@@ -277,22 +277,38 @@ export async function applyLogoToLabels(labels, logoDataUrl) {
 }
 
 export function zebraHeadline(label) {
-  const name = String(label?.name || "").trim();
-  const building = String(label?.building || "").trim();
-  if (!building) return name;
-  const haystack = name.toLowerCase();
-  const needle = building.toLowerCase();
-  if (haystack.includes(needle)) return name;
-  return name ? `${name} — ${building}` : building;
+  return String(label?.name || "").trim();
 }
 
 export const AFC_COMPANY_NAME = "ADVANCED FILTRATION CONCEPTS";
 export const AFC_PHONE = "323.832.8316";
 export const AFC_PHONE_TEL = "+13238328316";
 
+function hospitalNameOnly(hospital, building) {
+  let name = String(hospital || "").trim();
+  const bldg = String(building || "").trim();
+  if (!name) return "";
+  const dash = name.lastIndexOf(" - ");
+  if (dash > 0 && bldg) {
+    const suffix = name.slice(dash + 3).trim();
+    if (suffix && suffix.toLowerCase() !== name.slice(0, dash).trim().toLowerCase()) {
+      name = name.slice(0, dash).trim();
+    }
+  }
+  return name;
+}
+
 export function hospitalLine(label) {
-  const name = String(label?.hospital || "").trim();
-  return name ? name.toUpperCase() : "";
+  const building = String(label?.building || "").trim();
+  const hospital = hospitalNameOnly(label?.hospital, building);
+  if (hospital && building) {
+    if (hospital.toLowerCase().includes(building.toLowerCase())) {
+      return hospital.toUpperCase();
+    }
+    return `${hospital.toUpperCase()} - ${building}`;
+  }
+  if (hospital) return hospital.toUpperCase();
+  return building;
 }
 
 function zebraIdentityHtml(label, { sideLogo = "", footer = true } = {}) {
@@ -519,9 +535,9 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     .zebra-page .hospital {
       font-size: 8pt;
       font-weight: 700;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.06em;
       margin: 0.06in 0 0;
-      text-transform: uppercase;
+      overflow-wrap: anywhere;
     }
     .zebra-page .footer {
       margin-top: auto;

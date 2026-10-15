@@ -90,7 +90,7 @@ assert(zebra.includes("height: 2in"), "zebra label should be 2 inches tall");
 assert(zebra.includes("1.28in"), "zebra QR should sit in the left pane");
 assert(zebra.includes("border-left: 2px solid #000"), "zebra layout should use a vertical divider");
 assert(!zebra.includes("[HUNTINGTON]"), "zebra footer should not wrap the hospital in brackets");
-assert(zebra.includes(">HUNTINGTON<"), "zebra labels should still show the hospital name");
+assert(zebra.includes("HUNTINGTON - 21 Building"), "hospital line is hospital name plus this AHU's building");
 assert(!zebra.includes("SERVICED"), "zebra footer should not say serviced by");
 assert(zebra.includes("ADVANCED FILTRATION CONCEPTS"), "zebra footer should name Advanced Filtration Concepts");
 assert(zebra.includes("323.832.8316"), "zebra footer should show the company phone");
@@ -106,15 +106,26 @@ assert(!zebra.includes("class=\"id\""), "zebra labels should not include an ID r
 assert(!zebra.includes("6th Floor"), "zebra service layout should not print location");
 
 assert(
-  zebraHeadline({ name: "AHU-012", building: "Main" }) === "AHU-012 — Main",
-  "short AHU names should pick up the building in the headline"
+  zebraHeadline({ name: "AHU-012", building: "Main" }) === "AHU-012",
+  "AHU name stays the headline; building belongs on the hospital line"
 );
 assert(
   zebraHeadline({ name: "AHU-1 — 21 Building", building: "21 Building" }) === "AHU-1 — 21 Building",
-  "should not duplicate a building already in the name"
+  "stored AHU names that already include the building are left alone"
 );
 assert(hospitalLine({ hospital: "Huntington" }) === "HUNTINGTON", "hospital line is uppercase without brackets");
 assert(hospitalLine({ hospital: "" }) === "", "blank hospital stays off the label");
+assert(
+  hospitalLine({
+    hospital: "CHILDRENS LA HOSPITAL - MAIN BUILDING",
+    building: "Anderson Pavilion",
+  }) === "CHILDRENS LA HOSPITAL - Anderson Pavilion",
+  "hospital line uses this AHU's building, not a campus suffix on the hospital name"
+);
+assert(
+  hospitalLine({ hospital: "Foothill", building: "Main" }) === "FOOTHILL - Main",
+  "hospital line is hospital name - AHU building"
+);
 
 const short = buildQrPrintDocument(
   [
@@ -130,10 +141,10 @@ const short = buildQrPrintDocument(
   "QR Codes — Foothill",
   { layout: "zebra" }
 );
-assert(short.includes("AHU-012 — Main"), "print HTML should use the building headline");
+assert(short.includes("AHU-012"), "print HTML should use the AHU name as the headline");
+assert(short.includes("FOOTHILL - Main"), "print HTML should use hospital name - this AHU's building");
 assert(short.includes("323.832.8316"), "short-name labels should still show the company phone");
 assert(!short.includes("[FOOTHILL]"), "short-name labels should not show a bracketed hospital");
-assert(short.includes(">FOOTHILL<"), "short-name labels should still show the hospital name");
 
 assert(isZebraLayout("zebra-mark") && isZebraLayout("zebra-banner") && isZebraLayout("zebra-flip"), "all 4x2 designs are zebra layouts");
 assert(!isZebraLayout("sheet") && !isZebraLayout("single"), "paper layouts are not zebra");

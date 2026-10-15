@@ -297,7 +297,7 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
           {headline}
         </div>
         {hospital ? (
-          <div className="text-[10px] font-bold tracking-[0.14em] uppercase mt-1.5">
+          <div className="text-[10px] font-bold tracking-wide mt-1.5">
             {hospital}
           </div>
         ) : null}
