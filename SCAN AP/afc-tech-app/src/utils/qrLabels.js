@@ -18,7 +18,7 @@ export const QR_LAYOUTS = {
 export const QR_LAYOUT_OPTIONS = [
   { id: QR_LAYOUTS.zebra, label: "Zebra 4×2 — split", hint: "QR left, name right" },
   { id: QR_LAYOUTS.zebraMark, label: "Zebra 4×2 — logo in QR", hint: "AFC mark in the center of the QR" },
-  { id: QR_LAYOUTS.zebraBanner, label: "Zebra 4×2 — banner", hint: "Black top bar with AFC and phone" },
+  { id: QR_LAYOUTS.zebraBanner, label: "Zebra 4×2 — banner", hint: "Thin full-width bar, AFC mark in the QR" },
   { id: QR_LAYOUTS.zebraFlip, label: "Zebra 4×2 — QR right", hint: "Name left, QR on the right" },
   { id: QR_LAYOUTS.sheet, label: "Sheet (3 per page)", hint: "Letter page, 3 labels" },
   { id: QR_LAYOUTS.single, label: "One AHU per page", hint: "One AHU per printed page" },
@@ -35,7 +35,7 @@ export function resolveQrLayout(layout) {
 }
 
 export function usesQrCenterLogo(layout) {
-  return layout === QR_LAYOUTS.zebraMark;
+  return layout === QR_LAYOUTS.zebraMark || layout === QR_LAYOUTS.zebraBanner;
 }
 
 export function usesSideLogo(layout) {
@@ -516,14 +516,22 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     }
     .layout-zebra-banner .label {
       flex-direction: column;
+      width: 4in;
+      padding: 0;
+      margin: 0;
     }
     .layout-zebra-banner .band {
-      flex: 0 0 0.32in;
+      flex: 0 0 0.2in;
+      width: 4in;
+      min-width: 4in;
+      max-width: 4in;
+      align-self: stretch;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 0 0.12in;
+      margin: 0;
+      padding: 0 0.1in;
       background: #000;
       color: #fff;
     }

@@ -15,6 +15,24 @@ function formatServiceDate(iso) {
   return iso ? formatDate(iso, "en-US", SERVICE_DATE_OPTS) : "Never";
 }
 
+function formatDps(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = Number(value);
+  return Number.isFinite(n) ? String(n) : "—";
+}
+
+function LastDpsLine({ value, at }) {
+  if (value === null || value === undefined || value === "") {
+    return <p className="text-[11px] text-base-content/50 mt-1">Last DPS: none on file</p>;
+  }
+  return (
+    <p className="text-[11px] text-base-content/60 mt-1 select-none">
+      Last DPS: <span className="font-medium tabular-nums">{formatDps(value)}</span>
+      {at ? ` · ${formatDate(at, "en-US", SERVICE_DATE_OPTS)}` : ""}
+    </p>
+  );
+}
+
 function nextDueFromFrequency(row) {
   const last = parseIsoToDate(row.last_service_date);
   const days = Number(row.frequency_days);
@@ -440,6 +458,10 @@ function FilterInfo() {
                           }
                           onClick={(e) => e.stopPropagation()}
                         />
+                        <LastDpsLine
+                          value={row.previous_initial_resistance}
+                          at={row.previous_dps_at}
+                        />
                       </div>
 
                       <div onClick={(e) => e.stopPropagation()}>
@@ -456,6 +478,10 @@ function FilterInfo() {
                             handleFinalResistanceChange(row.id, e.target.value)
                           }
                           onClick={(e) => e.stopPropagation()}
+                        />
+                        <LastDpsLine
+                          value={row.previous_final_resistance}
+                          at={row.previous_dps_at}
                         />
                       </div>
                     </div>

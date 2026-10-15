@@ -180,7 +180,7 @@ export default function QrLabelPrintModal({
               {layout === QR_LAYOUTS.zebraMark
                 ? "AFC mark sits in the center of the QR"
                 : layout === QR_LAYOUTS.zebraBanner
-                  ? "Black bar with company name and phone, AHU name below"
+                  ? "Thin full-width bar, AFC mark in the QR"
                   : zebra
                     ? "AFC mark on the label, hospital under the AHU name"
                     : "Optional company logo sits in the center of each QR"}
@@ -327,13 +327,13 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
   );
 
   return (
-    <div className="border border-base-300 rounded bg-white text-black p-2">
+    <div className="border border-base-300 rounded bg-white text-black overflow-hidden">
       <div
-        className="flex flex-col bg-white overflow-hidden"
+        className="flex flex-col bg-white overflow-hidden w-full"
         style={{ aspectRatio: "2 / 1" }}
       >
         {banner ? (
-          <div className="bg-black text-white flex items-center justify-between gap-2 px-2 py-1 shrink-0">
+          <div className="bg-black text-white flex items-center justify-between gap-2 px-2 py-[3px] shrink-0 w-full">
             <span className="text-[8px] font-extrabold uppercase tracking-wide truncate">
               {AFC_COMPANY_NAME}
             </span>
@@ -345,9 +345,11 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
           {copy}
         </div>
       </div>
-      <button className="btn btn-xs mt-2" type="button" onClick={onPrint}>
-        Print this AHU
-      </button>
+      <div className="p-2 border-t border-base-300 bg-base-100">
+        <button className="btn btn-xs" type="button" onClick={onPrint}>
+          Print this AHU
+        </button>
+      </div>
     </div>
   );
 }

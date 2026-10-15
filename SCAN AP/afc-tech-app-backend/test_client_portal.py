@@ -214,6 +214,8 @@ def main():
     assert "269.50" not in blob and "unit_price" not in blob, "no prices in detail"
     assert "SECRET-PN" not in blob, "part numbers stay off the client payload"
     assert "internal" not in blob, "job notes stay off"
+    assert "initial_resistance" not in blob and "previous_initial_resistance" not in blob, "portal has no DPS"
+    assert "final_resistance" not in blob, "portal has no final DPS"
     comments = detail.get("comments") or []
     assert comments, "held-filter comments are on the unit page"
     assert any("No access" in (c.get("text") or "") for c in comments), "skip reason is visible"
