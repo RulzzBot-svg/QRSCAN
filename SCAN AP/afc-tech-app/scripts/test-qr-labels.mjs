@@ -10,6 +10,7 @@ import {
   usesQrCenterLogo,
   usesSideLogo,
   QR_LAYOUTS,
+  QR_CENTER_LOGO_RATIO,
 } from "../src/utils/qrLabels.js";
 
 function assert(cond, message) {
@@ -138,6 +139,7 @@ assert(isZebraLayout("zebra-mark") && isZebraLayout("zebra-banner") && isZebraLa
 assert(!isZebraLayout("sheet") && !isZebraLayout("single"), "paper layouts are not zebra");
 assert(resolveQrLayout("zebra-banner") === QR_LAYOUTS.zebraBanner, "unknown-safe resolve keeps banner");
 assert(resolveQrLayout("nope") === QR_LAYOUTS.sheet, "unknown layout falls back to sheet");
+assert(QR_CENTER_LOGO_RATIO >= 0.42, "center AFC mark should read about 90px on the 4x2 preview");
 assert(usesQrCenterLogo(QR_LAYOUTS.zebraMark), "logo-in-QR design overlays the mark");
 assert(!usesQrCenterLogo(QR_LAYOUTS.zebra), "split design does not overlay the QR");
 assert(usesSideLogo(QR_LAYOUTS.zebra) && usesSideLogo(QR_LAYOUTS.zebraFlip), "split and flip keep a side mark");
