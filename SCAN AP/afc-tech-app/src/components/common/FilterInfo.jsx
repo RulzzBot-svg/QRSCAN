@@ -7,7 +7,9 @@ import { submitJob } from "../../api/jobs";
 import { queueJob } from "../../offline/jobQueue";
 import { cacheAHU, getCachedAHU } from "../../offline/ahuCache";
 import { parseIsoToDate, formatDate } from "../../utils/dates";
-import PublicFilterCard from "../../client/PublicFilterCard";
+import { hasTechSession } from "../../api/api";
+import { hasClientToken, readClientUser } from "../../client/api";
+import { filterInfoScanDestination } from "../../utils/filterInfoGate";
 
 const SERVICE_DATE_OPTS = { month: "2-digit", day: "2-digit", year: "numeric" };
 
@@ -59,7 +61,6 @@ function FilterInfo() {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [inspected, setInspected] = useState({});
   const [tech, setTech] = useState(null);
-  const [guest, setGuest] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});
   const [initialResistance, setInitialResistance] = useState({});
   const [finalResistance, setFinalResistance] = useState({});
@@ -68,18 +69,23 @@ function FilterInfo() {
   /* Load technician from localStorage */
   /* ----------------------------- */
   useEffect(() => {
-    const storedTech = localStorage.getItem("tech");
-    if (storedTech) {
-      setTech(JSON.parse(storedTech));
-      return;
-    }
+    let storedTech = null;
     try {
-      if (localStorage.getItem("client_token") && localStorage.getItem("client_user")) {
-        navigate(`/client/ahu/${ahuId}`, { replace: true });
-        return;
-      }
+      storedTech = localStorage.getItem("tech");
     } catch {
-      /* ignore */
+      storedTech = null;
+    }
+    const dest = filterInfoScanDestination(ahuId, {
+      hasTech: Boolean(storedTech) && hasTechSession(),
+      hasClient: hasClientToken() && Boolean(readClientUser()),
+    });
+    if (dest.stay) {
+      try {
+        setTech(JSON.parse(storedTech));
+      } catch {
+        navigate("/", { replace: true });
+      }
+      return;
     }
     try {
       sessionStorage.setItem("post_login_path", `/FilterInfo/${ahuId}`);
@@ -87,7 +93,7 @@ function FilterInfo() {
     } catch {
       /* ignore */
     }
-    setGuest(true);
+    navigate(dest.path, { replace: true });
   }, [navigate, ahuId]);
 
   /* ----------------------------- */
@@ -269,10 +275,6 @@ function FilterInfo() {
       );
     });
   };
-
-  if (guest) {
-    return <PublicFilterCard ahuId={ahuId} />;
-  }
 
   if (!tech) {
     return (
