@@ -317,11 +317,11 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
   );
 
   const qr = (
-    <div className={`${banner ? "w-[38%]" : "w-[40%]"} flex items-center justify-center shrink-0`}>
+    <div className={`${banner ? "w-[42%]" : "w-[40%]"} flex items-center justify-center shrink-0`}>
       <img
         src={label.qrDataUrl}
         alt={`QR for ${headline}`}
-        className="h-[72%] w-auto aspect-square"
+        className={`${banner ? "h-[86%]" : "h-[72%]"} w-auto aspect-square`}
       />
     </div>
   );
@@ -333,7 +333,7 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
         style={{ aspectRatio: "2 / 1" }}
       >
         {banner ? (
-          <div className="bg-black text-white flex items-center justify-between gap-2 px-2 py-[3px] shrink-0 w-full">
+          <div className="bg-black text-white flex items-center justify-between gap-2 px-2 py-[3px] shrink-0 w-full self-stretch">
             <span className="text-[8px] font-extrabold uppercase tracking-wide truncate">
               {AFC_COMPANY_NAME}
             </span>

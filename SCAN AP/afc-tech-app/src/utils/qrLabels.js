@@ -4,8 +4,8 @@ export const DEFAULT_QR_BASE_URL = "https://qrscan-lyart.vercel.app/FilterInfo";
 export const QR_LOGO_STORAGE_KEY = "qrLabelLogo";
 export const DEFAULT_AFC_LOGO_PATH = "/afc-logo-bw.png";
 export const DEFAULT_AFC_MARK_PATH = "/afc-mark-bw.png";
-/** Center-of-QR mark size vs QR width. ~0.45 reads as ~90px on the 4×2 preview. */
-export const QR_CENTER_LOGO_RATIO = 0.45;
+/** Center-of-QR mark size vs QR width. ~0.58 fills the quiet zone without a hard rectangle. */
+export const QR_CENTER_LOGO_RATIO = 0.58;
 export const QR_LAYOUTS = {
   sheet: "sheet",
   single: "single",
@@ -157,10 +157,50 @@ export async function fileToLogoDataUrl(file) {
   return canvas.toDataURL("image/png");
 }
 
+function cropImageToInk(img, { threshold = 250 } = {}) {
+  const w = img.width || 1;
+  const h = img.height || 1;
+  const src = document.createElement("canvas");
+  src.width = w;
+  src.height = h;
+  const sctx = src.getContext("2d");
+  sctx.drawImage(img, 0, 0);
+  const data = sctx.getImageData(0, 0, w, h).data;
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      if (data[i + 3] > 8 && lum < threshold) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < minX) return img;
+  const pad = 1;
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(w - 1, maxX + pad);
+  maxY = Math.min(h - 1, maxY + pad);
+  const cw = maxX - minX + 1;
+  const ch = maxY - minY + 1;
+  const out = document.createElement("canvas");
+  out.width = cw;
+  out.height = ch;
+  out.getContext("2d").drawImage(src, minX, minY, cw, ch, 0, 0, cw, ch);
+  return out;
+}
+
 export async function overlayLogoOnQr(qrDataUrl, logoDataUrl, { logoRatio = QR_CENTER_LOGO_RATIO } = {}) {
   if (!logoDataUrl || typeof document === "undefined") return qrDataUrl;
   const qrImg = await loadImage(qrDataUrl);
-  const logoImg = await loadImage(logoDataUrl);
+  const logoImg = cropImageToInk(await loadImage(logoDataUrl));
   const size = qrImg.width || 280;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -174,21 +214,15 @@ export async function overlayLogoOnQr(qrDataUrl, logoDataUrl, { logoRatio = QR_C
   const fit = Math.min(maxSide / iw, maxSide / ih);
   const lw = iw * fit;
   const lh = ih * fit;
-  const pad = Math.max(3, Math.round(Math.min(lw, lh) * 0.1));
-  const boxW = lw + pad * 2;
-  const boxH = lh + pad * 2;
-  const x = (size - boxW) / 2;
-  const y = (size - boxH) / 2;
-  const radius = Math.max(5, Math.round(Math.min(boxW, boxH) * 0.12));
+  const pad = Math.max(4, Math.round(Math.min(lw, lh) * 0.06));
+  const plate = Math.min(size * 0.72, Math.max(lw, lh) + pad * 2);
+  const cx = size / 2;
+  const cy = size / 2;
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  if (typeof ctx.roundRect === "function") {
-    ctx.roundRect(x, y, boxW, boxH, radius);
-  } else {
-    ctx.rect(x, y, boxW, boxH);
-  }
+  ctx.arc(cx, cy, plate / 2, 0, Math.PI * 2);
   ctx.fill();
-  ctx.drawImage(logoImg, x + pad, y + pad, lw, lh);
+  ctx.drawImage(logoImg, cx - lw / 2, cy - lh / 2, lw, lh);
   return canvas.toDataURL("image/png");
 }
 
@@ -197,7 +231,7 @@ export async function generateQrDataUrl(text, { withLogo = false } = {}) {
   return QRCode.toDataURL(text, {
     errorCorrectionLevel: withLogo ? "H" : "Q",
     margin: 1,
-    width: withLogo ? 400 : 280,
+    width: withLogo ? 480 : 280,
     color: { dark: "#000000", light: "#ffffff" },
   });
 }
@@ -329,25 +363,32 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
   const layout = resolveQrLayout(options.layout);
   const zebra = isZebraLayout(layout);
   const pageCss = zebra
-    ? "@page { size: 4in 2in; margin: 0; }"
+    ? "@page { size: 4in 2in; margin: 0 !important; }"
     : "@page { size: letter; margin: 0.4in; }";
   const hint = zebra
     ? `${labels.length} label${labels.length === 1 ? "" : "s"} — 4×2 in Zebra ZD220 · black & white · scan opens FilterInfo`
     : `${labels.length} label${labels.length === 1 ? "" : "s"} — scan opens FilterInfo for that AHU`;
   const cards = labels.map((label) => labelCardHtml(label, options)).join("");
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en"${zebra ? ' class="print-zebra"' : ""}>
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
   <style>
     ${pageCss}
     * { box-sizing: border-box; }
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
       color: #111;
       font-family: Arial, Helvetica, sans-serif;
       background: #fff;
+    }
+    html.print-zebra,
+    html.print-zebra body {
+      width: 4in;
+      height: 2in;
+      overflow: hidden;
     }
     .toolbar {
       display: flex;
@@ -515,25 +556,36 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       left: 0.1in;
     }
     .layout-zebra-banner .label {
+      position: relative;
       flex-direction: column;
       width: 4in;
+      height: 2in;
       padding: 0;
       margin: 0;
+      overflow: hidden;
+      background: #000;
     }
     .layout-zebra-banner .band {
-      flex: 0 0 0.2in;
-      width: 4in;
-      min-width: 4in;
-      max-width: 4in;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      flex: none;
+      height: 0.22in;
+      width: 100%;
+      min-width: 100%;
+      max-width: none;
       align-self: stretch;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
       margin: 0;
-      padding: 0 0.1in;
+      padding: 0 0.12in;
       background: #000;
       color: #fff;
+      box-shadow: 0 0 0 0.08in #000;
     }
     .layout-zebra-banner .band .company,
     .layout-zebra-banner .band .phone {
@@ -543,16 +595,18 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     .layout-zebra-banner .body {
       flex: 1;
       min-height: 0;
+      margin-top: 0.22in;
       display: flex;
       flex-direction: row;
       align-items: stretch;
+      background: #fff;
     }
     .layout-zebra-banner .qr-wrap {
-      flex-basis: 1.55in;
+      flex-basis: 1.72in;
     }
     .layout-zebra-banner .label img.qr {
-      width: 1.22in;
-      height: 1.22in;
+      width: 1.42in;
+      height: 1.42in;
     }
     .layout-zebra-banner .copy {
       border-left: 2px solid #000;
@@ -566,7 +620,24 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     @media print {
       .toolbar { display: none !important; }
       .grid { padding: 0; gap: 10px; }
-      .grid.zebra-page { padding: 0; }
+      .grid.zebra-page {
+        padding: 0 !important;
+        gap: 0 !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4in;
+        height: 2in;
+      }
+      html.print-zebra,
+      html.print-zebra body,
+      .zebra-page .label {
+        width: 4in !important;
+        height: 2in !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+      }
     }
   </style>
 </head>
@@ -591,11 +662,14 @@ export function printQrLabels(labels, title, options = {}) {
   const layout = resolveQrLayout(options.layout);
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
-  iframe.style.left = "-10000px";
+  iframe.style.left = "0";
   iframe.style.top = "0";
   iframe.style.width = isZebraLayout(layout) ? "4in" : "8.5in";
   iframe.style.height = isZebraLayout(layout) ? "2in" : "11in";
   iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.style.zIndex = "-1";
   document.body.appendChild(iframe);
 
   const frameDoc = iframe.contentDocument || iframe.contentWindow?.document;

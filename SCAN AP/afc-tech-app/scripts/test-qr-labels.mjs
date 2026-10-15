@@ -139,7 +139,7 @@ assert(isZebraLayout("zebra-mark") && isZebraLayout("zebra-banner") && isZebraLa
 assert(!isZebraLayout("sheet") && !isZebraLayout("single"), "paper layouts are not zebra");
 assert(resolveQrLayout("zebra-banner") === QR_LAYOUTS.zebraBanner, "unknown-safe resolve keeps banner");
 assert(resolveQrLayout("nope") === QR_LAYOUTS.sheet, "unknown layout falls back to sheet");
-assert(QR_CENTER_LOGO_RATIO >= 0.42, "center AFC mark should read about 90px on the 4x2 preview");
+assert(QR_CENTER_LOGO_RATIO >= 0.55, "center AFC mark should fill the QR quiet zone");
 assert(usesQrCenterLogo(QR_LAYOUTS.zebraMark), "logo-in-QR design overlays the mark");
 assert(usesQrCenterLogo(QR_LAYOUTS.zebraBanner), "banner design overlays the mark in the QR");
 assert(!usesQrCenterLogo(QR_LAYOUTS.zebra), "split design does not overlay the QR");
@@ -181,9 +181,13 @@ const banner = buildQrPrintDocument(
 );
 assert(banner.includes("layout-zebra-banner"), "banner design should set its layout class");
 assert(banner.includes("class=\"band\""), "banner design should use a top bar");
-assert(banner.includes("flex: 0 0 0.2in"), "banner bar is shorter than the old 0.32in strip");
-assert(banner.includes("width: 4in"), "banner bar spans the full 4in label with no side gaps");
-assert(banner.includes("min-width: 4in"), "banner bar cannot shrink narrower than the label");
+assert(banner.includes("height: 0.22in"), "banner bar stays a thin strip");
+assert(banner.includes("class=\"print-zebra\""), "print document pins the 4x2 page");
+assert(banner.includes("left: 0"), "banner bar is pinned to the left edge");
+assert(banner.includes("right: 0"), "banner bar is pinned to the right edge");
+assert(banner.includes("width: 100%"), "banner bar spans the full label width");
+assert(banner.includes("box-shadow: 0 0 0 0.08in #000"), "banner bleeds so print corners stay black");
+assert(banner.includes("1.42in"), "banner QR is large enough for the bigger AFC mark");
 assert(banner.includes("ADVANCED FILTRATION CONCEPTS"), "banner still names the company");
 assert(banner.includes("323.832.8316"), "banner still shows the phone");
 assert(banner.includes("font-size: 14pt"), "banner name stays the smaller type");
