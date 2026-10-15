@@ -4,6 +4,8 @@ export const DEFAULT_QR_BASE_URL = "https://qrscan-lyart.vercel.app/FilterInfo";
 export const QR_LOGO_STORAGE_KEY = "qrLabelLogo";
 export const DEFAULT_AFC_LOGO_PATH = "/afc-logo-bw.png";
 export const DEFAULT_AFC_MARK_PATH = "/afc-mark-bw.png";
+/** Center-of-QR mark size vs QR width. ~0.45 reads as ~90px on the 4×2 preview. */
+export const QR_CENTER_LOGO_RATIO = 0.45;
 export const QR_LAYOUTS = {
   sheet: "sheet",
   single: "single",
@@ -155,7 +157,7 @@ export async function fileToLogoDataUrl(file) {
   return canvas.toDataURL("image/png");
 }
 
-export async function overlayLogoOnQr(qrDataUrl, logoDataUrl, { logoRatio = 0.22 } = {}) {
+export async function overlayLogoOnQr(qrDataUrl, logoDataUrl, { logoRatio = QR_CENTER_LOGO_RATIO } = {}) {
   if (!logoDataUrl || typeof document === "undefined") return qrDataUrl;
   const qrImg = await loadImage(qrDataUrl);
   const logoImg = await loadImage(logoDataUrl);
@@ -166,30 +168,27 @@ export async function overlayLogoOnQr(qrDataUrl, logoDataUrl, { logoRatio = 0.22
   const ctx = canvas.getContext("2d");
   ctx.drawImage(qrImg, 0, 0, size, size);
 
-  const logoSize = Math.round(size * logoRatio);
-  const pad = Math.max(4, Math.round(logoSize * 0.12));
-  const box = logoSize + pad * 2;
-  const x = (size - box) / 2;
-  const y = (size - box) / 2;
-  const radius = Math.max(6, Math.round(box * 0.12));
+  const maxSide = Math.round(size * logoRatio);
+  const iw = logoImg.width || maxSide;
+  const ih = logoImg.height || maxSide;
+  const fit = Math.min(maxSide / iw, maxSide / ih);
+  const lw = iw * fit;
+  const lh = ih * fit;
+  const pad = Math.max(3, Math.round(Math.min(lw, lh) * 0.1));
+  const boxW = lw + pad * 2;
+  const boxH = lh + pad * 2;
+  const x = (size - boxW) / 2;
+  const y = (size - boxH) / 2;
+  const radius = Math.max(5, Math.round(Math.min(boxW, boxH) * 0.12));
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
   if (typeof ctx.roundRect === "function") {
-    ctx.roundRect(x, y, box, box, radius);
+    ctx.roundRect(x, y, boxW, boxH, radius);
   } else {
-    ctx.rect(x, y, box, box);
+    ctx.rect(x, y, boxW, boxH);
   }
   ctx.fill();
-  const fit = Math.min(logoSize / (logoImg.width || 1), logoSize / (logoImg.height || 1));
-  const lw = (logoImg.width || logoSize) * fit;
-  const lh = (logoImg.height || logoSize) * fit;
-  ctx.drawImage(
-    logoImg,
-    x + pad + (logoSize - lw) / 2,
-    y + pad + (logoSize - lh) / 2,
-    lw,
-    lh
-  );
+  ctx.drawImage(logoImg, x + pad, y + pad, lw, lh);
   return canvas.toDataURL("image/png");
 }
 
@@ -198,7 +197,7 @@ export async function generateQrDataUrl(text, { withLogo = false } = {}) {
   return QRCode.toDataURL(text, {
     errorCorrectionLevel: withLogo ? "H" : "Q",
     margin: 1,
-    width: withLogo ? 360 : 280,
+    width: withLogo ? 400 : 280,
     color: { dark: "#000000", light: "#ffffff" },
   });
 }
@@ -237,7 +236,7 @@ export async function applyLogoToLabels(labels, logoDataUrl) {
     const qr = await generateQrDataUrl(label.url, { withLogo: true });
     next.push({
       ...label,
-      qrDataUrl: await overlayLogoOnQr(qr, logoDataUrl),
+      qrDataUrl: await overlayLogoOnQr(qr, logoDataUrl, { logoRatio: QR_CENTER_LOGO_RATIO }),
     });
   }
   return next;
