@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { hasTechSession } from "../../api/api";
 import { loginTech } from "../../api/tech";
 import { TECH_APP_NAME } from "../../branding";
+import { resumeTechPath } from "../../utils/techSession";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,18 +16,43 @@ export default function Login() {
   const [hospitalQrHint, setHospitalQrHint] = useState(false);
 
   useEffect(() => {
+    let post = "";
     try {
-      const post = sessionStorage.getItem("post_login_path");
-      if (post) {
-        setRedirectMessage("Please sign in to view the scanned AHU.");
-      }
+      post = sessionStorage.getItem("post_login_path") || "";
       if (sessionStorage.getItem("post_client_path")) {
         setHospitalQrHint(true);
       }
-    } catch (e) {
+    } catch {
       /* ignore */
     }
-  }, []);
+
+    let hasTech = false;
+    try {
+      hasTech = Boolean(localStorage.getItem("tech"));
+    } catch {
+      hasTech = false;
+    }
+
+    const next = resumeTechPath({
+      online: navigator.onLine,
+      hasSession: hasTechSession(),
+      hasTech,
+      postLoginPath: post,
+    });
+    if (next) {
+      try {
+        sessionStorage.removeItem("post_login_path");
+      } catch {
+        /* ignore */
+      }
+      navigate(next, { replace: true });
+      return;
+    }
+
+    if (post) {
+      setRedirectMessage("Please sign in to view the scanned AHU.");
+    }
+  }, [navigate]);
 
   const dismissRedirectMessage = () => {
     setRedirectMessage("");
