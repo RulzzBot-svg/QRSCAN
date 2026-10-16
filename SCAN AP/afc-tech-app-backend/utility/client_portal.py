@@ -310,6 +310,12 @@ def _as_date(value):
         return value.date()
     if isinstance(value, date):
         return value
+    if isinstance(value, str):
+        raw = value.strip()[:10]
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            return None
     return None
 
 
@@ -419,6 +425,11 @@ def hospital_graphs(hospital_id, ahus):
     freq_counts = defaultdict(int)
     phase_qty = defaultdict(int)
     upcoming = {30: 0, 60: 0, 90: 0}
+    month_keys = service_month_keys()
+    start = month_keys[0]
+    last = month_keys[-1]
+    current_key = date.today().strftime("%Y-%m")
+    scheduled = defaultdict(int)
 
     for ahu in ahus:
         summary["ahus"] += 1
@@ -445,6 +456,12 @@ def hospital_graphs(hospital_id, ahus):
             if qty:
                 phase_qty[filter_type_label(f.phase)] += qty
             fst = filter_status(f)
+            due = _as_date(fst.get("next_due_date"))
+            if due is not None:
+                if due < start:
+                    scheduled[current_key] += 1
+                elif due.replace(day=1) <= last:
+                    scheduled[due.strftime("%Y-%m")] += 1
             days = fst.get("days_until_due")
             if fst.get("status") == "Overdue":
                 continue
@@ -454,7 +471,7 @@ def hospital_graphs(hospital_id, ahus):
                 if 0 <= days <= window:
                     upcoming[window] += 1
 
-    visits = _jobs_by_month(hospital_id)
+    services = _services_by_month(hospital_id, month_keys, scheduled)
 
     return {
         "summary": summary,
@@ -471,7 +488,8 @@ def hospital_graphs(hospital_id, ahus):
             for days, count in sorted(freq_counts.items())
             if days
         ],
-        "visits": visits,
+        "services": services,
+        "visits": [{"month": row["month"], "jobs": row["completed"]} for row in services],
         "upcoming": [
             {"days": 30, "filters": upcoming[30]},
             {"days": 60, "filters": upcoming[60]},
@@ -480,28 +498,48 @@ def hospital_graphs(hospital_id, ahus):
     }
 
 
-def _jobs_by_month(hospital_id, months=12):
-    today = date.today().replace(day=1)
-    start = (today - timedelta(days=32 * (months - 1))).replace(day=1)
-    rows = (
-        Job.query.join(AHU, AHU.id == Job.ahu_id)
-        .filter(AHU.hospital_id == hospital_id, Job.completed_at.isnot(None))
-        .filter(Job.completed_at >= start)
-        .all()
-    )
-    counts = defaultdict(int)
-    for job in rows:
-        completed = job.completed_at.date() if hasattr(job.completed_at, "date") else job.completed_at
-        key = completed.strftime("%Y-%m")
-        counts[key] += 1
+def _shift_month(day, delta):
+    """Move a date by whole months, landing on the 1st of the target month."""
+    month_index = day.year * 12 + (day.month - 1) + delta
+    year, month0 = divmod(month_index, 12)
+    return date(year, month0 + 1, 1)
 
-    out = []
+
+def service_month_keys(today=None, back=5, months=12):
+    """First-of-month dates covering recent completed work and upcoming dues."""
+    current = (today or date.today()).replace(day=1)
+    start = _shift_month(current, -back)
+    keys = []
     cursor = start
     for _ in range(months):
-        key = cursor.strftime("%Y-%m")
-        out.append({"month": key, "jobs": counts.get(key, 0)})
-        if cursor.month == 12:
-            cursor = cursor.replace(year=cursor.year + 1, month=1)
-        else:
-            cursor = cursor.replace(month=cursor.month + 1)
-    return out
+        keys.append(cursor)
+        cursor = _shift_month(cursor, 1)
+    return keys
+
+
+def _services_by_month(hospital_id, month_keys, scheduled):
+    start_at = datetime.combine(month_keys[0], datetime.min.time())
+    rows = (
+        Job.query.join(AHU, AHU.id == Job.ahu_id)
+        .join(JobFilter, JobFilter.job_id == Job.id)
+        .filter(AHU.hospital_id == hospital_id)
+        .filter(Job.completed_at.isnot(None))
+        .filter(Job.completed_at >= start_at)
+        .filter(JobFilter.is_completed.is_(True))
+        .with_entities(Job.completed_at)
+        .all()
+    )
+    completed = defaultdict(int)
+    for (completed_at,) in rows:
+        day = _as_date(completed_at)
+        if day is None:
+            continue
+        completed[day.strftime("%Y-%m")] += 1
+    return [
+        {
+            "month": key.strftime("%Y-%m"),
+            "completed": completed.get(key.strftime("%Y-%m"), 0),
+            "scheduled": scheduled.get(key.strftime("%Y-%m"), 0),
+        }
+        for key in month_keys
+    ]
