@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { PORTAL_APP_SHORT } from "../branding";
 import { isClientDirector, loginClient, saveClientSession } from "./api";
 import { readClientTheme, storeClientTheme, toggleClientTheme, applyClientTheme } from "./theme";
 import ThemeToggle from "./ThemeToggle";
@@ -66,7 +67,7 @@ export default function ClientLogin() {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <p className="text-[11px] font-extrabold tracking-[0.22em] text-primary">ADVANCED FILTRATION CONCEPTS</p>
-          <h1 className="text-2xl font-bold mt-2">Hospital Portal</h1>
+          <h1 className="text-2xl font-bold mt-2">{PORTAL_APP_SHORT}</h1>
           <p className="text-sm text-base-content/60 mt-1">
             Scan a unit QR or browse service status for your hospital.
           </p>

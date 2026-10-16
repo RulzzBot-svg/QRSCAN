@@ -1,3 +1,5 @@
+import { PORTAL_APP_NAME, PORTAL_APP_SHORT, TECH_APP_SHORT } from "../branding";
+
 export function isClientPath(pathname = window.location.pathname) {
   return String(pathname || "").startsWith("/client");
 }
@@ -18,7 +20,7 @@ export function applyPwaManifest(pathname = window.location.pathname) {
     title.setAttribute("name", "apple-mobile-web-app-title");
     document.head.appendChild(title);
   }
-  title.setAttribute("content", client ? "AFC Portal" : "AFC Tech");
+  title.setAttribute("content", client ? PORTAL_APP_SHORT : TECH_APP_SHORT);
 
   let theme = document.querySelector('meta[name="theme-color"]');
   if (!theme) {
@@ -28,8 +30,8 @@ export function applyPwaManifest(pathname = window.location.pathname) {
   }
   theme.setAttribute("content", client ? "#0a4d8c" : "#0f172a");
 
-  if (client && !document.title.includes("Hospital Portal")) {
-    document.title = "AFC Hospital Portal";
+  if (client && document.title !== PORTAL_APP_NAME) {
+    document.title = PORTAL_APP_NAME;
   }
 }
 
