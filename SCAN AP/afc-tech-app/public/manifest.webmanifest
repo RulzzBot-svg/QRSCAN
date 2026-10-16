@@ -1,6 +1,7 @@
 {
-  "name": "AFC Technician",
-  "short_name": "AFC Tech",
+  "name": "AFC Field",
+  "short_name": "AFC Field",
+  "description": "QR scans, jobs, and filter changeouts for AFC technicians.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

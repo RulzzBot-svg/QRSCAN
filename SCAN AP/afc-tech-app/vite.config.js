@@ -19,9 +19,9 @@ export default defineConfig({
         "client-manifest.webmanifest",
       ],
       manifest: {
-        name: "AFC Technician",
-        short_name: "AFC Tech",
-        description: "AFC technician job app",
+        name: "AFC Field",
+        short_name: "AFC Field",
+        description: "QR scans, jobs, and filter changeouts for AFC technicians.",
         start_url: "/",
         scope: "/",
         display: "standalone",

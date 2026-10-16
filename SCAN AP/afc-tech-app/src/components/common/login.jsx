@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginTech } from "../../api/tech";
+import { TECH_APP_NAME } from "../../branding";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -138,9 +139,13 @@ export default function Login() {
       className="min-h-screen flex items-center justify-center bg-base-200"
     >
       <div className="w-full max-w-sm bg-base-100 border border-base-300 rounded-xl shadow-lg p-8">
-        <h1 className="text-2xl font-bold text-primary text-center mb-6">
-          Technician Login
-        </h1>
+        <div className="text-center mb-6">
+          <p className="text-[11px] font-extrabold tracking-[0.22em] text-primary">
+            ADVANCED FILTRATION CONCEPTS
+          </p>
+          <h1 className="text-2xl font-bold mt-2">{TECH_APP_NAME}</h1>
+          <p className="text-sm text-base-content/60 mt-1">Technician sign-in</p>
+        </div>
 
         {redirectMessage && (
           <div className="mb-4 rounded-lg bg-info/20 border border-info p-3 text-sm text-info flex justify-between items-center">

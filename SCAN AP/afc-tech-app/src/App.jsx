@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { TECH_APP_NAME } from "./branding";
 import LogoutButton from "./components/common/logoutbutton";
 import { useOfflineSync } from "./offline/useOfflineSync";
 import { hasAuthToken } from "./api/api";
@@ -39,7 +40,7 @@ export default function App() {
       {/* Header */}
       <header className="navbar bg-base-100 shadow-sm px-4">
         <div className="flex-1">
-          <span className="font-bold text-lg tracking-tight">AFC Technician</span>
+          <span className="font-bold text-lg tracking-tight">{TECH_APP_NAME}</span>
         </div>
         <div className="flex-none">
           <span className="badge badge-primary text-xs">v0.1</span>
