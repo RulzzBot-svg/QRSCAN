@@ -79,9 +79,10 @@ export default function ClientGraphs() {
     Overdue: b.overdue,
   }));
 
-  const visits = (data.visits || []).map((v) => ({
-    month: v.month.slice(5),
-    Visits: v.jobs,
+  const services = (data.services || data.visits || []).map((v) => ({
+    month: (v.month || "").slice(5),
+    Completed: v.completed ?? v.jobs ?? 0,
+    Scheduled: v.scheduled ?? 0,
   }));
 
   const types = (data.by_phase || []).map((row, i) => ({
@@ -157,14 +158,16 @@ export default function ClientGraphs() {
           )}
         </ChartCard>
 
-        <ChartCard title="Service visits by month">
+        <ChartCard title="Completed and scheduled">
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={visits} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={services} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="Visits" fill="#0a4d8c" radius={[4, 4, 0, 0]} />
+              <Legend />
+              <Bar dataKey="Completed" stackId="s" fill="#0a4d8c" />
+              <Bar dataKey="Scheduled" stackId="s" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -173,24 +176,21 @@ export default function ClientGraphs() {
           {types.length === 0 ? (
             <p className="text-sm text-base-content/50 py-16 text-center">No filter types yet.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={types} dataKey="value" nameKey="name" innerRadius={52} outerRadius={80}>
-                  {types.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value, name) => [`${value} qty`, name]}
-                />
-                <Legend
-                  formatter={(value) => {
-                    const row = types.find((t) => t.name === value);
-                    return `${value} (${row?.value ?? 0})`;
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 min-h-[240px]">
+              <div className="flex-1 min-w-0 h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={types} dataKey="value" nameKey="name" innerRadius={52} outerRadius={80}>
+                      {types.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [`${value} qty`, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <TypeLegend items={types} />
+            </div>
           )}
         </ChartCard>
       </div>
@@ -204,6 +204,23 @@ function ChartCard({ title, children }) {
       <h3 className="font-semibold mb-3">{title}</h3>
       {children}
     </div>
+  );
+}
+
+function TypeLegend({ items }) {
+  return (
+    <ul className="js-graph-legend shrink-0 space-y-2.5 text-sm min-w-[8.5rem] px-1">
+      {items.map((row) => (
+        <li key={row.name} className="flex items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 rounded-full shrink-0"
+            style={{ background: row.color }}
+          />
+          <span className="flex-1 leading-tight">{row.name}</span>
+          <span className="font-semibold tabular-nums">{row.value}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

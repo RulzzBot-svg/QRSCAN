@@ -14,9 +14,11 @@ function serializeCharts(root) {
   return [...root.querySelectorAll(".js-graph-card")].map((card) => {
     const title = card.querySelector("h3")?.textContent || "Chart";
     const svg = card.querySelector("svg");
+    const legend = card.querySelector(".js-graph-legend");
     return {
       title,
       svg: svg ? svg.outerHTML : "",
+      legend: legend ? legend.outerHTML : "",
     };
   });
 }
@@ -54,6 +56,8 @@ export function exportClientGraphsPdf({ hospitalName, summary, chartsRoot }) {
     .card { border: 1px solid #d4e1ea; border-radius: 10px; padding: 12px; break-inside: avoid; }
     .card h3 { margin: 0 0 10px; font-size: 14px; }
     .card svg { width: 100%; height: 220px; }
+    .js-graph-legend { list-style: none; padding: 0; margin: 10px 0 0; }
+    .js-graph-legend li { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 2px 0; }
     @media print {
       body { margin: 16px; }
       .no-print { display: none !important; }
@@ -81,7 +85,7 @@ export function exportClientGraphsPdf({ hospitalName, summary, chartsRoot }) {
     ${charts
       .map((c) => {
         const body = c.svg ? c.svg : "<div class='sub'>No chart for this section.</div>";
-        return `<div class="card"><h3>${escapeHtml(c.title)}</h3>${body}</div>`;
+        return `<div class="card"><h3>${escapeHtml(c.title)}</h3>${body}${c.legend || ""}</div>`;
       })
       .join("")}
   </div>

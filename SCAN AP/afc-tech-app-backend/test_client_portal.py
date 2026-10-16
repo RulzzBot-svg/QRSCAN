@@ -2,7 +2,7 @@
 """Hospital client portal: hospital-scoped read-only, no tech/admin crossover."""
 import os
 import tempfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Flask
 
@@ -16,7 +16,7 @@ from routes.ahu_routes import ahu_bp
 from routes.client_routes import client_bp
 from routes.job_routes import job_bp
 from routes.tech_routes import tech_bp
-from utility.client_portal import filter_type_label, frequency_label, public_filter
+from utility.client_portal import filter_type_label, frequency_label, public_filter, service_month_keys
 
 
 def make_app(db_path):
@@ -200,6 +200,10 @@ def main():
     assert_eq(filter_type_label("CARBON"), "Gas Phase", "carbon is gas phase")
     assert_eq(filter_type_label("HEPA"), "HEPA", "hepa")
     assert_eq(filter_type_label(""), "Other", "blank phase")
+    window = service_month_keys(date(2026, 10, 16))
+    assert_eq(window[0], date(2026, 5, 1), "services window starts 5 months back")
+    assert_eq(window[5], date(2026, 10, 1), "current month sits in the window")
+    assert_eq(window[-1], date(2027, 4, 1), "services window includes upcoming months")
 
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
@@ -254,6 +258,14 @@ def main():
     other = client.get(f"/api/client/ahus/{ids['other_ahu_id']}", headers=headers)
     assert_eq(other.status_code, 404, "other hospital AHU is hidden")
 
+    with app.app_context():
+        pre = Filter.query.filter_by(ahu_id=ids["ahu_id"], phase="PRE").first()
+        done = Job(ahu_id=ids["ahu_id"], tech_id=ids["tech_id"], completed_at=datetime.utcnow())
+        db.session.add(done)
+        db.session.flush()
+        db.session.add(JobFilter(job_id=done.id, filter_id=pre.id, is_completed=True))
+        db.session.commit()
+
     graphs = client.get("/api/client/graphs", headers=headers).get_json()
     assert_eq(graphs["summary"]["ahus"], 3, "graph ahus")
     assert graphs["summary"]["overdue"] >= 1, "overdue in graphs"
@@ -264,6 +276,16 @@ def main():
     assert_eq(phases.get("FINAL"), 20, "FINAL qty on graphs")
     assert_eq(phases.get("Gas Phase"), 4, "Gas Phase qty on graphs")
     assert_eq([r["phase"] for r in graphs["by_phase"]], ["PRE", "FINAL", "Gas Phase"], "type order")
+    services = graphs["services"]
+    assert_eq(len(services), 12, "twelve service months")
+    this_month = date.today().strftime("%Y-%m")
+    by_month = {row["month"]: row for row in services}
+    assert this_month in by_month, "current month is on the services chart"
+    assert by_month[this_month]["completed"] >= 1, "completed changeout is on this month"
+    assert sum(row["scheduled"] for row in services) >= 1, "upcoming or overdue work is scheduled"
+    due_first_stage = (date.today() - timedelta(days=30) + timedelta(days=90)).strftime("%Y-%m")
+    if due_first_stage in by_month:
+        assert by_month[due_first_stage]["scheduled"] >= 1, "PRE First Stage due month is scheduled"
 
     sticker = client.get(f"/api/public/units/{ids['ahu_id']}")
     assert_eq(sticker.status_code, 200, "logged-out QR card")
