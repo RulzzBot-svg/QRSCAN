@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PORTAL_APP_SHORT } from "../branding";
-import { isClientDirector, loginClient, saveClientSession } from "./api";
+import { hasClientToken, isClientDirector, loginClient, readClientUser, saveClientSession } from "./api";
 import { readClientTheme, storeClientTheme, toggleClientTheme, applyClientTheme } from "./theme";
 import ThemeToggle from "./ThemeToggle";
 import InstallHint from "./InstallHint";
@@ -17,6 +17,13 @@ export default function ClientLogin() {
   useEffect(() => {
     applyClientTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!hasClientToken()) return;
+    const user = readClientUser();
+    if (!user) return;
+    navigate(isClientDirector(user) ? "/client" : "/client/units", { replace: true });
+  }, [navigate]);
 
   const switchTheme = () => {
     const next = toggleClientTheme(theme);
