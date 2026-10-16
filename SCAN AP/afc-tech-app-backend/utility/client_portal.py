@@ -480,28 +480,39 @@ def hospital_graphs(hospital_id, ahus):
     }
 
 
-def _jobs_by_month(hospital_id, months=12):
-    today = date.today().replace(day=1)
-    start = (today - timedelta(days=32 * (months - 1))).replace(day=1)
+def _shift_month(day, delta):
+    """Move a date by whole months, landing on the 1st of the target month."""
+    month_index = day.year * 12 + (day.month - 1) + delta
+    year, month0 = divmod(month_index, 12)
+    return date(year, month0 + 1, 1)
+
+
+def visit_month_window(today=None, months=12):
+    """Inclusive first-of-month range covering this month and the prior months-1."""
+    end = (today or date.today()).replace(day=1)
+    start = _shift_month(end, 1 - months)
+    return start, end
+
+
+def _jobs_by_month(hospital_id, months=12, today=None):
+    start, _end = visit_month_window(today=today, months=months)
+    start_at = datetime.combine(start, datetime.min.time())
     rows = (
         Job.query.join(AHU, AHU.id == Job.ahu_id)
         .filter(AHU.hospital_id == hospital_id, Job.completed_at.isnot(None))
-        .filter(Job.completed_at >= start)
+        .filter(Job.completed_at >= start_at)
         .all()
     )
     counts = defaultdict(int)
     for job in rows:
-        completed = job.completed_at.date() if hasattr(job.completed_at, "date") else job.completed_at
-        key = completed.strftime("%Y-%m")
-        counts[key] += 1
+        completed = _as_date(job.completed_at)
+        if completed is None:
+            continue
+        counts[completed.strftime("%Y-%m")] += 1
 
     out = []
     cursor = start
     for _ in range(months):
-        key = cursor.strftime("%Y-%m")
-        out.append({"month": key, "jobs": counts.get(key, 0)})
-        if cursor.month == 12:
-            cursor = cursor.replace(year=cursor.year + 1, month=1)
-        else:
-            cursor = cursor.replace(month=cursor.month + 1)
+        out.append({"month": cursor.strftime("%Y-%m"), "jobs": counts.get(cursor.strftime("%Y-%m"), 0)})
+        cursor = _shift_month(cursor, 1)
     return out

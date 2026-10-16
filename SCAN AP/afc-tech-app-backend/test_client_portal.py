@@ -2,7 +2,7 @@
 """Hospital client portal: hospital-scoped read-only, no tech/admin crossover."""
 import os
 import tempfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Flask
 
@@ -16,7 +16,7 @@ from routes.ahu_routes import ahu_bp
 from routes.client_routes import client_bp
 from routes.job_routes import job_bp
 from routes.tech_routes import tech_bp
-from utility.client_portal import filter_type_label, frequency_label, public_filter
+from utility.client_portal import filter_type_label, frequency_label, public_filter, visit_month_window
 
 
 def make_app(db_path):
@@ -200,6 +200,9 @@ def main():
     assert_eq(filter_type_label("CARBON"), "Gas Phase", "carbon is gas phase")
     assert_eq(filter_type_label("HEPA"), "HEPA", "hepa")
     assert_eq(filter_type_label(""), "Other", "blank phase")
+    start, end = visit_month_window(date(2026, 10, 16), 12)
+    assert_eq(start, date(2025, 11, 1), "window starts 11 months before this month")
+    assert_eq(end, date(2026, 10, 1), "window includes the current month")
 
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
@@ -254,6 +257,23 @@ def main():
     other = client.get(f"/api/client/ahus/{ids['other_ahu_id']}", headers=headers)
     assert_eq(other.status_code, 404, "other hospital AHU is hidden")
 
+    with app.app_context():
+        last_month_day = date.today().replace(day=1) - timedelta(days=1)
+        too_old = date.today() - timedelta(days=400)
+        db.session.add_all([
+            Job(
+                ahu_id=ids["ahu_id"],
+                tech_id=ids["tech_id"],
+                completed_at=datetime(last_month_day.year, last_month_day.month, 15, 12, 0, 0),
+            ),
+            Job(
+                ahu_id=ids["ahu_id"],
+                tech_id=ids["tech_id"],
+                completed_at=datetime(too_old.year, too_old.month, 1, 12, 0, 0),
+            ),
+        ])
+        db.session.commit()
+
     graphs = client.get("/api/client/graphs", headers=headers).get_json()
     assert_eq(graphs["summary"]["ahus"], 3, "graph ahus")
     assert graphs["summary"]["overdue"] >= 1, "overdue in graphs"
@@ -264,6 +284,16 @@ def main():
     assert_eq(phases.get("FINAL"), 20, "FINAL qty on graphs")
     assert_eq(phases.get("Gas Phase"), 4, "Gas Phase qty on graphs")
     assert_eq([r["phase"] for r in graphs["by_phase"]], ["PRE", "FINAL", "Gas Phase"], "type order")
+    visits = graphs["visits"]
+    assert_eq(len(visits), 12, "twelve visit months")
+    this_month = date.today().strftime("%Y-%m")
+    last_month = (date.today().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    assert_eq(visits[-1]["month"], this_month, "current month is the last visits bucket")
+    by_month = {row["month"]: row["jobs"] for row in visits}
+    assert by_month[this_month] >= 1, "this month's job is on the visits chart"
+    assert_eq(by_month[last_month], 1, "last month's job is on the visits chart")
+    too_old_key = (date.today() - timedelta(days=400)).strftime("%Y-%m")
+    assert too_old_key not in by_month, "job older than the window is omitted"
 
     sticker = client.get(f"/api/public/units/{ids['ahu_id']}")
     assert_eq(sticker.status_code, 200, "logged-out QR card")
