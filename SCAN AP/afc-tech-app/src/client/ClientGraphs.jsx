@@ -22,15 +22,19 @@ const STATUS_COLORS = {
   pending: "#64748b",
 };
 
-const PHASE_COLORS = {
-  PRE: "#0a4d8c",
-  FINAL: "#15803d",
-  "Gas Phase": "#7c3aed",
-  HEPA: "#0f766e",
-  Other: "#64748b",
-};
-
-const PHASE_FALLBACK = ["#0369a1", "#c2410c", "#a16207", "#be185d"];
+const PART_COLORS = [
+  "#0a4d8c",
+  "#15803d",
+  "#7c3aed",
+  "#c2410c",
+  "#0f766e",
+  "#a16207",
+  "#be185d",
+  "#0369a1",
+  "#4338ca",
+  "#b45309",
+  "#64748b",
+];
 
 export default function ClientGraphs() {
   const [data, setData] = useState(null);
@@ -85,10 +89,10 @@ export default function ClientGraphs() {
     Scheduled: v.scheduled ?? 0,
   }));
 
-  const types = (data.by_phase || []).map((row, i) => ({
-    name: row.phase,
+  const parts = (data.by_part || []).map((row, i) => ({
+    name: row.part_number,
     value: row.quantity,
-    color: PHASE_COLORS[row.phase] || PHASE_FALLBACK[i % PHASE_FALLBACK.length],
+    color: PART_COLORS[i % PART_COLORS.length],
   }));
 
   return (
@@ -172,16 +176,16 @@ export default function ClientGraphs() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Filter types">
-          {types.length === 0 ? (
-            <p className="text-sm text-base-content/50 py-16 text-center">No filter types yet.</p>
+        <ChartCard title="Part numbers">
+          {parts.length === 0 ? (
+            <p className="text-sm text-base-content/50 py-16 text-center">No part numbers yet.</p>
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 min-h-[240px]">
               <div className="flex-1 min-w-0 h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={types} dataKey="value" nameKey="name" innerRadius={52} outerRadius={80}>
-                      {types.map((entry) => (
+                    <Pie data={parts} dataKey="value" nameKey="name" innerRadius={52} outerRadius={80}>
+                      {parts.map((entry) => (
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
@@ -189,7 +193,7 @@ export default function ClientGraphs() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <TypeLegend items={types} />
+              <TypeLegend items={parts} />
             </div>
           )}
         </ChartCard>
@@ -209,14 +213,16 @@ function ChartCard({ title, children }) {
 
 function TypeLegend({ items }) {
   return (
-    <ul className="js-graph-legend shrink-0 space-y-2.5 text-sm min-w-[8.5rem] px-1">
+    <ul className="js-graph-legend shrink-0 space-y-2.5 text-sm min-w-[9.5rem] max-w-[12.5rem] max-h-[220px] overflow-y-auto px-1">
       {items.map((row) => (
         <li key={row.name} className="flex items-center gap-2">
           <span
             className="h-2.5 w-2.5 rounded-full shrink-0"
             style={{ background: row.color }}
           />
-          <span className="flex-1 leading-tight">{row.name}</span>
+          <span className="flex-1 leading-tight break-all" title={row.name}>
+            {row.name}
+          </span>
           <span className="font-semibold tabular-nums">{row.value}</span>
         </li>
       ))}

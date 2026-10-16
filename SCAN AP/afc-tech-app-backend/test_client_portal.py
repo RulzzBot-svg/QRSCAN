@@ -271,11 +271,12 @@ def main():
     assert graphs["summary"]["overdue"] >= 1, "overdue in graphs"
     buildings = [b["name"] for b in graphs["by_building"]]
     assert "South Tower" in buildings and "MAIN BLDG" in buildings
-    phases = {r["phase"]: r["quantity"] for r in graphs["by_phase"]}
-    assert_eq(phases.get("PRE"), 63, "PRE qty includes first stage")
-    assert_eq(phases.get("FINAL"), 20, "FINAL qty on graphs")
-    assert_eq(phases.get("Gas Phase"), 4, "Gas Phase qty on graphs")
-    assert_eq([r["phase"] for r in graphs["by_phase"]], ["PRE", "FINAL", "Gas Phase"], "type order")
+    parts = {r["part_number"]: r["quantity"] for r in graphs["by_part"]}
+    assert_eq(parts.get("F8V4-2424-GWB"), 55, "PRE catalog PN qty")
+    assert_eq(parts.get("SECRET-PN"), 20, "FINAL catalog PN qty")
+    assert_eq(parts.get("HVP20252XM"), 8, "first-stage PN qty")
+    assert_eq(parts.get("LH07590"), 4, "gas phase PN qty")
+    assert_eq(graphs["by_part"][0]["part_number"], "F8V4-2424-GWB", "largest PN first")
     services = graphs["services"]
     assert_eq(len(services), 12, "twelve service months")
     this_month = date.today().strftime("%Y-%m")

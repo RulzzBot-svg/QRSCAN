@@ -45,6 +45,11 @@ def filter_type_label(phase):
     return raw
 
 
+def part_number_label(f):
+    raw = (getattr(f, "part_number", None) or "").strip()
+    return raw or "Unspecified"
+
+
 def filter_quantity(f):
     qty = getattr(f, "quantity", None)
     if qty is None:
@@ -424,6 +429,7 @@ def hospital_graphs(hospital_id, ahus):
     by_building = {}
     freq_counts = defaultdict(int)
     phase_qty = defaultdict(int)
+    part_qty = defaultdict(int)
     upcoming = {30: 0, 60: 0, 90: 0}
     month_keys = service_month_keys()
     start = month_keys[0]
@@ -455,6 +461,7 @@ def hospital_graphs(hospital_id, ahus):
             qty = filter_quantity(f)
             if qty:
                 phase_qty[filter_type_label(f.phase)] += qty
+                part_qty[part_number_label(f)] += qty
             fst = filter_status(f)
             due = _as_date(fst.get("next_due_date"))
             if due is not None:
@@ -481,6 +488,13 @@ def hospital_graphs(hospital_id, ahus):
             for label, count in sorted(
                 phase_qty.items(),
                 key=lambda item: (FILTER_TYPE_ORDER.get(item[0], 50), item[0].lower()),
+            )
+        ],
+        "by_part": [
+            {"part_number": label, "quantity": count}
+            for label, count in sorted(
+                part_qty.items(),
+                key=lambda item: (-item[1], item[0].lower()),
             )
         ],
         "by_frequency": [
