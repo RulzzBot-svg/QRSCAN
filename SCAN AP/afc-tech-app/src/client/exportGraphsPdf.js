@@ -21,7 +21,7 @@ function serializeCharts(root) {
   });
 }
 
-export function exportClientGraphsPdf({ hospitalName, summary, frequencies, chartsRoot }) {
+export function exportClientGraphsPdf({ hospitalName, summary, chartsRoot }) {
   const charts = serializeCharts(chartsRoot);
   const when = new Date().toLocaleString();
   const hospital = hospitalName || "Hospital";
@@ -54,7 +54,6 @@ export function exportClientGraphsPdf({ hospitalName, summary, frequencies, char
     .card { border: 1px solid #d4e1ea; border-radius: 10px; padding: 12px; break-inside: avoid; }
     .card h3 { margin: 0 0 10px; font-size: 14px; }
     .card svg { width: 100%; height: 220px; }
-    .list-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px solid #eef4f8; }
     @media print {
       body { margin: 16px; }
       .no-print { display: none !important; }
@@ -81,16 +80,7 @@ export function exportClientGraphsPdf({ hospitalName, summary, frequencies, char
   <div class="grid">
     ${charts
       .map((c) => {
-        const body = c.svg
-          ? c.svg
-          : c.title === "Filter frequencies"
-            ? (frequencies || [])
-                .map(
-                  (row) =>
-                    `<div class="list-row"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.count)}</strong></div>`
-                )
-                .join("") || "<div class='sub'>No filter rows yet.</div>"
-            : "<div class='sub'>No chart for this section.</div>";
+        const body = c.svg ? c.svg : "<div class='sub'>No chart for this section.</div>";
         return `<div class="card"><h3>${escapeHtml(c.title)}</h3>${body}</div>`;
       })
       .join("")}

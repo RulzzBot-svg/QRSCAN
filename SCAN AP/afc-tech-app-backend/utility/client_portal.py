@@ -19,6 +19,42 @@ FREQUENCY_LABELS = {
     1095: "3 years",
 }
 
+FILTER_TYPE_ORDER = {
+    "PRE": 0,
+    "FINAL": 1,
+    "Gas Phase": 2,
+    "HEPA": 3,
+    "Other": 99,
+}
+
+
+def filter_type_label(phase):
+    """Bucket survey phase names into PRE / FINAL / Gas Phase / HEPA / Other."""
+    raw = (phase or "").strip()
+    key = re.sub(r"[^a-z0-9]+", " ", raw.lower()).strip()
+    if not key:
+        return "Other"
+    if key.startswith("pre"):
+        return "PRE"
+    if key.startswith("final"):
+        return "FINAL"
+    if "gas" in key or key in ("carbon", "carb"):
+        return "Gas Phase"
+    if "hepa" in key:
+        return "HEPA"
+    return raw
+
+
+def filter_quantity(f):
+    qty = getattr(f, "quantity", None)
+    if qty is None:
+        return 1
+    try:
+        n = int(qty)
+    except (TypeError, ValueError):
+        return 1
+    return n if n > 0 else 0
+
 
 def frequency_label(days):
     try:
@@ -381,6 +417,7 @@ def hospital_graphs(hospital_id, ahus):
     }
     by_building = {}
     freq_counts = defaultdict(int)
+    phase_qty = defaultdict(int)
     upcoming = {30: 0, 60: 0, 90: 0}
 
     for ahu in ahus:
@@ -404,6 +441,9 @@ def hospital_graphs(hospital_id, ahus):
         for f in filters:
             summary["filters"] += 1
             freq_counts[int(f.frequency_days or 0)] += 1
+            qty = filter_quantity(f)
+            if qty:
+                phase_qty[filter_type_label(f.phase)] += qty
             fst = filter_status(f)
             days = fst.get("days_until_due")
             if fst.get("status") == "Overdue":
@@ -419,6 +459,13 @@ def hospital_graphs(hospital_id, ahus):
     return {
         "summary": summary,
         "by_building": sorted(by_building.values(), key=lambda r: r["name"].lower()),
+        "by_phase": [
+            {"phase": label, "quantity": count}
+            for label, count in sorted(
+                phase_qty.items(),
+                key=lambda item: (FILTER_TYPE_ORDER.get(item[0], 50), item[0].lower()),
+            )
+        ],
         "by_frequency": [
             {"days": days, "label": frequency_label(days) or f"{days} days", "count": count}
             for days, count in sorted(freq_counts.items())
