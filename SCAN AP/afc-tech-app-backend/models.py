@@ -151,6 +151,7 @@ class ClientUser(db.Model):
     active = Column(Boolean, default=True)
     # director = full portal; tech = hospital staff, scan + units only
     role = Column(String(20), default="director", nullable=False)
+    email = Column(String(200))
 
     hospital = relationship("Hospital")
 

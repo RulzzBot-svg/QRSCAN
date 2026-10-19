@@ -8,6 +8,8 @@ from flask import current_app
 def create_access_token(subject_id: int, role: str, token_type: str = "tech") -> str:
     secret = current_app.config["JWT_SECRET"]
     hours = int(current_app.config.get("JWT_EXPIRY_HOURS", 12))
+    if (token_type or "tech") == "client":
+        hours = int(current_app.config.get("JWT_CLIENT_EXPIRY_HOURS", 16))
     now = datetime.now(timezone.utc)
     exp = now + timedelta(hours=hours)
     payload = {

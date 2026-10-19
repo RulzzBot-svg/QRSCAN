@@ -13,6 +13,7 @@ from models import AHU, ClientInquiry, ClientUser, Hospital
 from utility.client_portal import (
     hospital_graphs,
     hospital_overview,
+    hospital_upcoming,
     public_ahu_detail,
     public_ahu_summary,
     sticker_card,
@@ -123,7 +124,17 @@ def client_hospital():
         "overdue_units": overview["overdue_units"],
         "due_soon_units": overview["due_soon_units"],
         "recent_changeouts": overview["recent_changeouts"],
+        "held_filters": overview["held_filters"],
+        "week": overview["week"],
+        "upcoming_summary": overview["upcoming_summary"],
     }), 200
+
+
+@client_bp.route("/client/upcoming", methods=["GET"])
+@require_director
+def client_upcoming():
+    ahus = _hospital_ahus(g.current_hospital_id)
+    return jsonify(hospital_upcoming(ahus)), 200
 
 
 @client_bp.route("/client/ahus", methods=["GET"])

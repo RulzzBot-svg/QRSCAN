@@ -46,6 +46,7 @@ def ensure_schema():
         """,
         "CREATE INDEX IF NOT EXISTS ix_client_users_hospital_id ON client_users (hospital_id)",
         "ALTER TABLE client_users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'director'",
+        "ALTER TABLE client_users ADD COLUMN IF NOT EXISTS email VARCHAR(200)",
         """
         CREATE TABLE IF NOT EXISTS client_inquiries (
             id SERIAL PRIMARY KEY,
@@ -83,6 +84,7 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET"] = jwt_secret
     app.config["JWT_EXPIRY_HOURS"] = os.getenv("JWT_EXPIRY_HOURS", "12")
+    app.config["JWT_CLIENT_EXPIRY_HOURS"] = os.getenv("JWT_CLIENT_EXPIRY_HOURS", "16")
     app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # survey workbooks
 
     cors_origins = [
