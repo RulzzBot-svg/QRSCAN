@@ -21,13 +21,13 @@ This portal stores equipment identity, filter geometry, PM dates, and skip comme
 | Hospital portal | React (Vite) SPA, optional PWA | Read-only UI at `/client` |
 | Technician / admin app | React SPA | AFC field work — not issued to hospital logins |
 | API | Flask / SQLAlchemy | JWT issue, hospital-scoped GET |
-| Identity | `client_users` | Username, bcrypt PIN, role, `hospital_id` |
+| Identity | `client_users` | Username, bcrypt PIN, role, `hospital_id`, optional digest email |
 
 Tenant isolation: `g.current_hospital_id` from the authenticated row, not from JWT role and not from `localStorage`.
 
 ## Identity
 
-- Unique username; PIN bcrypt `$2b$`; JWT HS256, `typ=client`, default exp 12 hours
+- Unique username; PIN bcrypt `$2b$`; JWT HS256, `typ=client`, portal default exp 16 hours (`JWT_CLIENT_EXPIRY_HOURS`); technician 12 hours
 - Role re-read from DB every request (`require_client` / `require_director`)
 - Technician/admin routes reject portal tokens
 - Login rate limit 5 / 15 minutes
@@ -40,7 +40,7 @@ Tenant isolation: `g.current_hospital_id` from the authenticated row, not from J
 | POST | `/api/client/login` | Public | 5 / 15 min |
 | GET | `/api/client/me` | Portal | default |
 | GET | `/api/client/ahus`, `/ahus/<id>` | Portal | default |
-| GET | `/api/client/hospital`, `/graphs` | Director | default |
+| GET | `/api/client/hospital`, `/upcoming`, `/graphs` | Director | default |
 | POST | `/api/client/contact` | Director | 5 / hour |
 | GET | `/api/public/units/<id>` | Public GET | 30 / min |
 
@@ -51,7 +51,7 @@ PATCH/PUT/DELETE on portal units → 405. Public sticker has no comments, prices
 | Safeguard | Citation | Implementation |
 | --- | --- | --- |
 | Unique user ID | 164.312(a)(2)(i); IA-2 | Unique username; JWT `sub` |
-| Automatic logoff | 164.312(a)(2)(iii); AC-12 | JWT 12h; 401 clears SPA |
+| Automatic logoff | 164.312(a)(2)(iii); AC-12 | Portal JWT 16h; technician 12h; 401 clears SPA |
 | Encryption | 164.312(a)(2)(iv) addressable | TLS in transit; bcrypt PINs |
 | Audit | 164.312(b); AU-2 | Access logs; not an ePHI audit trail |
 | Integrity | 164.312(c) | Read-only API; signed JWT; ORM |

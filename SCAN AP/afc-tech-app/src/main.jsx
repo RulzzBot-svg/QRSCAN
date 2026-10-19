@@ -26,6 +26,7 @@ import TechSignoff from "./pages/TechSignoff";
 import ClientApp from "./client/ClientApp";
 import ClientLogin from "./client/ClientLogin";
 import ClientHome from "./client/ClientHome";
+import ClientUpcoming from "./client/ClientUpcoming";
 import ClientScan from "./client/ClientScan";
 import ClientUnits from "./client/ClientUnits";
 import ClientAhu from "./client/ClientAhu";
@@ -86,6 +87,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/client/login" element={<ClientLogin />} />
         <Route path="/client" element={<ClientApp />}>
           <Route index element={<ClientHome />} />
+          <Route path="upcoming" element={<ClientUpcoming />} />
           <Route path="scan" element={<ClientScan />} />
           <Route path="units" element={<ClientUnits />} />
           <Route path="ahu/:ahuId" element={<ClientAhu />} />

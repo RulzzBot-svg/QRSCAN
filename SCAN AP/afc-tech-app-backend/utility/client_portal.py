@@ -6,6 +6,7 @@ import re
 
 from models import AHU, Filter, Job, JobFilter
 from utility.status import compute_filter_status
+from utility.upcoming import ASAP_DAYS, SEVERITY_RANK, WINDOW_DAYS, due_severity
 
 
 FREQUENCY_LABELS = {
@@ -232,6 +233,7 @@ def public_ahu_detail(ahu):
     payload = public_ahu_summary(ahu)
     payload["filters"] = [public_filter(f) for f in filters]
     payload["comments"] = ahu_service_comments(ahu)
+    payload["history"] = ahu_visit_history(ahu)
     return payload
 
 
@@ -295,11 +297,19 @@ def hospital_overview(ahus):
             due_soon.append(row)
     ahus_n = len(ahus or [])
     compliant = sum(1 for a in (ahus or []) if public_ahu_summary(a)["status"] == "Completed")
+    hospital_id = None
+    for ahu in ahus or []:
+        hospital_id = getattr(ahu, "hospital_id", None)
+        if hospital_id is not None:
+            break
     return {
         "compliance_pct": int(round((100.0 * compliant / ahus_n))) if ahus_n else 0,
         "overdue_units": overdue[:12],
         "due_soon_units": due_soon[:12],
         "recent_changeouts": recent_changeouts(ahus),
+        "held_filters": hospital_held_filters(hospital_id),
+        "week": hospital_week_digest(hospital_id, ahus),
+        "upcoming_summary": hospital_upcoming(ahus).get("summary") or {},
     }
 
 
@@ -543,3 +553,259 @@ def _services_by_month(hospital_id, month_keys, scheduled):
         }
         for key in month_keys
     ]
+
+
+def _qty(filter_row):
+    try:
+        n = int(getattr(filter_row, "quantity", 0) or 0)
+    except (TypeError, ValueError):
+        n = 0
+    return n
+
+
+def _worst(current, candidate):
+    if candidate is None:
+        return current
+    if current is None:
+        return candidate
+    return candidate if SEVERITY_RANK[candidate] < SEVERITY_RANK[current] else current
+
+
+def hospital_upcoming(ahus, *, window_days=WINDOW_DAYS, asap_days=ASAP_DAYS):
+    """Director 30-day due list: buildings then AHU cards. No catalog PNs or prices."""
+    buildings = {}
+    summary = {
+        "ahus_asap": 0,
+        "ahus_month": 0,
+        "filters_asap": 0,
+        "filters_month": 0,
+    }
+
+    for ahu in ahus or []:
+        due_filters = []
+        worst = None
+        next_due = None
+        days_until = None
+        days_overdue = 0
+        for f in active_filters(ahu):
+            sev, st = due_severity(f, window_days=window_days, asap_days=asap_days)
+            if not sev:
+                continue
+            due_date = st.get("next_due_date")
+            due_filters.append(
+                {
+                    "phase": getattr(f, "phase", None),
+                    "size": getattr(f, "size", None),
+                    "quantity": _qty(f),
+                    "next_due_date": due_date,
+                    "days_until_due": st.get("days_until_due"),
+                    "days_overdue": st.get("days_overdue") or 0,
+                    "severity": sev,
+                }
+            )
+            worst = _worst(worst, sev)
+            if due_date and (next_due is None or due_date < next_due):
+                next_due = due_date
+            until = st.get("days_until_due")
+            if until is not None:
+                days_until = until if days_until is None else min(days_until, until)
+            days_overdue = max(days_overdue, st.get("days_overdue") or 0)
+        if not due_filters:
+            continue
+
+        building = getattr(ahu, "building", None)
+        bname = building.name if building is not None else "(No building)"
+        bid = getattr(ahu, "building_id", None)
+        bkey = str(bid) if bid is not None else bname
+        group = buildings.setdefault(bkey, {"id": bid, "name": bname, "ahus": []})
+        is_asap = worst in ("overdue", "soon")
+        if is_asap:
+            summary["ahus_asap"] += 1
+        else:
+            summary["ahus_month"] += 1
+        asap_n = sum(1 for row in due_filters if row["severity"] in ("overdue", "soon"))
+        summary["filters_asap"] += asap_n
+        summary["filters_month"] += len(due_filters) - asap_n
+        group["ahus"].append(
+            {
+                "id": ahu.id,
+                "name": ahu.name,
+                "location": ahu.location,
+                "severity": worst,
+                "next_due_date": next_due,
+                "days_until_due": 0 if worst == "overdue" else days_until,
+                "days_overdue": days_overdue,
+                "filters_due": len(due_filters),
+                "qty_due": sum(row["quantity"] for row in due_filters),
+                "filters": due_filters,
+            }
+        )
+
+    building_list = []
+    for group in buildings.values():
+        group["ahus"].sort(
+            key=lambda a: (
+                SEVERITY_RANK.get(a["severity"], 9),
+                a.get("next_due_date") or "9999-12-31",
+                str(a.get("name") or "").lower(),
+            )
+        )
+        building_list.append(group)
+    building_list.sort(key=lambda b: str(b.get("name") or "").lower())
+    return {
+        "window_days": window_days,
+        "asap_days": asap_days,
+        "summary": summary,
+        "buildings": building_list,
+    }
+
+
+def ahu_visit_history(ahu, limit=12):
+    """Last visits on one unit: stages replaced and anything held. No tech names."""
+    if ahu is None or not getattr(ahu, "id", None):
+        return []
+    from db import db
+
+    rows = (
+        db.session.query(Job, JobFilter, Filter)
+        .join(JobFilter, JobFilter.job_id == Job.id)
+        .join(Filter, Filter.id == JobFilter.filter_id)
+        .filter(Job.ahu_id == ahu.id)
+        .filter(Job.completed_at.isnot(None))
+        .order_by(Job.completed_at.desc(), Job.id.desc(), JobFilter.id.asc())
+        .limit(120)
+        .all()
+    )
+    visits = []
+    index = {}
+    for job, jf, filt in rows:
+        key = job.id
+        if key not in index:
+            if len(visits) >= limit:
+                continue
+            index[key] = len(visits)
+            visits.append(
+                {
+                    "at": (_as_date(job.completed_at) or date.today()).isoformat(),
+                    "replaced": [],
+                    "held": [],
+                }
+            )
+        visit = visits[index[key]]
+        phase = (getattr(filt, "phase", None) or "Filter").strip() or "Filter"
+        if jf.is_completed:
+            if phase not in visit["replaced"]:
+                visit["replaced"].append(phase)
+        else:
+            visit["held"].append(
+                {
+                    "filter": phase,
+                    "text": _sanitize_comment(jf.note),
+                }
+            )
+    return visits
+
+
+def hospital_held_filters(hospital_id, limit=12):
+    """Recent held / not-replaced filters for director Home. No tech names."""
+    if hospital_id is None:
+        return []
+    from db import db
+
+    rows = (
+        db.session.query(Job, JobFilter, Filter, AHU)
+        .join(JobFilter, JobFilter.job_id == Job.id)
+        .join(Filter, Filter.id == JobFilter.filter_id)
+        .join(AHU, AHU.id == Job.ahu_id)
+        .filter(AHU.hospital_id == hospital_id)
+        .filter(JobFilter.is_completed.is_(False))
+        .filter(JobFilter.note.isnot(None))
+        .filter(Job.completed_at.isnot(None))
+        .order_by(Job.completed_at.desc(), JobFilter.id.desc())
+        .limit(40)
+        .all()
+    )
+    out = []
+    for job, jf, filt, ahu in rows:
+        text = _sanitize_comment(jf.note)
+        if not text:
+            continue
+        building = getattr(ahu, "building", None)
+        out.append(
+            {
+                "ahu_id": ahu.id,
+                "name": ahu.name,
+                "building": building.name if building is not None else None,
+                "filter": getattr(filt, "phase", None),
+                "at": (_as_date(job.completed_at) or date.today()).isoformat(),
+                "text": text,
+            }
+        )
+        if len(out) >= limit:
+            break
+    return out
+
+
+def week_start(today=None):
+    day = today or date.today()
+    return day - timedelta(days=day.weekday())
+
+
+def hospital_week_digest(hospital_id, ahus, today=None):
+    """Monday–today: units AFC touched, filters replaced, still overdue, held."""
+    start = week_start(today)
+    overdue_n = 0
+    for ahu in ahus or []:
+        if public_ahu_summary(ahu)["status"] == "Overdue":
+            overdue_n += 1
+
+    visits = []
+    filters_replaced = 0
+    held_n = 0
+    by_job = {}
+    if hospital_id is not None:
+        from db import db
+
+        start_at = datetime.combine(start, datetime.min.time())
+        rows = (
+            db.session.query(Job, JobFilter, Filter, AHU)
+            .join(JobFilter, JobFilter.job_id == Job.id)
+            .join(Filter, Filter.id == JobFilter.filter_id)
+            .join(AHU, AHU.id == Job.ahu_id)
+            .filter(AHU.hospital_id == hospital_id)
+            .filter(Job.completed_at.isnot(None))
+            .filter(Job.completed_at >= start_at)
+            .order_by(Job.completed_at.desc(), JobFilter.id.asc())
+            .all()
+        )
+        by_job = {}
+        for job, jf, filt, ahu in rows:
+            row = by_job.setdefault(
+                job.id,
+                {
+                    "id": ahu.id,
+                    "name": ahu.name,
+                    "building": ahu.building.name if getattr(ahu, "building", None) else None,
+                    "at": (_as_date(job.completed_at) or start).isoformat(),
+                    "stages": [],
+                    "held": 0,
+                },
+            )
+            phase = (getattr(filt, "phase", None) or "Filter").strip() or "Filter"
+            if jf.is_completed:
+                filters_replaced += 1
+                if phase not in row["stages"]:
+                    row["stages"].append(phase)
+            else:
+                held_n += 1
+                row["held"] += 1
+        visits = sorted(by_job.values(), key=lambda r: r["at"], reverse=True)[:8]
+
+    return {
+        "week_start": start.isoformat(),
+        "units_serviced": len({row["id"] for row in by_job.values()}),
+        "filters_replaced": filters_replaced,
+        "still_overdue": overdue_n,
+        "held": held_n,
+        "visits": visits,
+    }

@@ -13,10 +13,10 @@ import ThemeToggle from "./ThemeToggle";
 
 const DIRECTOR_NAV = [
   { to: "/client", label: "Home", end: true, icon: HomeIcon },
+  { to: "/client/upcoming", label: "Due", icon: DueIcon },
   { to: "/client/units", label: "Units", icon: UnitsIcon },
   { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
   { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
-  { to: "/client/docs", label: "Docs", icon: HelpIcon },
 ];
 
 const STAFF_NAV = [
@@ -58,6 +58,7 @@ export default function ClientApp() {
       path === "/client/" ||
       path.startsWith("/client/graphs") ||
       path.startsWith("/client/contact") ||
+      path.startsWith("/client/upcoming") ||
       path.startsWith("/client/datasheet")
     ) {
       navigate("/client/units", { replace: true });
@@ -223,6 +224,16 @@ function HelpIcon({ className }) {
       <circle cx="12" cy="12" r="9" />
       <path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.8.4-1.2.9-1.2 1.6V14" />
       <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+function DueIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M8 3v4M16 3v4M4 10h16" />
+      <path d="M12 14v3M12 14l2 2" />
     </svg>
   );
 }

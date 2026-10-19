@@ -78,6 +78,7 @@ export const getClientHospital = () => ClientAPI.get("/client/hospital");
 export const getClientAhus = () => ClientAPI.get("/client/ahus");
 export const getClientAhu = (id) => ClientAPI.get(`/client/ahus/${id}`);
 export const getClientGraphs = () => ClientAPI.get("/client/graphs");
+export const getClientUpcoming = () => ClientAPI.get("/client/upcoming");
 export const sendClientContact = (payload) => ClientAPI.post("/client/contact", payload);
 
 export function getPublicUnit(ahuId) {

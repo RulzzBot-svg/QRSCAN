@@ -782,12 +782,22 @@ def _portal_role(raw):
     return "director"
 
 
+def _normalize_client_email(raw):
+    s = str(raw or "").strip().lower()
+    if not s:
+        return None
+    if "@" not in s or "." not in s.split("@")[-1]:
+        return False
+    return s[:200]
+
+
 def _client_admin_dict(c):
     return {
         "id": c.id,
         "hospital_id": c.hospital_id,
         "name": c.name,
         "username": c.username,
+        "email": getattr(c, "email", None),
         "active": bool(c.active),
         "role": _portal_role(getattr(c, "role", None)),
     }
@@ -831,6 +841,9 @@ def create_hospital_client(hospital_id):
         return jsonify({"error": "PIN must be at least 4 characters"}), 400
     if ClientUser.query.filter_by(username=username).first():
         return jsonify({"error": "That username is already in use"}), 409
+    email = _normalize_client_email(data.get("email"))
+    if email is False:
+        return jsonify({"error": "That email does not look valid."}), 400
 
     client = ClientUser(
         hospital_id=hospital_id,
@@ -839,6 +852,7 @@ def create_hospital_client(hospital_id):
         pin=hash_pin(pin),
         active=True,
         role=_portal_role(data.get("role")),
+        email=email,
     )
     db.session.add(client)
     db.session.commit()
@@ -866,6 +880,23 @@ def update_hospital_client(client_id):
         if len(pin) < 4:
             return jsonify({"error": "PIN must be at least 4 characters"}), 400
         client.pin = hash_pin(pin)
+    if "email" in data:
+        email = _normalize_client_email(data.get("email"))
+        if email is False:
+            return jsonify({"error": "That email does not look valid."}), 400
+        client.email = email
 
     db.session.commit()
     return jsonify(_client_admin_dict(client)), 200
+
+
+@admin_bp.route("/director-digests", methods=["POST"])
+@require_admin
+def send_director_digests():
+    """Email this-week status to directors who have an email on file. No-op without SMTP."""
+    from utility.director_digest import send_director_digests as run_digests
+
+    try:
+        return jsonify(run_digests()), 200
+    except Exception as e:
+        return internal_error(e)

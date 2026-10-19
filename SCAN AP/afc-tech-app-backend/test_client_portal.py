@@ -4,6 +4,7 @@ import os
 import tempfile
 from datetime import date, datetime, timedelta
 
+import jwt
 from flask import Flask
 
 from db import db
@@ -17,6 +18,7 @@ from routes.client_routes import client_bp
 from routes.job_routes import job_bp
 from routes.tech_routes import tech_bp
 from utility.client_portal import filter_type_label, frequency_label, public_filter, service_month_keys
+from utility.director_digest import format_digest_text
 
 
 def make_app(db_path):
@@ -25,6 +27,7 @@ def make_app(db_path):
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET"] = "client-portal-test-secret"
     app.config["JWT_EXPIRY_HOURS"] = "12"
+    app.config["JWT_CLIENT_EXPIRY_HOURS"] = "16"
     app.config["TESTING"] = True
     db.init_app(app)
     limiter.init_app(app)
@@ -157,7 +160,12 @@ def seed(app):
         )
         db.session.add_all([admin, tech, client, floor])
         db.session.flush()
-        job = Job(ahu_id=ahu.id, tech_id=tech.id, overall_notes="internal")
+        job = Job(
+            ahu_id=ahu.id,
+            tech_id=tech.id,
+            overall_notes="internal",
+            completed_at=datetime.utcnow(),
+        )
         db.session.add(job)
         db.session.flush()
         pre = Filter.query.filter_by(ahu_id=ahu.id, phase="PRE").first()
@@ -220,6 +228,8 @@ def main():
     headers = {"Authorization": f"Bearer {token}"}
     assert_eq(login.get_json()["hospital_name"], "CHOC", "login names the hospital")
     assert_eq(login.get_json()["role"], "director", "facilities login is director")
+    decoded = jwt.decode(token, "client-portal-test-secret", algorithms=["HS256"])
+    assert_eq(decoded["exp"] - decoded["iat"], 16 * 3600, "portal session lasts a shift")
 
     me = client.get("/api/client/me", headers=headers)
     assert_eq(me.status_code, 200, "me")
@@ -248,6 +258,13 @@ def main():
     assert comments, "held-filter comments are on the unit page"
     assert any("No access" in (c.get("text") or "") for c in comments), "skip reason is visible"
     assert all("tech_id" not in c and "technician" not in c for c in comments), "comments hide tech identity"
+    history = detail.get("history") or []
+    assert history, "unit history is on the payload"
+    assert any((h.get("held") or []) for h in history), "held visit is in history"
+    assert "internal" not in str(history), "job notes stay off history"
+    assert "SECRET-PN" not in str(history), "history has no catalog PNs"
+    assert "technician" not in str(history).lower(), "history hides tech identity"
+    assert all("tech_id" not in h for h in history), "history has no tech ids"
     phases = sorted(f["phase"] for f in detail["filters"])
     assert_eq(phases, ["FINAL", "PRE"], "both filters")
     labels = {f["phase"]: f["frequency_label"] for f in detail["filters"]}
@@ -296,6 +313,7 @@ def main():
     assert "internal" not in blob, "sticker hides job notes"
     assert "No access" not in blob, "sticker hides skip comments"
     assert "comments" not in card, "sticker has no comment list"
+    assert "history" not in card, "sticker has no visit history"
     assert "hospital_id" not in card, "sticker hides hospital id"
     assert card["hospital"] == "CHOC", "sticker hospital name"
     assert card["name"] == "AHU-E2", "sticker AHU name"
@@ -369,6 +387,10 @@ def main():
     tech_login = client.post("/api/technicians/login", json={"name": "Tech", "pin": "1111"})
     assert_eq(tech_login.status_code, 200, "tech login still works")
     assert tech_login.get_json().get("token"), "tech token issued"
+    tech_decoded = jwt.decode(
+        tech_login.get_json()["token"], "client-portal-test-secret", algorithms=["HS256"]
+    )
+    assert_eq(tech_decoded["exp"] - tech_decoded["iat"], 12 * 3600, "tech token still 12h")
 
     admin_headers = auth_header(app, ids["admin_id"], "admin", "tech")
     created = client.post(
@@ -394,6 +416,9 @@ def main():
     assert any("No access" in (c.get("text") or "") for c in staff_detail.get_json().get("comments") or []), "hospital tech sees skip comments"
     assert_eq(client.get("/api/client/graphs", headers=staff_headers).status_code, 403, "hospital tech cannot graphs")
     assert_eq(client.get("/api/client/hospital", headers=staff_headers).status_code, 403, "hospital tech cannot director home")
+    assert_eq(client.get("/api/client/upcoming", headers=staff_headers).status_code, 403, "hospital tech cannot upcoming")
+    staff_history = staff_detail.get_json().get("history") or []
+    assert staff_history, "hospital tech can read unit history"
     assert_eq(client.get("/api/client/datasheet", headers=staff_headers).status_code, 404, "no portal datasheet dump")
     staff_contact = client.post(
         "/api/client/contact",
@@ -409,9 +434,55 @@ def main():
     assert recent, "director home lists recent changeouts"
     assert recent[0]["name"] == "AHU-E2", "most recent CHOC changeout is AHU-E2"
     assert recent[0]["id"] == ids["ahu_id"], "recent changeout links to the unit"
-    home_blob = str(home.get_json())
+    home_json = home.get_json()
+    home_blob = str(home_json)
     assert "SECRET-PN" not in home_blob and "269.50" not in home_blob, "recent changeouts have no PNs or prices"
     assert "Tech" not in str(recent), "recent changeouts have no tech names"
+    held = home_json.get("held_filters") or []
+    assert held, "director home lists held filters"
+    assert any("No access" in (r.get("text") or "") for r in held), "held reason is on Home"
+    week = home_json.get("week") or {}
+    assert week.get("week_start"), "this-week digest has a Monday"
+    assert week.get("still_overdue") >= 1, "digest still overdue"
+    assert week.get("held") >= 1, "digest counts held this week"
+    assert (home_json.get("upcoming_summary") or {}).get("ahus_asap") >= 1, "home previews due ASAP"
+
+    upcoming = client.get("/api/client/upcoming", headers=headers)
+    assert_eq(upcoming.status_code, 200, "director upcoming")
+    up = upcoming.get_json()
+    assert (up.get("summary") or {}).get("ahus_asap") >= 1, "overdue AHU is due ASAP"
+    assert any(b.get("name") == "South Tower" for b in (up.get("buildings") or [])), "upcoming grouped by building"
+    up_blob = str(up)
+    assert "SECRET-PN" not in up_blob and "269.50" not in up_blob, "upcoming has no PNs or prices"
+    assert "Tech" not in up_blob, "upcoming has no tech names"
+
+    digest_text = format_digest_text(
+        "CHOC",
+        {
+            "week_start": "2026-10-13",
+            "units_serviced": 1,
+            "filters_replaced": 2,
+            "still_overdue": 1,
+            "held": 1,
+            "visits": [],
+        },
+        {"ahus_asap": 1, "ahus_month": 0},
+        [],
+    )
+    assert "Still overdue: 1" in digest_text, "digest names overdue count"
+    assert "Joint Commission" in digest_text, "digest is not an accreditation record"
+
+    email_set = client.patch(
+        f"/api/admin/clients/{ids['client_id']}",
+        headers=admin_headers,
+        json={"email": "director@choc.test"},
+    )
+    assert_eq(email_set.status_code, 200, "admin sets director email")
+    assert_eq(email_set.get_json()["email"], "director@choc.test", "email stored")
+    digest = client.post("/api/admin/director-digests", headers=admin_headers)
+    assert_eq(digest.status_code, 200, "digest endpoint")
+    assert_eq(digest.get_json().get("sent"), 0, "no SMTP means nothing sent")
+    assert "SMTP_HOST" in str(digest.get_json().get("skipped") or ""), "digest explains missing SMTP"
 
     reset = client.patch(
         f"/api/admin/clients/{created.get_json()['id']}",

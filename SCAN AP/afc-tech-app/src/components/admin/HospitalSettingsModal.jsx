@@ -21,14 +21,20 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
   const [error, setError] = useState(null);
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState(null);
-  const [newClient, setNewClient] = useState({ name: "", username: "", pin: "", role: "director" });
+  const [newClient, setNewClient] = useState({
+    name: "",
+    username: "",
+    pin: "",
+    role: "director",
+    email: "",
+  });
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!hospital || !open) return;
     setError(null);
     setClientsError(null);
-    setNewClient({ name: "", username: "", pin: "", role: "director" });
+    setNewClient({ name: "", username: "", pin: "", role: "director", email: "" });
     const applyHospital = (data) => {
       setForm({
         estimate_number: data.estimate_number || "",
@@ -86,7 +92,7 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
     try {
       const res = await createHospitalClient(hospital.id, newClient);
       setClients((prev) => [...prev, res.data]);
-      setNewClient({ name: "", username: "", pin: "", role: "director" });
+      setNewClient({ name: "", username: "", pin: "", role: "director", email: "" });
     } catch (err) {
       setClientsError(err?.response?.data?.error || "Could not create portal login");
     } finally {
@@ -100,6 +106,21 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
       setClients((prev) => prev.map((c) => (c.id === row.id ? res.data : c)));
     } catch (err) {
       setClientsError(err?.response?.data?.error || "Could not update portal login");
+    }
+  };
+
+  const setClientEmail = async (row) => {
+    const email = window.prompt(
+      `Weekly digest email for ${row.username} (blank to clear)`,
+      row.email || ""
+    );
+    if (email == null) return;
+    try {
+      const res = await updateHospitalClient(row.id, { email: String(email).trim() });
+      setClients((prev) => prev.map((c) => (c.id === row.id ? res.data : c)));
+      setClientsError(null);
+    } catch (err) {
+      setClientsError(err?.response?.data?.error || "Could not update email");
     }
   };
 
@@ -200,6 +221,7 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
         <div className="divider my-4">Hospital portal</div>
         <p className="text-xs text-base-content/60 mb-3">
           Director logins see the full portal. Hospital tech logins only get Scan and Units. No prices or invoices.
+          Optional email is for the weekly status digest (Home always shows This week; mail sends only if SMTP is set).
           Share <code className="text-[11px]">/client/login</code> with them.
         </p>
 
@@ -216,8 +238,16 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
                 <span className="badge badge-ghost badge-xs ml-2">
                   {row.role === "tech" ? "hospital tech" : "director"}
                 </span>
+                {row.email ? (
+                  <span className="block text-[11px] text-base-content/50">{row.email}</span>
+                ) : null}
               </div>
               <div className="flex gap-1 shrink-0">
+                {row.role !== "tech" ? (
+                  <button type="button" className="btn btn-xs btn-ghost" onClick={() => setClientEmail(row)}>
+                    Email
+                  </button>
+                ) : null}
                 <button type="button" className="btn btn-xs btn-ghost" onClick={() => resetClientPin(row)}>
                   Reset PIN
                 </button>
@@ -257,6 +287,13 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
             value={newClient.pin}
             onChange={(e) => setNewClient((p) => ({ ...p, pin: e.target.value }))}
             required
+          />
+          <input
+            className="input input-xs input-bordered col-span-2"
+            type="email"
+            placeholder="Director email (optional digest)"
+            value={newClient.email}
+            onChange={(e) => setNewClient((p) => ({ ...p, email: e.target.value }))}
           />
           <select
             className="select select-xs select-bordered col-span-2"

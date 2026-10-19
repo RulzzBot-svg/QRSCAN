@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PORTAL_APP_SHORT } from "../branding";
-import { isClientDirector, loginClient, saveClientSession } from "./api";
+import { hasClientToken, isClientDirector, loginClient, readClientUser, saveClientSession } from "./api";
 import { readClientTheme, storeClientTheme, toggleClientTheme, applyClientTheme } from "./theme";
 import ThemeToggle from "./ThemeToggle";
 import InstallHint from "./InstallHint";
@@ -17,6 +17,33 @@ export default function ClientLogin() {
   useEffect(() => {
     applyClientTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!hasClientToken() || !readClientUser()) return;
+    const director = isClientDirector();
+    let next = director ? "/client" : "/client/units";
+    try {
+      const stored = sessionStorage.getItem("post_client_path");
+      if (stored && stored.startsWith("/client") && stored !== "/client/login") {
+        next = stored;
+      }
+      sessionStorage.removeItem("post_client_path");
+    } catch {
+      /* ignore */
+    }
+    if (
+      !director &&
+      (next === "/client" ||
+        next === "/client/" ||
+        next.startsWith("/client/graphs") ||
+        next.startsWith("/client/contact") ||
+        next.startsWith("/client/upcoming") ||
+        next.startsWith("/client/datasheet"))
+    ) {
+      next = "/client/units";
+    }
+    navigate(next, { replace: true });
+  }, [navigate]);
 
   const switchTheme = () => {
     const next = toggleClientTheme(theme);
@@ -47,6 +74,7 @@ export default function ClientLogin() {
           next === "/client/" ||
           next.startsWith("/client/graphs") ||
           next.startsWith("/client/contact") ||
+          next.startsWith("/client/upcoming") ||
           next.startsWith("/client/datasheet"))
       ) {
         next = "/client/units";
