@@ -1,6 +1,7 @@
 // AdminAHUs.jsx
 // Redesigned Admin AHU UI: two-pane layout
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { API } from "../../api/api";
 import { deleteAdminAhus, fetchFiltersByAhuIds } from "../../api/admin";
 import AdminFilterEditorInline from "./adminInlineEditor";
@@ -38,6 +39,8 @@ const naturalAhuSort = (a, b) => {
 };
 
 function AdminAHUs() {
+  const [searchParams] = useSearchParams();
+  const hospitalFromUrl = searchParams.get("hospital");
   const [ahus, setAhus] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +49,9 @@ function AdminAHUs() {
   const [hospitalQuery, setHospitalQuery] = useState(""); // searches hospitals in the left pane
   const [ahuQuery, setAhuQuery] = useState(""); // searches AHUs in the right pane
   const [selected, setSelected] = useState({}); // { [ahuId]: true }
-  const [selectedHospitalKey, setSelectedHospitalKey] = useState(null);
+  const [selectedHospitalKey, setSelectedHospitalKey] = useState(
+    () => (hospitalFromUrl ? String(hospitalFromUrl) : null)
+  );
   const [showImport, setShowImport] = useState(false);
   const [showSignoff, setShowSignoff] = useState(false);
   const [showAddAhu, setShowAddAhu] = useState(false);
@@ -59,7 +64,7 @@ function AdminAHUs() {
   const [manualReviewData, setManualReviewData] = useState(null);
   const [qbCopyResult, setQbCopyResult] = useState(null);
   const [buildingFilter, setBuildingFilter] = useState("");
-  const [showAllHospitals, setShowAllHospitals] = useState(false);
+  const [showAllHospitals, setShowAllHospitals] = useState(() => Boolean(hospitalFromUrl));
   const [qrPrint, setQrPrint] = useState({
     open: false,
     loading: false,
