@@ -7,7 +7,7 @@ import { submitJob } from "../../api/jobs";
 import { queueJob } from "../../offline/jobQueue";
 import { cacheAHU, getCachedAHU } from "../../offline/ahuCache";
 import { parseIsoToDate, formatDate } from "../../utils/dates";
-import { hasTechSession } from "../../api/api";
+import { canUseFieldAppNow } from "../../api/api";
 import { hasClientToken, readClientUser } from "../../client/api";
 import { filterInfoScanDestination } from "../../utils/filterInfoGate";
 
@@ -76,7 +76,7 @@ function FilterInfo() {
       storedTech = null;
     }
     const dest = filterInfoScanDestination(ahuId, {
-      hasTech: Boolean(storedTech) && hasTechSession(),
+      hasTech: Boolean(storedTech) && canUseFieldAppNow(),
       hasClient: hasClientToken() && Boolean(readClientUser()),
     });
     if (dest.stay) {
@@ -122,28 +122,30 @@ function FilterInfo() {
     const loadAHU = async () => {
       try {
         if (navigator.onLine) {
-          const res = await getAHUbyQR(ahuId);
-          if (cancelled) return;
+          try {
+            const res = await getAHUbyQR(ahuId);
+            if (cancelled) return;
 
-          setAhu(res.data);
-          setFilterRows(res.data.filters || []);
-
-          // 🔑 cache for offline use (keyed by ahu_id)
-          await cacheAHU(res.data);
-        } else {
-          const cached = await getCachedAHU(ahuId);
-          if (!cached) throw new Error("No cached AHU");
-
-          if (cancelled) return;
-          setAhu(cached);
-          setFilterRows(cached.filters || []);
+            setAhu(res.data);
+            setFilterRows(res.data.filters || []);
+            await cacheAHU(res.data);
+            return;
+          } catch (err) {
+            console.warn("Live AHU fetch failed, trying download cache", err);
+          }
         }
+
+        const cached = await getCachedAHU(ahuId);
+        if (!cached) throw new Error("No cached AHU");
+        if (cancelled) return;
+        setAhu(cached);
+        setFilterRows(cached.filters || []);
       } catch (err) {
         console.error("Error loading AHU:", err);
         alert(
           navigator.onLine
             ? "AHU not found"
-            : "This AHU is not available offline"
+            : "This AHU is not on this phone. Download the hospital while you have signal, then scan again."
         );
         navigate("/scan");
       }
@@ -228,6 +230,11 @@ function FilterInfo() {
     try {
       if (!navigator.onLine) {
         await queueJob(jobData);
+        try {
+          window.dispatchEvent(new Event("jobs:queued"));
+        } catch {
+          /* ignore */
+        }
         openModal();
         return;
       }
@@ -245,6 +252,11 @@ function FilterInfo() {
     } catch (err) {
       console.error("Error submitting job:", err);
       await queueJob(jobData);
+      try {
+        window.dispatchEvent(new Event("jobs:queued"));
+      } catch {
+        /* ignore */
+      }
       openModal();
     } finally {
       setSubmitting(false);
@@ -256,7 +268,7 @@ function FilterInfo() {
   /* ----------------------------- */
   const getCurrentLocation = () => {
     return new Promise((resolve) => {
-      if (!navigator.geolocation) {
+      if (!navigator.onLine || !navigator.geolocation) {
         return resolve({ lat: null, long: null });
       }
 
@@ -269,7 +281,7 @@ function FilterInfo() {
         () => resolve({ lat: null, long: null }),
         {
           enableHighAccuracy: false,
-          timeout: 20000,
+          timeout: 4000,
           maximumAge: 300000,
         }
       );

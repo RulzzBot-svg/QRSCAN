@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getBuildingsForHospital } from "../../api/hospitals";
+import { getCachedAhusForHospital } from "../../offline/ahuCache";
+import { buildingHref, buildingsFromAhus } from "../../offline/cacheBrowse";
 
 function BuildingsPage() {
   const { hospitalId } = useParams();
@@ -14,15 +16,38 @@ function BuildingsPage() {
   const [activeOnly, setActiveOnly] = useState(false);
 
   useEffect(() => {
-    getBuildingsForHospital(hospitalId)
-      .then((res) => {
-        setBuildings(Array.isArray(res.data) ? res.data : []);
-      })
-      .catch((err) => {
-        console.error("Failed to load buildings", err);
-        setBuildings([]);
-      })
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    async function fromCache() {
+      const ahus = await getCachedAhusForHospital(hospitalId);
+      return buildingsFromAhus(ahus);
+    }
+
+    async function load() {
+      setLoading(true);
+      try {
+        if (!navigator.onLine) {
+          const rows = await fromCache();
+          if (!cancelled) setBuildings(rows);
+          return;
+        }
+        try {
+          const res = await getBuildingsForHospital(hospitalId);
+          if (!cancelled) setBuildings(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+          console.warn("Buildings API failed, using download cache", err);
+          const rows = await fromCache();
+          if (!cancelled) setBuildings(rows);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [hospitalId]);
 
   
@@ -74,7 +99,7 @@ function BuildingsPage() {
           }).map((building) => (
             <div
               key={building.id}
-              onClick={() => navigate(`/AHU/${hospitalId}/building/${building.id}`)}
+              onClick={() => navigate(buildingHref(hospitalId, building.id))}
               className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md hover:border-primary transition-all cursor-pointer"
             >
               <div className="card-body p-5">

@@ -1,13 +1,18 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TECH_APP_NAME } from "./branding";
 import LogoutButton from "./components/common/logoutbutton";
 import { useOfflineSync } from "./offline/useOfflineSync";
+import { getOfflineHospitals } from "./offline/offlineBundle";
 import { hasAuthToken } from "./api/api";
 
 export default function App() {
   const navigate = useNavigate();
-  const { syncing, lastResult, runSync } = useOfflineSync();
+  const { syncing, lastResult, queue, runSync } = useOfflineSync();
+  const [online, setOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+  const [downloads, setDownloads] = useState([]);
 
   const tech = useMemo(() => {
     try {
@@ -19,17 +24,34 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  useEffect(() => {
+    getOfflineHospitals()
+      .then((rows) => setDownloads(rows || []))
+      .catch(() => setDownloads([]));
+  }, []);
+
+  useEffect(() => {
     if (!tech) {
       navigate("/");
       return;
     }
-    if (navigator.onLine && !hasAuthToken()) {
+    if (online && !hasAuthToken()) {
       navigate("/");
     }
-  }, [tech, navigate]);
+  }, [tech, navigate, online]);
 
   if (!tech) return null;
-  if (navigator.onLine && !hasAuthToken()) return null;
+  if (online && !hasAuthToken()) return null;
 
   // Normalize role check (handles missing role, casing, extra spaces)
   const role = String(tech?.role || "").trim().toLowerCase();
@@ -56,6 +78,57 @@ export default function App() {
             Choose how you want to start today’s job.
           </p>
         </section>
+
+        {!online ? (
+          <div className="rounded-lg bg-warning/20 border border-warning p-3 text-sm">
+            No signal. Scan and complete jobs from hospitals already downloaded on this phone.
+            They upload when you are back online.
+          </div>
+        ) : null}
+
+        {queue?.pending > 0 ? (
+          <div className="rounded-lg bg-info/15 border border-info p-3 text-sm space-y-2">
+            <p className="font-medium">
+              {queue.pending} job{queue.pending === 1 ? "" : "s"} saved on this phone
+              {queue.failed ? ` · ${queue.failed} failed last upload` : " · not uploaded yet"}
+            </p>
+            {lastResult?.needsLogin ? (
+              <p>Sign in while online to upload. Jobs stay on the phone until then.</p>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={runSync}
+              disabled={syncing || !online || !hasAuthToken()}
+            >
+              {syncing ? "Uploading…" : online ? "Upload now" : "Waiting for signal"}
+            </button>
+          </div>
+        ) : null}
+
+        {downloads.length > 0 ? (
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-base-content/70">Downloaded for offline</h2>
+            <ul className="space-y-1">
+              {downloads.map((h) => (
+                <li key={h.hospital_id}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm w-full justify-start"
+                    onClick={() => navigate(`/buildings/${h.hospital_id}`)}
+                  >
+                    {h.name}
+                    <span className="ml-auto text-xs opacity-60">{h.ahu_count} AHUs</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : (
+          <p className="text-xs text-base-content/50">
+            Before a no-signal job, open Choose Hospital and tap Download Hospital for offline.
+          </p>
+        )}
 
         {/* Quick Actions */}
         <section className="space-y-4">
@@ -134,7 +207,7 @@ export default function App() {
         <section className="space-y-1 pt-4">
           <div className="flex justify-between text-xs text-base-content/60">
             <span>Today's jobs</span>
-            <span className="font-semibold">—</span>
+            <span className="font-semibold">{queue?.pending || 0} queued</span>
           </div>
 
           <div style={{ position: "fixed", bottom: 10, right: 10, zIndex: 9999 }}>
@@ -156,8 +229,8 @@ export default function App() {
 
           <div className="flex justify-between text-xs text-base-content/60">
             <span>Connection</span>
-            <span className={`font-semibold ${navigator.onLine ? "text-success" : "text-error"}`}>
-              {navigator.onLine ? "Online" : "Offline"}
+            <span className={`font-semibold ${online ? "text-success" : "text-error"}`}>
+              {online ? "Online" : "Offline"}
             </span>
           </div>
         </section>

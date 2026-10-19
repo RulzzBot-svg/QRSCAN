@@ -157,7 +157,8 @@ def hospital_offline_bundle(hospital_id):
         db.session.query(Hospital)
         .filter(Hospital.id == hospital_id)
         .options(
-            selectinload(Hospital.ahus).selectinload(AHU.filters)
+            selectinload(Hospital.ahus).selectinload(AHU.filters),
+            selectinload(Hospital.ahus).selectinload(AHU.building),
         )
         .first()
     )
@@ -165,21 +166,28 @@ def hospital_offline_bundle(hospital_id):
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
 
+    return jsonify(serialize_offline_bundle(hospital)), 200
+
+
+def serialize_offline_bundle(hospital):
     payload = {
         "hospital": {
             "id": hospital.id,
             "name": hospital.name,
-            "address": hospital.address,
-            "city": hospital.city,
-            "active": hospital.active,
+            "address": getattr(hospital, "address", None),
+            "city": getattr(hospital, "city", None),
+            "active": getattr(hospital, "active", True),
         },
         "ahus": [],
     }
 
-    for a in hospital.ahus:
+    for a in hospital.ahus or []:
+        building = getattr(a, "building", None)
         payload["ahus"].append({
             "id": a.id,
             "hospital_id": a.hospital_id,
+            "building_id": a.building_id,
+            "building": building.name if building is not None else None,
             "name": a.name,
             "location": a.location,
             "notes": getattr(a, "notes", None),
@@ -204,4 +212,4 @@ def hospital_offline_bundle(hospital_id):
             ],
         })
 
-    return jsonify(payload), 200
+    return payload
