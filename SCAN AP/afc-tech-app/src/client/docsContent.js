@@ -96,7 +96,7 @@ export const TECH_PACKET = {
         ],
       },
       bullets: [
-        "Director: dashboard (this-week digest, held filters, due preview), Due tab, units (Status + History), scan, graphs (export), this packet, contact form. Optional weekly email if SMTP is configured.",
+        "Director: dashboard (held filters, due this month, needs attention), Due tab, units (Status + History), scan, graphs (export), this packet, contact form. Optional weekly email if SMTP is configured.",
         "Hospital technician: units (Status + History), scan, how-to. No Due list, graphs, packet PDF, or contact.",
         "Deprovisioning: AFC sets client_users.active = false; subsequent requests 401.",
       ],

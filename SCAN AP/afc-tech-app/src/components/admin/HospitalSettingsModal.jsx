@@ -221,7 +221,7 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
         <div className="divider my-4">Hospital portal</div>
         <p className="text-xs text-base-content/60 mb-3">
           Director logins see the full portal. Hospital tech logins only get Scan and Units. No prices or invoices.
-          Optional email is for the weekly status digest (Home always shows This week; mail sends only if SMTP is set).
+          Optional email is for the weekly status digest (mail sends only if SMTP is set).
           Share <code className="text-[11px]">/client/login</code> with them.
         </p>
 

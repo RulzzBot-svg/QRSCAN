@@ -125,7 +125,6 @@ def client_hospital():
         "due_soon_units": overview["due_soon_units"],
         "recent_changeouts": overview["recent_changeouts"],
         "held_filters": overview["held_filters"],
-        "week": overview["week"],
         "upcoming_summary": overview["upcoming_summary"],
     }), 200
 

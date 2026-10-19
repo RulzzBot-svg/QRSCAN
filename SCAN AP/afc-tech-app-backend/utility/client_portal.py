@@ -308,7 +308,6 @@ def hospital_overview(ahus):
         "due_soon_units": due_soon[:12],
         "recent_changeouts": recent_changeouts(ahus),
         "held_filters": hospital_held_filters(hospital_id),
-        "week": hospital_week_digest(hospital_id, ahus),
         "upcoming_summary": hospital_upcoming(ahus).get("summary") or {},
     }
 
