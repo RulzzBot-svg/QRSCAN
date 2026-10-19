@@ -60,8 +60,6 @@ export default function ClientHome() {
         <Stat label="Compliance" value={`${hospital?.compliance_pct ?? 0}%`} />
       </div>
 
-      <WeekDigest week={hospital?.week} />
-
       {(hospital?.held_filters || []).length ? (
         <section className="rounded-2xl bg-base-100 border border-warning/40 p-5">
           <h3 className="font-semibold">Held / not replaced</h3>
@@ -89,8 +87,6 @@ export default function ClientHome() {
           </ul>
         </section>
       ) : null}
-
-      <DuePreview summary={hospital?.upcoming_summary} />
 
       {(hospital?.recent_changeouts || []).length ? (
         <section className="rounded-2xl bg-base-100 border border-success/30 p-5">
@@ -166,26 +162,30 @@ export default function ClientHome() {
             <p className="text-sm text-base-content/60">How to use, and a download button for the hospital-IT PDF.</p>
           </div>
         </Link>
-      </div>
-
-      {(hospital?.overdue_units || []).length ? (
-        <section className="rounded-2xl bg-base-100 border border-base-300 p-5">
-          <h3 className="font-semibold mb-3">Needs attention</h3>
-          <ul className="space-y-2">
-            {hospital.overdue_units.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
-                <Link className="link link-primary font-medium" to={`/client/ahu/${a.id}`}>
-                  {a.name}
-                </Link>
-                <span className="text-xs text-base-content/50 truncate">
-                  {[a.building, a.location].filter(Boolean).join(" · ")}
-                </span>
-                <StatusBadge status={a.status} />
-              </li>
-            ))}
-          </ul>
+        <section className="card bg-base-100 border border-base-300">
+          <div className="card-body p-5">
+            <h3 className="font-semibold">Needs attention</h3>
+            {(hospital?.overdue_units || []).length ? (
+              <ul className="space-y-2 mt-2">
+                {hospital.overdue_units.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+                    <Link className="link link-primary font-medium" to={`/client/ahu/${a.id}`}>
+                      {a.name}
+                    </Link>
+                    <span className="text-xs text-base-content/50 truncate">
+                      {[a.building, a.location].filter(Boolean).join(" · ")}
+                    </span>
+                    <StatusBadge status={a.status} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-base-content/60 mt-2">No overdue units right now.</p>
+            )}
+          </div>
         </section>
-      ) : null}
+        <DuePreview summary={hospital?.upcoming_summary} />
+      </div>
 
       <div className="flex items-center gap-2 text-xs text-base-content/50">
         <StatusBadge status="Completed" />
@@ -197,67 +197,18 @@ export default function ClientHome() {
   );
 }
 
-function WeekDigest({ week }) {
-  if (!week) return null;
-  return (
-    <section className="rounded-2xl bg-base-100 border border-base-300 p-5">
-      <h3 className="font-semibold">This week</h3>
-      <p className="text-xs text-base-content/50 mt-0.5 mb-3">
-        Monday {prettyDate(week.week_start)} through today. AFC visits at this hospital.
-      </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MiniStat label="Units serviced" value={week.units_serviced || 0} />
-        <MiniStat label="Filters replaced" value={week.filters_replaced || 0} />
-        <MiniStat label="Still overdue" value={week.still_overdue || 0} tone="error" />
-        <MiniStat label="Held" value={week.held || 0} tone="warning" />
-      </div>
-      {(week.visits || []).length ? (
-        <ul className="mt-3 space-y-1 text-sm">
-          {week.visits.map((v) => (
-            <li key={`${v.id}-${v.at}`}>
-              <Link className="link link-primary font-medium" to={`/client/ahu/${v.id}`}>
-                {v.name}
-              </Link>
-              <span className="text-xs text-base-content/50 ml-2">
-                {[prettyDate(v.at), (v.stages || []).join(", ")].filter(Boolean).join(" · ")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-base-content/50 mt-3">No completed visits recorded this week yet.</p>
-      )}
-    </section>
-  );
-}
-
 function DuePreview({ summary }) {
   const asap = summary?.ahus_asap || 0;
   const month = summary?.ahus_month || 0;
   return (
-    <Link
-      to="/client/upcoming"
-      className="card bg-base-100 border border-base-300 hover:border-primary/40 transition"
-    >
+    <Link to="/client/upcoming" className="card bg-base-100 border border-base-300">
       <div className="card-body p-5">
         <h3 className="font-semibold">Due this month</h3>
         <p className="text-sm text-base-content/60">
-          {asap} ASAP · {month} later this month. Open the building list to walk what is coming due.
+          {asap} ASAP · {month} later this month. Building list of what is coming due.
         </p>
-        <span className="btn btn-sm btn-outline w-fit">Open due list</span>
       </div>
     </Link>
-  );
-}
-
-function MiniStat({ label, value, tone }) {
-  const color =
-    tone === "error" ? "text-error" : tone === "warning" ? "text-warning" : "text-primary";
-  return (
-    <div>
-      <p className="text-xs text-base-content/50">{label}</p>
-      <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
-    </div>
   );
 }
 

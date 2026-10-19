@@ -441,10 +441,7 @@ def main():
     held = home_json.get("held_filters") or []
     assert held, "director home lists held filters"
     assert any("No access" in (r.get("text") or "") for r in held), "held reason is on Home"
-    week = home_json.get("week") or {}
-    assert week.get("week_start"), "this-week digest has a Monday"
-    assert week.get("still_overdue") >= 1, "digest still overdue"
-    assert week.get("held") >= 1, "digest counts held this week"
+    assert "week" not in home_json, "Home does not include a this-week digest"
     assert (home_json.get("upcoming_summary") or {}).get("ahus_asap") >= 1, "home previews due ASAP"
 
     upcoming = client.get("/api/client/upcoming", headers=headers)
