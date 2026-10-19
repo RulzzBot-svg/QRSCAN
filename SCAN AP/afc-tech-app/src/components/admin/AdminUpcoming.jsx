@@ -117,8 +117,8 @@ export default function AdminUpcoming() {
         <div>
           <h1 className="text-2xl font-bold">Upcoming filters</h1>
           <p className="text-sm text-base-content/60 mt-1">
-            What is overdue or due in the next {windowDays} days, grouped by hospital and
-            building. Tap a square to open that hospital in AHUs.
+            What is overdue or due in the next {windowDays} days. Tap a hospital to expand,
+            then tap a square to open that hospital in AHUs.
           </p>
         </div>
         <button className="btn btn-sm btn-ghost" onClick={load} disabled={loading} type="button">
@@ -180,46 +180,60 @@ export default function AdminUpcoming() {
           </p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-3">
           {hospitals.map((hospital) => (
-            <section key={hospital.id ?? hospital.name}>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <div>
-                  <h2 className="text-lg font-semibold">{hospital.name}</h2>
-                  <p className="text-xs text-base-content/50">
-                    {hospital.asap_ahus ? `${hospital.asap_ahus} ASAP` : "No ASAP"}
+            <details
+              key={hospital.id ?? hospital.name}
+              className={`collapse collapse-arrow bg-base-100 border rounded-xl ${
+                hospital.asap_ahus ? "border-error/30" : "border-base-300"
+              }`}
+            >
+              <summary className="collapse-title min-h-16 py-3">
+                <div className="flex items-center justify-between gap-3 pr-4">
+                  <span className="font-semibold text-base leading-tight">
+                    {hospital.name}
+                  </span>
+                  <span className="text-xs text-base-content/60 shrink-0">
+                    {hospital.asap_ahus ? (
+                      <span className="text-error font-medium">{hospital.asap_ahus} ASAP</span>
+                    ) : (
+                      "No ASAP"
+                    )}
                     {" · "}
                     {hospital.month_ahus ? `${hospital.month_ahus} this month` : "none this month"}
-                  </p>
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-xs btn-outline"
-                  onClick={() => openHospital(hospital.id)}
-                >
-                  Open in AHUs
-                </button>
-              </div>
-
-              <div className="space-y-5">
-                {(hospital.buildings || []).map((building) => (
-                  <div key={`${hospital.id}-${building.id ?? building.name}`}>
-                    <h3 className="text-sm font-medium text-base-content/70 mb-2">
-                      {building.name}
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {(building.ahus || []).map((ahu) => (
-                        <AhuSquare
-                          key={ahu.id}
-                          ahu={ahu}
-                          onOpen={() => openHospital(hospital.id)}
-                        />
-                      ))}
+              </summary>
+              <div className="collapse-content">
+                <div className="flex justify-end pb-3">
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => openHospital(hospital.id)}
+                  >
+                    Open in AHUs
+                  </button>
+                </div>
+                <div className="space-y-5 pb-2">
+                  {(hospital.buildings || []).map((building) => (
+                    <div key={`${hospital.id}-${building.id ?? building.name}`}>
+                      <h3 className="text-sm font-medium text-base-content/70 mb-2">
+                        {building.name}
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {(building.ahus || []).map((ahu) => (
+                          <AhuSquare
+                            key={ahu.id}
+                            ahu={ahu}
+                            onOpen={() => openHospital(hospital.id)}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </section>
+            </details>
           ))}
         </div>
       )}
