@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { getClientGraphs, readClientUser } from "./api";
 import { exportClientGraphsPdf } from "./exportGraphsPdf";
+import { parseYearMonth, prettyMonthLong } from "./format";
 
 const STATUS_COLORS = {
   compliant: "#15803d",
@@ -80,10 +81,11 @@ export default function ClientGraphs() {
   }));
 
   const services = (data.services || data.visits || []).map((v) => ({
-    month: (v.month || "").slice(5),
+    month: v.month,
     Completed: v.completed ?? v.jobs ?? 0,
     Scheduled: v.scheduled ?? 0,
   }));
+  const servicesHint = servicesRangeHint(services);
 
   const types = (data.by_phase || []).map((row, i) => ({
     name: row.phase,
@@ -158,16 +160,24 @@ export default function ClientGraphs() {
           )}
         </ChartCard>
 
-        <ChartCard title="Completed and scheduled">
-          <ResponsiveContainer width="100%" height={240}>
+        <ChartCard
+          title="Completed and scheduled"
+          hint={servicesHint}
+        >
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={services} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <XAxis
+                dataKey="month"
+                interval={0}
+                tick={{ fontSize: 11 }}
+                tickFormatter={monthNameTick}
+              />
               <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="Completed" stackId="s" fill="#0a4d8c" />
-              <Bar dataKey="Scheduled" stackId="s" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Tooltip labelFormatter={prettyMonthLong} />
+              <Legend verticalAlign="top" height={28} />
+              <Bar dataKey="Completed" fill="#0a4d8c" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="Scheduled" fill="#f59e0b" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -198,10 +208,23 @@ export default function ClientGraphs() {
   );
 }
 
-function ChartCard({ title, children }) {
+function monthNameTick(ym) {
+  const d = parseYearMonth(ym);
+  return d ? d.toLocaleString("en-US", { month: "short" }) : ym || "";
+}
+
+function servicesRangeHint(rows) {
+  const first = prettyMonthLong(rows[0]?.month);
+  const last = prettyMonthLong(rows[rows.length - 1]?.month);
+  const range = first && last ? `${first} – ${last}. ` : "";
+  return `${range}Blue = filters AFC replaced that month. Amber = filters due that month.`;
+}
+
+function ChartCard({ title, hint, children }) {
   return (
     <div className="js-graph-card rounded-2xl bg-base-100 border border-base-300 p-4">
-      <h3 className="font-semibold mb-3">{title}</h3>
+      <h3 className={`font-semibold ${hint ? "mb-1" : "mb-3"}`}>{title}</h3>
+      {hint ? <p className="text-xs text-base-content/50 mb-3">{hint}</p> : null}
       {children}
     </div>
   );

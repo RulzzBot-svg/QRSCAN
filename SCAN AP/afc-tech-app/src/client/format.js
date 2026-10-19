@@ -28,6 +28,29 @@ export function prettyDate(value) {
   return value ? formatDate(value) : "—";
 }
 
+export function parseYearMonth(value) {
+  const match = /^(\d{4})-(\d{2})/.exec(String(value || "").trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!year || month < 1 || month > 12) return null;
+  return new Date(year, month - 1, 1);
+}
+
+export function prettyMonthShort(value) {
+  const d = parseYearMonth(value);
+  if (!d) return value || "";
+  const month = d.toLocaleString("en-US", { month: "short" });
+  if (d.getMonth() === 0) return `${month} '${String(d.getFullYear()).slice(2)}`;
+  return month;
+}
+
+export function prettyMonthLong(value) {
+  const d = parseYearMonth(value);
+  if (!d) return value || "";
+  return d.toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+
 export function extractAhuId(decodedText) {
   const s = String(decodedText || "").trim();
   if (!s) return "";
