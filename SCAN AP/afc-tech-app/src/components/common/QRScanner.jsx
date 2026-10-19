@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { canUseFieldAppNow } from "../../api/api";
 import { getCachedAHU } from "../../offline/ahuCache";
 
 // If your QR codes sometimes contain a URL, this extracts the AHU id reliably.
@@ -72,10 +73,7 @@ export default function QRScanner() {
               return;
             }
 
-              // If not logged in, save intended path and send user to login
-              const tech = localStorage.getItem("tech");
-              const token = localStorage.getItem("auth_token");
-              if (!tech || !token) {
+              if (!canUseFieldAppNow()) {
                 const target = `/FilterInfo/${encodeURIComponent(ahuId)}`;
                 try {
                   sessionStorage.setItem("post_login_path", target);
@@ -84,18 +82,17 @@ export default function QRScanner() {
                 return;
               }
 
-            // ✅ OFFLINE: require the AHU to exist in cache
             if (!navigator.onLine) {
               setStatus("Checking offline downloads…");
               const cached = await getCachedAHU(ahuId);
 
               if (cached) {
                 setStatus("Opening cached AHU…");
-                // IMPORTANT: replace with your real route
                 window.location.assign(`/FilterInfo/${encodeURIComponent(ahuId)}`);
               } else {
-                setStatus("Not downloaded for offline use.");
-                window.location.assign(`/offline-not-downloaded/${encodeURIComponent(ahuId)}`);
+                setError("This unit is not on this phone. Download the hospital while you have signal.");
+                setStatus("Not downloaded");
+                setScanned(false);
               }
               return;
             }
@@ -120,7 +117,7 @@ export default function QRScanner() {
     return () => {
       scanner.stop().catch(() => {});
     };
-  }, [offline, scanned]);
+  }, [scanned]);
 
   return (
     <div className="min-h-screen bg-base-200 flex items-center justify-center p-4">

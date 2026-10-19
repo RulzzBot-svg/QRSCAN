@@ -32,6 +32,8 @@ export async function saveHospitalBundle(bundle) {
   await tx.objectStore("offlineHospitals").put({
     hospital_id: hospitalId,
     name: bundle.hospital.name ?? `Hospital ${hospitalId}`,
+    city: bundle.hospital.city ?? "",
+    active: bundle.hospital.active !== false,
     ahu_count: ahus.length,
     downloaded_at: new Date().toISOString(),
   });

@@ -22,7 +22,7 @@ export default defineConfig({
         name: "AFC Field",
         short_name: "AFC Field",
         description: "QR scans, jobs, and filter changeouts for AFC technicians.",
-        start_url: "/",
+        start_url: "/Home",
         scope: "/",
         display: "standalone",
         background_color: "#ffffff",

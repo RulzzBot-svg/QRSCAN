@@ -6,7 +6,7 @@ export default function LogoutButton() {
   const navigate = useNavigate();
 
   const handleLogOut = () => {
-    clearTechSession();
+    clearTechSession({ keepOfflinePin: true });
     clearClientSession();
     navigate("/");
   };

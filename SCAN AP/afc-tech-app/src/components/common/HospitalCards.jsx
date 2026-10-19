@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getHospitals, getAHUsForHospital } from "../../api/hospitals";
-import { saveHospitalBundle, isHospitalDownloaded } from "../../offline/offlineBundle";
+import { getHospitals } from "../../api/hospitals";
+import { saveHospitalBundle, isHospitalDownloaded, getOfflineHospitals } from "../../offline/offlineBundle";
 import { dbPromise } from "../../offline/db";
 import { parseIsoToDate } from "../../utils/dates";
-import LogoutButton from "./logoutbutton";
 import { API } from "../../api/api";
 
 async function downloadHospital(hospitalId) {
@@ -24,7 +23,55 @@ function HospitalCards() {
   const [hospitals, setHospitals] = useState([]);
 
   useEffect(() => {
-    getHospitals().then((res) => setHospitals(res.data)).catch((err) => console.error("Error Loading", err));
+    let cancelled = false;
+
+    async function load() {
+      try {
+        if (!navigator.onLine) {
+          const rows = await getOfflineHospitals();
+          if (cancelled) return;
+          setHospitals(
+            (rows || []).map((h) => ({
+              id: h.hospital_id,
+              name: h.name,
+              city: h.city || "",
+              active: h.active !== false,
+            }))
+          );
+          return;
+        }
+        const res = await getHospitals();
+        if (!cancelled) setHospitals(res.data || []);
+      } catch (err) {
+        console.error("Error Loading", err);
+        try {
+          const rows = await getOfflineHospitals();
+          if (!cancelled) {
+            setHospitals(
+              (rows || []).map((h) => ({
+                id: h.hospital_id,
+                name: h.name,
+                city: h.city || "",
+                active: h.active !== false,
+              }))
+            );
+          }
+        } catch {
+          if (!cancelled) setHospitals([]);
+        }
+      }
+    }
+
+    load();
+    const onOnline = () => load();
+    const onOffline = () => load();
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
   }, []);
 
   // Pagination: how many hospitals to show at once
@@ -132,6 +179,11 @@ function HospitalCards() {
       </button>
       {/* Header */}
       <h1 className="text-3xl font-bold mb-2 text-primary">Hospitals</h1>
+      {!navigator.onLine ? (
+        <p className="text-sm text-warning mb-3">
+          No signal — showing hospitals downloaded on this phone.
+        </p>
+      ) : null}
 
 
       {/* Search Bar */}
@@ -150,6 +202,13 @@ function HospitalCards() {
 
       {/* Divider */}
       <div className="divider my-2">Hospital List</div>
+
+      {!navigator.onLine && hospitals.length === 0 ? (
+        <p className="text-sm text-base-content/70 my-6">
+          No hospitals downloaded on this phone. Connect to the internet, open a hospital, and tap
+          Download Hospital for offline.
+        </p>
+      ) : null}
 
       {/* Grid of Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -207,6 +266,7 @@ function HospitalCards() {
                 >
                   View Buildings
                 </button>
+                {navigator.onLine ? (
                 <button
                   className="btn btn-sm"
                   onClick={async (e) => {
@@ -220,8 +280,11 @@ function HospitalCards() {
                     }
                   }}
                 >
-                  Download Hospital for offline
+                  {offlineMap[hospital.id] ? "Re-download for offline" : "Download Hospital for offline"}
                 </button>
+                ) : (
+                  <p className="text-xs text-base-content/60">Already on this phone. Open buildings to work.</p>
+                )}
                 <button
                   className="btn btn-success btn-sm w-full mt-2"
                   onClick={(e) => { e.stopPropagation(); navigate(`/tech/signoff?h=${hospital.id}`); }}

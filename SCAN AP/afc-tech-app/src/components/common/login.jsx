@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { hasTechSession } from "../../api/api";
 import { loginTech } from "../../api/tech";
 import { TECH_APP_NAME } from "../../branding";
+import {
+  namesMatch,
+  readOfflineTech,
+  readStoredTech,
+  restoreTechFromOfflineRecord,
+  resumeTechPath,
+} from "../../utils/techSession";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,20 +20,47 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [redirectMessage, setRedirectMessage] = useState("");
   const [hospitalQrHint, setHospitalQrHint] = useState(false);
+  const [offlineHint, setOfflineHint] = useState("");
 
   useEffect(() => {
+    let post = "";
     try {
-      const post = sessionStorage.getItem("post_login_path");
-      if (post) {
-        setRedirectMessage("Please sign in to view the scanned AHU.");
-      }
+      post = sessionStorage.getItem("post_login_path") || "";
       if (sessionStorage.getItem("post_client_path")) {
         setHospitalQrHint(true);
       }
-    } catch (e) {
+    } catch {
       /* ignore */
     }
-  }, []);
+
+    const storedTech = Boolean(readStoredTech());
+    const next = resumeTechPath({
+      online: navigator.onLine,
+      hasSession: hasTechSession(),
+      hasTech: storedTech,
+      postLoginPath: post,
+    });
+    if (next) {
+      try {
+        sessionStorage.removeItem("post_login_path");
+      } catch {
+        /* ignore */
+      }
+      navigate(next, { replace: true });
+      return;
+    }
+
+    if (post) {
+      setRedirectMessage("Please sign in to view the scanned AHU.");
+    }
+    if (!navigator.onLine) {
+      setOfflineHint(
+        readOfflineTech()
+          ? "No signal. Use the same name and PIN as last time — downloaded hospitals still work."
+          : "No signal, and this phone has never signed in online. Connect once, then you can work offline."
+      );
+    }
+  }, [navigate]);
 
   const dismissRedirectMessage = () => {
     setRedirectMessage("");
@@ -42,23 +77,32 @@ export default function Login() {
     setLoading(true);
     try {
       if (!navigator.onLine) {
-        const stored = localStorage.getItem("offline_tech");
-        if (!stored) throw new Error("No offline credentials available");
-        const offline = JSON.parse(stored);
+        const offline = readOfflineTech();
+        if (!offline) {
+          throw new Error(
+            "No offline credentials on this phone. Sign in once while online, then you can work with no signal."
+          );
+        }
         const pinHash = await digestPin(pin);
-        if (offline.username === username && offline.pinHash === pinHash) {
+        if (namesMatch(offline.username, username) && offline.pinHash === pinHash) {
           localStorage.setItem(
             "tech",
-            JSON.stringify({
-              id: offline.id,
-              name: offline.name,
-              role: offline.role || "technician",
-            })
+            JSON.stringify(restoreTechFromOfflineRecord(offline))
           );
-          navigate("/Home");
+          const postOffline = sessionStorage.getItem("post_login_path");
+          if (postOffline && postOffline.startsWith("/") && !postOffline.startsWith("//")) {
+            try {
+              sessionStorage.removeItem("post_login_path");
+            } catch {
+              /* ignore */
+            }
+            navigate(postOffline, { replace: true });
+          } else {
+            navigate("/Home", { replace: true });
+          }
           return;
         }
-        throw new Error("Offline login failed — go online to sign in");
+        throw new Error("Offline login failed — check the name and PIN from your last online sign-in");
       }
 
       const res = await loginTech(username, pin);
@@ -146,6 +190,12 @@ export default function Login() {
           <h1 className="text-2xl font-bold mt-2">{TECH_APP_NAME}</h1>
           <p className="text-sm text-base-content/60 mt-1">Technician sign-in</p>
         </div>
+
+        {offlineHint && (
+          <div className="mb-4 rounded-lg bg-warning/20 border border-warning p-3 text-sm">
+            {offlineHint}
+          </div>
+        )}
 
         {redirectMessage && (
           <div className="mb-4 rounded-lg bg-info/20 border border-info p-3 text-sm text-info flex justify-between items-center">

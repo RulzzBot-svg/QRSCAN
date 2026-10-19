@@ -52,3 +52,21 @@ export async function deleteJob(local_id){
     const db = await dbPromise;
     await db.delete("jobQueue",local_id);
 }
+
+export async function getQueueSummary() {
+  const all = await getQueuedJobs();
+  const pending = (all || []).filter((j) => !j.synced);
+  const failed = pending.filter((j) => j.last_error);
+  return {
+    pending: pending.length,
+    failed: failed.length,
+    oldest: pending[0]?.created_at || null,
+  };
+}
+
+export async function pruneSyncedJobs() {
+  const all = await getQueuedJobs();
+  for (const j of all || []) {
+    if (j.synced) await deleteJob(j.local_id);
+  }
+}

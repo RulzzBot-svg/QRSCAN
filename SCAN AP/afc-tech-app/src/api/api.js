@@ -35,8 +35,9 @@ API.interceptors.response.use(
 
     if (status === 401) {
       try {
+        // Keep `tech` and hashed offline PIN so a dead JWT does not wipe
+        // the ability to finish downloaded hospitals with no signal.
         localStorage.removeItem("auth_token");
-        localStorage.removeItem("tech");
       } catch (e) {
         /* ignore */
       }
@@ -83,11 +84,29 @@ export function hasTechSession() {
   }
 }
 
-export function clearTechSession() {
+export function hasLocalTech() {
+  try {
+    return Boolean(localStorage.getItem("tech"));
+  } catch {
+    return false;
+  }
+}
+
+export function canUseFieldAppNow() {
+  try {
+    if (!localStorage.getItem("tech")) return false;
+    if (!navigator.onLine) return true;
+    return Boolean(localStorage.getItem("auth_token"));
+  } catch {
+    return false;
+  }
+}
+
+export function clearTechSession({ keepOfflinePin = false } = {}) {
   try {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("tech");
-    localStorage.removeItem("offline_tech");
+    if (!keepOfflinePin) localStorage.removeItem("offline_tech");
   } catch {
     /* ignore */
   }

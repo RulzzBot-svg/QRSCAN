@@ -42,6 +42,11 @@ export default function JobSignature() {
           job_id: Number(jobId),
           payload
         });
+        try {
+          window.dispatchEvent(new Event("jobs:queued"));
+        } catch {
+          /* ignore */
+        }
       } else {
         await axios.post(`/jobs/${jobId}/signature`, payload);
       }
@@ -52,8 +57,13 @@ export default function JobSignature() {
       await queueJob({
         type: "signature",
         job_id: Number(jobId),
-        payload
+        payload,
       });
+      try {
+        window.dispatchEvent(new Event("jobs:queued"));
+      } catch {
+        /* ignore */
+      }
       navigate("/job-completed");
     } finally {
       setSaving(false);
