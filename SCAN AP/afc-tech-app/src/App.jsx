@@ -65,7 +65,7 @@ export default function App() {
           <span className="font-bold text-lg tracking-tight">{TECH_APP_NAME}</span>
         </div>
         <div className="flex-none">
-          <span className="badge badge-primary text-xs">v0.1</span>
+          <span className="badge badge-primary text-xs">v1.3</span>
         </div>
       </header>
 
@@ -105,30 +105,6 @@ export default function App() {
             </button>
           </div>
         ) : null}
-
-        {downloads.length > 0 ? (
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-base-content/70">Downloaded for offline</h2>
-            <ul className="space-y-1">
-              {downloads.map((h) => (
-                <li key={h.hospital_id}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm w-full justify-start"
-                    onClick={() => navigate(`/buildings/${h.hospital_id}`)}
-                  >
-                    {h.name}
-                    <span className="ml-auto text-xs opacity-60">{h.ahu_count} AHUs</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : (
-          <p className="text-xs text-base-content/50">
-            Before a no-signal job, open Choose Hospital and tap Download Hospital for offline.
-          </p>
-        )}
 
         {/* Quick Actions */}
         <section className="space-y-4">
@@ -202,6 +178,37 @@ export default function App() {
             <LogoutButton />
           </div>
         </div>
+
+        <details className="collapse collapse-arrow bg-base-100 border border-base-300">
+          <summary className="collapse-title text-sm font-semibold min-h-12">
+            Downloaded for offline
+            <span className="ml-2 font-normal text-base-content/50">
+              {downloads.length ? `(${downloads.length})` : ""}
+            </span>
+          </summary>
+          <div className="collapse-content">
+            {downloads.length ? (
+              <ul className="space-y-1 pb-1">
+                {downloads.map((h) => (
+                  <li key={h.hospital_id}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm w-full justify-start"
+                      onClick={() => navigate(`/buildings/${h.hospital_id}`)}
+                    >
+                      {h.name}
+                      <span className="ml-auto text-xs opacity-60">{h.ahu_count} AHUs</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-base-content/50 pb-2">
+                None yet. Open Choose Hospital and tap Download Hospital for offline.
+              </p>
+            )}
+          </div>
+        </details>
 
         {/* Status Section */}
         <section className="space-y-1 pt-4">
