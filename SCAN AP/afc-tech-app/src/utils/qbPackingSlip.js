@@ -173,11 +173,33 @@ export function countPackingSlipItems(filtersByAhu) {
   );
 }
 
+function fallbackCopyText(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  const ok = document.execCommand("copy");
+  ta.remove();
+  if (!ok) throw new Error("Could not copy");
+}
+
 export async function copyPackingSlipToClipboard(filtersByAhu, { mode = "special" } = {}) {
   const delim = mode === "tabs" ? "\t" : QB_FIELD_DELIM;
   const text = buildQbPasteString(filtersByAhu, { delim });
   if (!text) throw new Error("Nothing to copy");
-  await navigator.clipboard.writeText(text);
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return text;
+    }
+  } catch {
+    /* fall through to execCommand */
+  }
+  fallbackCopyText(text);
   return text;
 }
 
