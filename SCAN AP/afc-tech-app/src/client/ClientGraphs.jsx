@@ -46,7 +46,7 @@ export default function ClientGraphs() {
         if (!cancelled) setData(res.data);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.response?.data?.error || "Could not load graphs");
+        if (!cancelled) setError(err.response?.data?.error || "Could not load analytics");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -97,7 +97,7 @@ export default function ClientGraphs() {
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">Graphs</h2>
+          <h2 className="text-xl font-bold">Analytics</h2>
           <p className="text-sm text-base-content/60">This hospital only. Counts, not dollars.</p>
         </div>
         <button
@@ -111,7 +111,7 @@ export default function ClientGraphs() {
             })
           }
         >
-          Export graphs PDF
+          Export analytics PDF
         </button>
       </div>
 
