@@ -437,7 +437,6 @@ def hospital_graphs(hospital_id, ahus):
     month_keys = service_month_keys()
     start = month_keys[0]
     last = month_keys[-1]
-    current_key = date.today().strftime("%Y-%m")
     scheduled = defaultdict(int)
 
     for ahu in ahus:
@@ -467,9 +466,11 @@ def hospital_graphs(hospital_id, ahus):
             fst = filter_status(f)
             due = _as_date(fst.get("next_due_date"))
             if due is not None:
-                if due < start:
-                    scheduled[current_key] += 1
-                elif due.replace(day=1) <= last:
+                due_month = due.replace(day=1)
+                if due_month < start:
+                    # Still due from last year — show as January carry-in, not dropped.
+                    scheduled[start.strftime("%Y-%m")] += 1
+                elif due_month <= last:
                     scheduled[due.strftime("%Y-%m")] += 1
             days = fst.get("days_until_due")
             if fst.get("status") == "Overdue":
@@ -507,23 +508,14 @@ def hospital_graphs(hospital_id, ahus):
     }
 
 
-def _shift_month(day, delta):
-    """Move a date by whole months, landing on the 1st of the target month."""
-    month_index = day.year * 12 + (day.month - 1) + delta
-    year, month0 = divmod(month_index, 12)
-    return date(year, month0 + 1, 1)
-
-
 def service_month_keys(today=None, back=5, months=12):
-    """First-of-month dates covering recent completed work and upcoming dues."""
-    current = (today or date.today()).replace(day=1)
-    start = _shift_month(current, -back)
-    keys = []
-    cursor = start
-    for _ in range(months):
-        keys.append(cursor)
-        cursor = _shift_month(cursor, 1)
-    return keys
+    """January–December of the calendar year containing today.
+
+    Directors read this chart as one year of work, not a rolling 12-month window.
+    `back` and `months` are ignored; kept so older callers do not break.
+    """
+    year = (today or date.today()).year
+    return [date(year, month, 1) for month in range(1, 13)]
 
 
 def _services_by_month(hospital_id, month_keys, scheduled):

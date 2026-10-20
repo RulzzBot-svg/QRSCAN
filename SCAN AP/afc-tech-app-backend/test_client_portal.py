@@ -209,9 +209,10 @@ def main():
     assert_eq(filter_type_label("HEPA"), "HEPA", "hepa")
     assert_eq(filter_type_label(""), "Other", "blank phase")
     window = service_month_keys(date(2026, 10, 16))
-    assert_eq(window[0], date(2026, 5, 1), "services window starts 5 months back")
-    assert_eq(window[5], date(2026, 10, 1), "current month sits in the window")
-    assert_eq(window[-1], date(2027, 4, 1), "services window includes upcoming months")
+    assert_eq(len(window), 12, "calendar year has twelve months")
+    assert_eq(window[0], date(2026, 1, 1), "services chart starts in January")
+    assert_eq(window[9], date(2026, 10, 1), "October sits in the same year")
+    assert_eq(window[-1], date(2026, 12, 1), "services chart ends in December")
 
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
@@ -294,7 +295,12 @@ def main():
     assert_eq(phases.get("Gas Phase"), 4, "Gas Phase qty on graphs")
     assert_eq([r["phase"] for r in graphs["by_phase"]], ["PRE", "FINAL", "Gas Phase"], "type order")
     services = graphs["services"]
-    assert_eq(len(services), 12, "twelve service months")
+    year = date.today().year
+    assert_eq(
+        [row["month"] for row in services],
+        [f"{year}-{month:02d}" for month in range(1, 13)],
+        "services chart is January through December of this year",
+    )
     this_month = date.today().strftime("%Y-%m")
     by_month = {row["month"]: row for row in services}
     assert this_month in by_month, "current month is on the services chart"

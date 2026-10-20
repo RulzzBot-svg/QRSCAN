@@ -170,7 +170,7 @@ export default function ClientGraphs() {
               <XAxis
                 dataKey="month"
                 interval={0}
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 10 }}
                 tickFormatter={monthNameTick}
               />
               <YAxis allowDecimals={false} />
@@ -214,9 +214,19 @@ function monthNameTick(ym) {
 }
 
 function servicesRangeHint(rows) {
-  const first = prettyMonthLong(rows[0]?.month);
-  const last = prettyMonthLong(rows[rows.length - 1]?.month);
-  const range = first && last ? `${first} – ${last}. ` : "";
+  const first = parseYearMonth(rows[0]?.month);
+  const last = parseYearMonth(rows[rows.length - 1]?.month);
+  const calendarYear =
+    first &&
+    last &&
+    first.getFullYear() === last.getFullYear() &&
+    first.getMonth() === 0 &&
+    last.getMonth() === 11;
+  const range = calendarYear
+    ? `Calendar year ${first.getFullYear()}. `
+    : first && last
+      ? `${prettyMonthLong(rows[0].month)} – ${prettyMonthLong(rows[rows.length - 1].month)}. `
+      : "";
   return `${range}Blue = filters AFC replaced that month. Amber = filters due that month.`;
 }
 
