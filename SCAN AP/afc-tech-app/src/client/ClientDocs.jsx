@@ -40,7 +40,7 @@ export default function ClientDocs() {
         </button>
       ) : (
         <DocCard title="Hospital technician access">
-          This login can scan and view every unit at this hospital. It cannot open graphs, exports,
+          This login can scan and view every unit at this hospital. It cannot open analytics, exports,
           or the contact form, and it cannot change filters.
         </DocCard>
       )}

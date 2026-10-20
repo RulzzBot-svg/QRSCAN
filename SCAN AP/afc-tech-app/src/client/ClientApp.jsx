@@ -16,7 +16,7 @@ const DIRECTOR_NAV = [
   { to: "/client/upcoming", label: "Due", icon: DueIcon },
   { to: "/client/units", label: "Units", icon: UnitsIcon },
   { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
-  { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
+  { to: "/client/graphs", label: "Analytics", icon: GraphIcon },
 ];
 
 const DIRECTOR_TAB_NAV = [
@@ -24,7 +24,7 @@ const DIRECTOR_TAB_NAV = [
   { to: "/client/upcoming", label: "Due", icon: DueIcon },
   { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
   { to: "/client/units", label: "Units", icon: UnitsIcon },
-  { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
+  { to: "/client/graphs", label: "Analytics", icon: GraphIcon },
 ];
 
 const STAFF_NAV = [
@@ -225,12 +225,17 @@ function UnitsIcon({ className }) {
 
 function GraphIcon({ className }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 19V5" />
-      <path d="M4 19h16" />
-      <path d="M8 16v-5" />
-      <path d="M12 16V8" />
-      <path d="M16 16v-8" />
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    >
+      <path d="M7 18V11" />
+      <path d="M12 18V6" />
+      <path d="M17 18V9" />
     </svg>
   );
 }

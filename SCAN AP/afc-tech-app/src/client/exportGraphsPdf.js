@@ -40,7 +40,7 @@ export function exportClientGraphsPdf({ hospitalName, summary, chartsRoot }) {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${escapeHtml(hospital)} — AFC graphs</title>
+  <title>${escapeHtml(hospital)} — AFC analytics</title>
   <style>
     body { font-family: Arial, Helvetica, sans-serif; color: #0b1f33; margin: 28px; }
     .header { display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #0a4d8c; padding-bottom: 12px; margin-bottom: 18px; }
@@ -70,7 +70,7 @@ export function exportClientGraphsPdf({ hospitalName, summary, chartsRoot }) {
     <div>
       <div class="brand">${escapeHtml(AFC_COMPANY_NAME)}</div>
       <h1>${escapeHtml(hospital)}</h1>
-      <div class="sub">Filter status graphs · ${escapeHtml(when)}</div>
+      <div class="sub">Filter status analytics · ${escapeHtml(when)}</div>
     </div>
   </div>
   <div class="kpis">

@@ -46,8 +46,8 @@ export default function ClientHome() {
       <section>
         <h2 className="text-2xl font-bold">{hospital?.name}</h2>
         <p className="text-sm text-base-content/60 mt-1">
-          Filter status only — no pricing, invoices, or job notes. Graphs export and the technical
-          packet PDF are under Graphs and Docs.
+          Filter status only — no pricing, invoices, or job notes. Analytics export and the technical
+          packet PDF are under Analytics and Docs.
         </p>
       </section>
       <InstallHint />
@@ -59,6 +59,31 @@ export default function ClientHome() {
         <Stat label="Overdue" value={summary.overdue || 0} tone="error" />
         <Stat label="Compliance" value={`${hospital?.compliance_pct ?? 0}%`} />
       </div>
+
+      <section>
+        <p className="text-[11px] font-semibold tracking-[0.18em] text-base-content/45 uppercase mb-2">
+          Actions
+        </p>
+        <div className="rounded-3xl bg-primary/5 border border-primary/10 p-4 sm:p-5">
+          <div className="inline-flex items-center rounded-full bg-base-100 border border-base-300 px-4 py-1.5 text-sm font-semibold shadow-sm mb-4">
+            Quick Actions
+          </div>
+          <div className="grid grid-cols-3 gap-3 max-w-md">
+            {QUICK_ACTIONS.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-base-100 border border-base-300 shadow-sm px-2 py-4 min-h-[6.25rem] hover:border-primary/40 hover:shadow-md active:scale-[0.98] transition"
+              >
+                <item.icon className="w-8 h-8 text-primary" />
+                <span className="text-xs font-medium text-center leading-tight text-base-content">
+                  {item.label}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {(hospital?.held_filters || []).length ? (
         <section className="rounded-2xl bg-base-100 border border-warning/40 p-5">
@@ -122,46 +147,7 @@ export default function ClientHome() {
         </section>
       )}
 
-      <Link
-        to="/client/scan"
-        className="card bg-primary text-primary-content shadow-md active:scale-[0.99] transition"
-      >
-        <div className="card-body p-5">
-          <h3 className="card-title text-lg">Scan a unit QR</h3>
-          <p className="text-sm opacity-90">
-            Point the camera at the AHU label. Same sticker technicians use — portal view only.
-          </p>
-          <span className="btn btn-sm bg-white text-primary border-0 w-fit">Open camera</span>
-        </div>
-      </Link>
-
       <div className="grid md:grid-cols-2 gap-3">
-        <Link to="/client/units" className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h3 className="font-semibold">Browse units</h3>
-            <p className="text-sm text-base-content/60">Building, location, last serviced, and next due.</p>
-          </div>
-        </Link>
-        <Link to="/client/graphs" className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h3 className="font-semibold">Graphs</h3>
-            <p className="text-sm text-base-content/60">Compliance mix, buildings, and visits.</p>
-          </div>
-        </Link>
-        <Link to="/client/contact" className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h3 className="font-semibold">Call or email AFC</h3>
-            <p className="text-sm text-base-content/60">
-              Phone and a short message form. Nothing here can edit units.
-            </p>
-          </div>
-        </Link>
-        <Link to="/client/docs" className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h3 className="font-semibold">Documentation</h3>
-            <p className="text-sm text-base-content/60">How to use, and a download button for the hospital-IT PDF.</p>
-          </div>
-        </Link>
         <section className="card bg-base-100 border border-base-300">
           <div className="card-body p-5">
             <h3 className="font-semibold">Needs attention</h3>
@@ -194,6 +180,91 @@ export default function ClientHome() {
         <StatusBadge status="Overdue" />
       </div>
     </div>
+  );
+}
+
+const QUICK_ACTIONS = [
+  { to: "/client/scan", label: "Scan unit QR", icon: QrIcon },
+  { to: "/client/units", label: "Browse units", icon: FolderIcon },
+  { to: "/client/graphs", label: "Analytics", icon: AnalyticsIcon },
+  { to: "/client/contact", label: "Help", icon: HelpCircleIcon },
+  { to: "/client/docs", label: "Docs", icon: DocsIcon },
+];
+
+function QrIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="5.75" y="5.75" width="2.5" height="2.5" fill="currentColor" stroke="none" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="15.75" y="5.75" width="2.5" height="2.5" fill="currentColor" stroke="none" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.2" />
+      <rect x="5.75" y="15.75" width="2.5" height="2.5" fill="currentColor" stroke="none" />
+      <rect x="13.5" y="13.5" width="3" height="3" fill="currentColor" stroke="none" />
+      <rect x="17.5" y="13.5" width="3" height="3" rx="0.4" />
+      <rect x="13.5" y="17.5" width="3" height="3" rx="0.4" />
+      <rect x="17.75" y="17.75" width="2.5" height="2.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function FolderIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+    >
+      <path d="M3.5 8.5h5.2l1.8 1.8H20.5v8.2a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" />
+      <path d="M3.5 8.5V6.8A1.3 1.3 0 0 1 4.8 5.5h4.1l1.5 1.5" />
+    </svg>
+  );
+}
+
+function AnalyticsIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    >
+      <path d="M7 18V11" />
+      <path d="M12 18V6" />
+      <path d="M17 18V9" />
+    </svg>
+  );
+}
+
+function HelpCircleIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M9.6 9.4a2.5 2.5 0 1 1 3.3 2.35c-.85.4-1.3.9-1.3 1.75" strokeLinecap="round" />
+      <circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function DocsIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+    >
+      <path d="M7 3.5h7.2L20.5 10v10.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" />
+      <path d="M14.2 3.5V10h6.3" />
+      <path d="M9 13.5h6.5M9 17h4.5" strokeLinecap="round" />
+    </svg>
   );
 }
 
