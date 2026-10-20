@@ -17,7 +17,13 @@ from routes.ahu_routes import ahu_bp
 from routes.client_routes import client_bp
 from routes.job_routes import job_bp
 from routes.tech_routes import tech_bp
-from utility.client_portal import filter_type_label, frequency_label, public_filter, service_month_keys
+from utility.client_portal import (
+    cadence_dates,
+    filter_type_label,
+    frequency_label,
+    public_filter,
+    service_month_keys,
+)
 from utility.director_digest import format_digest_text
 
 
@@ -213,6 +219,18 @@ def main():
     assert_eq(window[0], date(2026, 1, 1), "services chart starts in January")
     assert_eq(window[9], date(2026, 10, 1), "October sits in the same year")
     assert_eq(window[-1], date(2026, 12, 1), "services chart ends in December")
+    year_start, year_end = date(2026, 1, 1), date(2026, 12, 31)
+    walked = cadence_dates(date(2026, 12, 19), 90, year_start, year_end)
+    assert_eq(
+        [d.strftime("%Y-%m") for d in walked],
+        ["2026-03", "2026-06", "2026-09", "2026-12"],
+        "90-day cadence walks back through the year",
+    )
+    assert_eq(
+        cadence_dates(date(2025, 9, 15), 365, year_start, year_end),
+        [],
+        "last year's service stays off this year's completed",
+    )
 
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
@@ -306,6 +324,13 @@ def main():
     assert this_month in by_month, "current month is on the services chart"
     assert by_month[this_month]["completed"] >= 1, "completed changeout is on this month"
     assert sum(row["scheduled"] for row in services) >= 1, "upcoming or overdue work is scheduled"
+    last_first_stage = date.today() - timedelta(days=30)
+    prev_first_stage = last_first_stage - timedelta(days=90)
+    assert by_month[last_first_stage.strftime("%Y-%m")]["completed"] >= 1, "last service month is completed"
+    if prev_first_stage.year == year:
+        prev_key = prev_first_stage.strftime("%Y-%m")
+        assert by_month[prev_key]["completed"] >= 1, "previous frequency slot is completed"
+        assert by_month[prev_key]["scheduled"] >= 1, "previous frequency slot is still scheduled"
     due_first_stage = (date.today() - timedelta(days=30) + timedelta(days=90)).strftime("%Y-%m")
     if due_first_stage in by_month:
         assert by_month[due_first_stage]["scheduled"] >= 1, "PRE First Stage due month is scheduled"
