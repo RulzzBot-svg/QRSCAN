@@ -16,7 +16,7 @@ from utility.admin_filters import (
 )
 from utility.ahu_delete import AHU_DELETE_LIMIT, delete_ahus_by_ids, normalize_ahu_ids
 from utility.resistance import last_dps_by_filter_ids
-from utility.upcoming import group_upcoming_ahus
+from utility.upcoming import group_upcoming_ahus, parse_iso_date
 
 ahu_bp = Blueprint("ahu", __name__)
 
@@ -540,6 +540,16 @@ def get_all_ahus():
 @require_admin
 def admin_upcoming():
     try:
+        from_raw = request.args.get("from")
+        to_raw = request.args.get("to")
+        if bool(from_raw) != bool(to_raw):
+            return jsonify({"error": "from and to are both required"}), 400
+        try:
+            from_date = parse_iso_date(from_raw)
+            to_date = parse_iso_date(to_raw)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
         ahus = (
             db.session.query(AHU)
             .options(
@@ -550,7 +560,7 @@ def admin_upcoming():
             .order_by(AHU.hospital_id.asc(), AHU.excel_order.asc(), AHU.id.asc())
             .all()
         )
-        return jsonify(group_upcoming_ahus(ahus)), 200
+        return jsonify(group_upcoming_ahus(ahus, from_date=from_date, to_date=to_date)), 200
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

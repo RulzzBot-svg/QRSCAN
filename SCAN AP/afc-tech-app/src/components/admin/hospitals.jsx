@@ -16,7 +16,30 @@ const FREQUENCIES = [
   { value: 1095, label: "3 yrs" },
 ];
 
-const SEVERITY_RANK = { overdue: 0, soon: 1, month: 2 };
+const SEVERITY_RANK = { overdue: 0, soon: 1, month: 2, later: 3 };
+
+function isoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function defaultDateRange() {
+  const from = new Date();
+  const to = new Date();
+  to.setDate(to.getDate() + 30);
+  return { from: isoDate(from), to: isoDate(to) };
+}
+
+function dueInRange(due, fromDate, toDate) {
+  if (!fromDate && !toDate) return true;
+  if (!due) return false;
+  const d = String(due).slice(0, 10);
+  if (fromDate && d < fromDate) return false;
+  if (toDate && d > toDate) return false;
+  return true;
+}
 
 function dueLabel(ahu) {
   if (ahu.severity === "overdue") {
@@ -63,10 +86,13 @@ function worstOf(filters) {
   return { worst, nextDue, daysUntil, daysOverdue };
 }
 
-function slimAhu(ahu, frequencyDays) {
+function slimAhu(ahu, frequencyDays, fromDate, toDate) {
   let filters = ahu.filters || [];
   if (frequencyDays) {
     filters = filters.filter((f) => Number(f.frequency_days) === frequencyDays);
+  }
+  if (fromDate && toDate) {
+    filters = filters.filter((f) => dueInRange(f.next_due_date, fromDate, toDate));
   }
   if (!filters.length) return null;
   const { worst, nextDue, daysUntil, daysOverdue } = worstOf(filters);
@@ -82,14 +108,14 @@ function slimAhu(ahu, frequencyDays) {
   };
 }
 
-function slimHospital(hospital, bucket, frequencyDays) {
+function slimHospital(hospital, bucket, frequencyDays, fromDate, toDate) {
   const buildings = [];
   let asap = 0;
   let month = 0;
   for (const building of hospital.buildings || []) {
     const ahus = [];
     for (const ahu of building.ahus || []) {
-      const slim = slimAhu(ahu, frequencyDays);
+      const slim = slimAhu(ahu, frequencyDays, fromDate, toDate);
       if (!slim || !matchesBucket(slim.severity, bucket)) continue;
       if (slim.severity === "overdue" || slim.severity === "soon") asap += 1;
       else month += 1;
@@ -125,15 +151,27 @@ function AdminHospitals() {
   const [error, setError] = useState("");
   const [settingsHospital, setSettingsHospital] = useState(null);
   const [bucket, setBucket] = useState("all");
-  const [frequency, setFrequency] = useState(null);
+  const [freqKey, setFreqKey] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const usingDates = freqKey === "dates";
+  const frequencyDays = usingDates || freqKey === "all" ? null : Number(freqKey);
+  const rangeFrom = usingDates ? fromDate : "";
+  const rangeTo = usingDates ? toDate : "";
+  const viewBucket = usingDates ? "all" : bucket;
+  const upcomingQuery =
+    usingDates && fromDate && toDate ? `${fromDate}:${toDate}` : usingDates ? "" : "default";
 
   const load = async () => {
+    if (usingDates && (!fromDate || !toDate)) return;
     setLoading(true);
     setError("");
     try {
+      const params = usingDates ? { from: fromDate, to: toDate } : {};
       const [hospitalRes, upcomingRes] = await Promise.all([
         getAdminHospitals(),
-        getAdminUpcoming(),
+        getAdminUpcoming(params),
       ]);
       const roster = Array.isArray(hospitalRes?.data) ? hospitalRes.data : [];
       setHospitals(roster);
@@ -147,8 +185,11 @@ function AdminHospitals() {
   };
 
   useEffect(() => {
+    if (!upcomingQuery) return;
     load();
-  }, []);
+    // Frequency options are client-side; only the default window vs From–To hits the API.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upcomingQuery]);
 
   const dueById = useMemo(() => {
     const map = new Map();
@@ -167,7 +208,13 @@ function AdminHospitals() {
         asap_ahus: 0,
         month_ahus: 0,
       };
-      return slimHospital({ ...h, ...due, name: h.name, id: h.id }, bucket, frequency);
+      return slimHospital(
+        { ...h, ...due, name: h.name, id: h.id },
+        viewBucket,
+        frequencyDays,
+        rangeFrom,
+        rangeTo
+      );
     });
     merged.sort((a, b) => {
       const aDue = (a.asap_ahus || 0) + (a.month_ahus || 0);
@@ -177,7 +224,7 @@ function AdminHospitals() {
       return String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
     });
     return merged;
-  }, [hospitals, dueById, bucket, frequency]);
+  }, [hospitals, dueById, viewBucket, frequencyDays, rangeFrom, rangeTo]);
 
   const summary = useMemo(() => {
     return rows.reduce(
@@ -211,54 +258,102 @@ function AdminHospitals() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-        <div className="rounded-xl border border-error/30 bg-error/5 p-4">
-          <div className="text-xs uppercase tracking-wide text-error font-semibold">Due ASAP</div>
-          <div className="text-3xl font-bold text-error mt-1">{summary.ahus_asap}</div>
-          <div className="text-xs text-base-content/60 mt-1">Overdue or due within 7 days</div>
+      {usingDates ? (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 mb-5">
+          <div className="text-xs uppercase tracking-wide text-primary font-semibold">Due in this range</div>
+          <div className="text-3xl font-bold mt-1">{summary.ahus_asap + summary.ahus_month}</div>
+          <div className="text-xs text-base-content/60 mt-1">
+            {fromDate && toDate
+              ? `${formatDate(fromDate)} – ${formatDate(toDate)}`
+              : "Pick a from and to date"}
+          </div>
         </div>
-        <div className="rounded-xl border border-info/30 bg-info/5 p-4">
-          <div className="text-xs uppercase tracking-wide text-info font-semibold">This month</div>
-          <div className="text-3xl font-bold text-info mt-1">{summary.ahus_month}</div>
-          <div className="text-xs text-base-content/60 mt-1">Due in 8–{windowDays} days</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+          <div className="rounded-xl border border-error/30 bg-error/5 p-4">
+            <div className="text-xs uppercase tracking-wide text-error font-semibold">Due ASAP</div>
+            <div className="text-3xl font-bold text-error mt-1">{summary.ahus_asap}</div>
+            <div className="text-xs text-base-content/60 mt-1">Overdue or due within 7 days</div>
+          </div>
+          <div className="rounded-xl border border-info/30 bg-info/5 p-4">
+            <div className="text-xs uppercase tracking-wide text-info font-semibold">This month</div>
+            <div className="text-3xl font-bold text-info mt-1">{summary.ahus_month}</div>
+            <div className="text-xs text-base-content/60 mt-1">Due in 8–{windowDays} days</div>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-wrap gap-2 mb-3">
-        {[
-          { id: "all", label: "All due" },
-          { id: "asap", label: "Due ASAP" },
-          { id: "month", label: "This month" },
-        ].map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            className={`btn btn-sm ${bucket === opt.id ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setBucket(opt.id)}
+      <div className="flex flex-wrap items-end gap-3 mb-5">
+        {usingDates ? null : (
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "all", label: "All due" },
+              { id: "asap", label: "Due ASAP" },
+              { id: "month", label: "This month" },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`btn btn-sm ${bucket === opt.id ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setBucket(opt.id)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <label className="form-control" htmlFor="hospitals-frequency">
+          <span className="text-xs text-base-content/60 mb-1">Frequency</span>
+          <select
+            id="hospitals-frequency"
+            className="select select-sm select-bordered min-w-[12rem]"
+            value={freqKey}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFreqKey(next);
+              if (next === "dates") {
+                setBucket("all");
+                if (!fromDate || !toDate) {
+                  const range = defaultDateRange();
+                  setFromDate(range.from);
+                  setToDate(range.to);
+                }
+              }
+            }}
           >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-5">
-        <button
-          type="button"
-          className={`btn btn-xs ${frequency == null ? "btn-primary" : "btn-ghost"}`}
-          onClick={() => setFrequency(null)}
-        >
-          All frequencies
-        </button>
-        {FREQUENCIES.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            className={`btn btn-xs ${frequency === opt.value ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setFrequency(opt.value)}
-          >
-            {opt.label}
-          </button>
-        ))}
+            <option value="all">All frequencies</option>
+            {FREQUENCIES.map((opt) => (
+              <option key={opt.value} value={String(opt.value)}>
+                {opt.label}
+              </option>
+            ))}
+            <option value="dates">From–to dates</option>
+          </select>
+        </label>
+        {usingDates ? (
+          <>
+            <label className="form-control" htmlFor="hospitals-due-from">
+              <span className="text-xs text-base-content/60 mb-1">From</span>
+              <input
+                id="hospitals-due-from"
+                type="date"
+                className="input input-sm input-bordered"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </label>
+            <label className="form-control" htmlFor="hospitals-due-to">
+              <span className="text-xs text-base-content/60 mb-1">To</span>
+              <input
+                id="hospitals-due-to"
+                type="date"
+                className="input input-sm input-bordered"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </label>
+          </>
+        ) : null}
       </div>
 
       {error ? (
@@ -298,16 +393,26 @@ function AdminHospitals() {
                       </span>
                     </span>
                     <span className="text-xs shrink-0 text-right">
-                      {hospital.asap_ahus ? (
-                        <span className="text-error font-semibold">{hospital.asap_ahus} ASAP</span>
+                      {usingDates ? (
+                        dueCount ? (
+                          <span className="font-semibold">{dueCount} due</span>
+                        ) : (
+                          <span className="text-base-content/50">Nothing due</span>
+                        )
                       ) : (
-                        <span className="text-base-content/50">No ASAP</span>
-                      )}
-                      <span className="text-base-content/40"> · </span>
-                      {hospital.month_ahus ? (
-                        <span className="text-info font-medium">{hospital.month_ahus} this month</span>
-                      ) : (
-                        <span className="text-base-content/50">none this month</span>
+                        <>
+                          {hospital.asap_ahus ? (
+                            <span className="text-error font-semibold">{hospital.asap_ahus} ASAP</span>
+                          ) : (
+                            <span className="text-base-content/50">No ASAP</span>
+                          )}
+                          <span className="text-base-content/40"> · </span>
+                          {hospital.month_ahus ? (
+                            <span className="text-info font-medium">{hospital.month_ahus} this month</span>
+                          ) : (
+                            <span className="text-base-content/50">none this month</span>
+                          )}
+                        </>
                       )}
                     </span>
                     <span

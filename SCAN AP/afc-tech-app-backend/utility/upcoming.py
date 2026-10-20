@@ -1,19 +1,72 @@
 """Group filters due in the next month for the admin Upcoming tab."""
 
+from datetime import date, datetime
+
 from utility.status import compute_filter_status
 
 WINDOW_DAYS = 30
 ASAP_DAYS = 7
-SEVERITY_RANK = {"overdue": 0, "soon": 1, "month": 2}
+SEVERITY_RANK = {"overdue": 0, "soon": 1, "month": 2, "later": 3}
 
 
-def due_severity(filter_row, *, window_days=WINDOW_DAYS, asap_days=ASAP_DAYS):
-    """Return (overdue|soon|month|None, status dict) for an active filter."""
+def parse_iso_date(value):
+    """Parse YYYY-MM-DD (or a date/datetime). Blank is None. Raise ValueError otherwise."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value).strip()[:10]
+    try:
+        return date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError("dates must be YYYY-MM-DD") from exc
+
+
+def _as_date(value):
+    try:
+        return parse_iso_date(value)
+    except ValueError:
+        return None
+
+
+def due_severity(
+    filter_row,
+    *,
+    window_days=WINDOW_DAYS,
+    asap_days=ASAP_DAYS,
+    from_date=None,
+    to_date=None,
+):
+    """Return (overdue|soon|month|later|None, status dict) for an active filter.
+
+    Default window is the next `window_days`. When from_date/to_date are set,
+    include the filter only if next_due_date falls in that inclusive range.
+    """
     if not getattr(filter_row, "is_active", True):
         return None, {}
     st = compute_filter_status(filter_row) or {}
-    if not st.get("next_due_date"):
+    due = _as_date(st.get("next_due_date"))
+    if due is None:
         return None, st
+
+    if from_date is not None or to_date is not None:
+        if from_date is not None and due < from_date:
+            return None, st
+        if to_date is not None and due > to_date:
+            return None, st
+        if st.get("days_overdue"):
+            return "overdue", st
+        until = st.get("days_until_due")
+        if until is None:
+            return None, st
+        if until <= asap_days:
+            return "soon", st
+        if until <= window_days:
+            return "month", st
+        return "later", st
+
     if st.get("days_overdue"):
         return "overdue", st
     until = st.get("days_until_due")
@@ -64,8 +117,20 @@ def _sort_key_name(name):
     return str(name or "").lower()
 
 
-def group_upcoming_ahus(ahus, *, window_days=WINDOW_DAYS, asap_days=ASAP_DAYS):
+def group_upcoming_ahus(
+    ahus,
+    *,
+    window_days=WINDOW_DAYS,
+    asap_days=ASAP_DAYS,
+    from_date=None,
+    to_date=None,
+):
     """Build the Upcoming tab payload from AHU rows with filters loaded."""
+    from_date = _as_date(from_date)
+    to_date = _as_date(to_date)
+    if from_date and to_date and from_date > to_date:
+        from_date, to_date = to_date, from_date
+
     hospitals = {}
 
     for ahu in ahus or []:
@@ -76,7 +141,13 @@ def group_upcoming_ahus(ahus, *, window_days=WINDOW_DAYS, asap_days=ASAP_DAYS):
         days_overdue = 0
 
         for f in getattr(ahu, "filters", None) or []:
-            sev, st = due_severity(f, window_days=window_days, asap_days=asap_days)
+            sev, st = due_severity(
+                f,
+                window_days=window_days,
+                asap_days=asap_days,
+                from_date=from_date,
+                to_date=to_date,
+            )
             if not sev:
                 continue
             due_date = st.get("next_due_date")
@@ -203,6 +274,8 @@ def group_upcoming_ahus(ahus, *, window_days=WINDOW_DAYS, asap_days=ASAP_DAYS):
     return {
         "window_days": window_days,
         "asap_days": asap_days,
+        "from_date": from_date.isoformat() if from_date else None,
+        "to_date": to_date.isoformat() if to_date else None,
         "summary": summary,
         "hospitals": hospital_list,
     }

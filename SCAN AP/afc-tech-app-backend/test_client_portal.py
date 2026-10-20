@@ -393,6 +393,32 @@ def main():
     assert_eq(tech_decoded["exp"] - tech_decoded["iat"], 12 * 3600, "tech token still 12h")
 
     admin_headers = auth_header(app, ids["admin_id"], "admin", "tech")
+
+    def upcoming_ahu_names(payload):
+        names = []
+        for hospital in payload.get("hospitals") or []:
+            for building in hospital.get("buildings") or []:
+                for ahu in building.get("ahus") or []:
+                    names.append(ahu["name"])
+        return names
+
+    default_up = client.get("/api/admin/upcoming", headers=admin_headers)
+    assert_eq(default_up.status_code, 200, "admin upcoming default window")
+    assert "AHU-9" not in upcoming_ahu_names(default_up.get_json()), "due in 60 days stays out of the 30-day window"
+
+    today = date.today()
+    ranged = client.get(
+        f"/api/admin/upcoming?from={today.isoformat()}&to={(today + timedelta(days=90)).isoformat()}",
+        headers=admin_headers,
+    )
+    assert_eq(ranged.status_code, 200, "admin upcoming from-to")
+    assert "AHU-9" in upcoming_ahu_names(ranged.get_json()), "from-to includes the 60-day due"
+    assert ranged.get_json()["from_date"] == today.isoformat(), "from_date echoed"
+    missing_to = client.get(f"/api/admin/upcoming?from={today.isoformat()}", headers=admin_headers)
+    assert_eq(missing_to.status_code, 400, "from without to is 400")
+    bad_date = client.get("/api/admin/upcoming?from=nope&to=2026-01-01", headers=admin_headers)
+    assert_eq(bad_date.status_code, 400, "bad from date is 400")
+
     created = client.post(
         f"/api/admin/hospitals/{ids['choc_id']}/clients",
         headers=admin_headers,
