@@ -8,8 +8,11 @@ export const getAdminHospitals = () => {
   return API.get("/admin/hospitals");
 };
 
-export const getAdminUpcoming = () => {
-  return API.get("/admin/upcoming");
+export const getAdminUpcoming = ({ from, to } = {}) => {
+  const params = {};
+  if (from) params.from = from;
+  if (to) params.to = to;
+  return API.get("/admin/upcoming", { params });
 };
 
 export const getHospitalSettings = (hospitalId) => {
