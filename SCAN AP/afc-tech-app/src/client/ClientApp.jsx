@@ -19,6 +19,14 @@ const DIRECTOR_NAV = [
   { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
 ];
 
+const DIRECTOR_TAB_NAV = [
+  { to: "/client", label: "Home", end: true, icon: HomeIcon },
+  { to: "/client/upcoming", label: "Due", icon: DueIcon },
+  { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
+  { to: "/client/units", label: "Units", icon: UnitsIcon },
+  { to: "/client/graphs", label: "Graphs", icon: GraphIcon },
+];
+
 const STAFF_NAV = [
   { to: "/client/units", label: "Units", icon: UnitsIcon },
   { to: "/client/scan", label: "Scan", icon: ScanIcon, featured: true },
@@ -70,6 +78,7 @@ export default function ClientApp() {
   const hospital = user.hospital_name || "Hospital portal";
   const director = isClientDirector(user);
   const nav = director ? DIRECTOR_NAV : STAFF_NAV;
+  const tabNav = director ? DIRECTOR_TAB_NAV : STAFF_NAV;
 
   return (
     <div data-theme={theme} className="min-h-dvh bg-base-200 text-base-content">
@@ -146,7 +155,7 @@ export default function ClientApp() {
 
           <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
             <div className={`grid h-16 ${director ? "grid-cols-5" : "grid-cols-3"}`}>
-              {nav.map((item) => (
+              {tabNav.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
