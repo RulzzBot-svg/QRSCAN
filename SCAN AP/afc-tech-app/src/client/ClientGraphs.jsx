@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { getClientGraphs, readClientUser } from "./api";
 import { exportClientGraphsPdf } from "./exportGraphsPdf";
+import FilterTypesDonut from "./FilterTypesDonut";
 import { parseYearMonth, prettyMonthLong } from "./format";
 
 const STATUS_COLORS = {
@@ -187,18 +188,7 @@ export default function ClientGraphs() {
             <p className="text-sm text-base-content/50 py-16 text-center">No filter types yet.</p>
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 min-h-[240px]">
-              <div className="flex-1 min-w-0 h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={types} dataKey="value" nameKey="name" innerRadius={52} outerRadius={80}>
-                      {types.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [`${value} qty`, name]} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <FilterTypesDonut items={types} />
               <TypeLegend items={types} />
             </div>
           )}
@@ -227,7 +217,7 @@ function servicesRangeHint(rows) {
     : first && last
       ? `${prettyMonthLong(rows[0].month)} – ${prettyMonthLong(rows[rows.length - 1].month)}. `
       : "";
-  return `${range}Blue = filters AFC replaced that month. Amber = filters due that month.`;
+  return `${range}Blue = replaced. Amber = due. Past months walk each filter back by its frequency.`;
 }
 
 function ChartCard({ title, hint, children }) {
