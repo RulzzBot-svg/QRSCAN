@@ -80,12 +80,17 @@ def group_upcoming_ahus(ahus, *, window_days=WINDOW_DAYS, asap_days=ASAP_DAYS):
             if not sev:
                 continue
             due_date = st.get("next_due_date")
+            try:
+                freq = int(getattr(f, "frequency_days", 0) or 0)
+            except (TypeError, ValueError):
+                freq = 0
             due_filters.append(
                 {
                     "id": getattr(f, "id", None),
                     "phase": getattr(f, "phase", None),
                     "size": getattr(f, "size", None),
                     "quantity": _qty(f),
+                    "frequency_days": freq or None,
                     "next_due_date": due_date,
                     "days_until_due": st.get("days_until_due"),
                     "days_overdue": st.get("days_overdue") or 0,
