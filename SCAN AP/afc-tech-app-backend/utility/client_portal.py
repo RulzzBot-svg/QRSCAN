@@ -436,8 +436,12 @@ def hospital_graphs(hospital_id, ahus):
     upcoming = {30: 0, 60: 0, 90: 0}
     month_keys = service_month_keys()
     start = month_keys[0]
-    last = month_keys[-1]
+    today = date.today()
+    year_start = start
+    year_end = date(start.year, 12, 31)
     scheduled = defaultdict(int)
+    completed = defaultdict(int)
+    inferred_completed = set()
 
     for ahu in ahus:
         summary["ahus"] += 1
@@ -464,14 +468,22 @@ def hospital_graphs(hospital_id, ahus):
             if qty:
                 phase_qty[filter_type_label(f.phase)] += qty
             fst = filter_status(f)
+            last_svc = _as_date(getattr(f, "last_service_date", None))
             due = _as_date(fst.get("next_due_date"))
+            freq = getattr(f, "frequency_days", None)
+            for visit in cadence_dates(last_svc, freq, year_start, year_end):
+                ym = visit.strftime("%Y-%m")
+                completed[ym] += 1
+                inferred_completed.add((f.id, ym))
             if due is not None:
-                due_month = due.replace(day=1)
-                if due_month < start:
+                if due.replace(day=1) < start:
                     # Still due from last year — show as January carry-in, not dropped.
                     scheduled[start.strftime("%Y-%m")] += 1
-                elif due_month <= last:
-                    scheduled[due.strftime("%Y-%m")] += 1
+                still_ahead = due >= today
+                for visit in cadence_dates(
+                    due, freq, year_start, year_end, include_forward=still_ahead
+                ):
+                    scheduled[visit.strftime("%Y-%m")] += 1
             days = fst.get("days_until_due")
             if fst.get("status") == "Overdue":
                 continue
@@ -481,7 +493,9 @@ def hospital_graphs(hospital_id, ahus):
                 if 0 <= days <= window:
                     upcoming[window] += 1
 
-    services = _services_by_month(hospital_id, month_keys, scheduled)
+    services = _services_by_month(
+        hospital_id, month_keys, scheduled, completed, inferred_completed
+    )
 
     return {
         "summary": summary,
@@ -518,7 +532,41 @@ def service_month_keys(today=None, back=5, months=12):
     return [date(year, month, 1) for month in range(1, 13)]
 
 
-def _services_by_month(hospital_id, month_keys, scheduled):
+def cadence_dates(anchor, frequency_days, start, last, *, include_forward=False):
+    """Dates on a filter's frequency grid that fall in [start, last].
+
+    Walks backward from `anchor` so a 90-day filter still shows earlier visits
+    this year, not only the next due. Set `include_forward` when the next due
+    is still ahead so remaining visits this year are included too.
+    """
+    day = _as_date(anchor)
+    try:
+        step = int(frequency_days or 0)
+    except (TypeError, ValueError):
+        step = 0
+    if day is None or step <= 0 or start is None or last is None or start > last:
+        return []
+    delta = timedelta(days=step)
+    found = []
+    cursor = day
+    guard = 0
+    while cursor >= start and guard < 64:
+        if cursor <= last:
+            found.append(cursor)
+        cursor -= delta
+        guard += 1
+    if include_forward:
+        cursor = day + delta
+        while cursor <= last and guard < 80:
+            if cursor >= start:
+                found.append(cursor)
+            cursor += delta
+            guard += 1
+    found.sort()
+    return found
+
+
+def _services_by_month(hospital_id, month_keys, scheduled, completed, inferred_completed):
     start_at = datetime.combine(month_keys[0], datetime.min.time())
     rows = (
         Job.query.join(AHU, AHU.id == Job.ahu_id)
@@ -527,19 +575,25 @@ def _services_by_month(hospital_id, month_keys, scheduled):
         .filter(Job.completed_at.isnot(None))
         .filter(Job.completed_at >= start_at)
         .filter(JobFilter.is_completed.is_(True))
-        .with_entities(Job.completed_at)
+        .with_entities(Job.completed_at, JobFilter.filter_id)
         .all()
     )
-    completed = defaultdict(int)
-    for (completed_at,) in rows:
+    seen = set(inferred_completed or ())
+    merged = defaultdict(int, completed or {})
+    for completed_at, filter_id in rows:
         day = _as_date(completed_at)
         if day is None:
             continue
-        completed[day.strftime("%Y-%m")] += 1
+        ym = day.strftime("%Y-%m")
+        key = (filter_id, ym)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged[ym] += 1
     return [
         {
             "month": key.strftime("%Y-%m"),
-            "completed": completed.get(key.strftime("%Y-%m"), 0),
+            "completed": merged.get(key.strftime("%Y-%m"), 0),
             "scheduled": scheduled.get(key.strftime("%Y-%m"), 0),
         }
         for key in month_keys
