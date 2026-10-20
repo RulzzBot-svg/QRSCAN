@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { API } from "../../api/api";
 import { deleteAdminAhus, fetchFiltersByAhuIds } from "../../api/admin";
+import { allSelectableFilterObjects } from "../../utils/filterSelection";
 import AdminFilterEditorInline from "./adminInlineEditor";
 import SupervisorSignoff from "../common/SupervisorSignoff";
 import PackingSlipPanel from "./PackingSlipPanel";
@@ -79,7 +80,9 @@ function AdminAHUs() {
   const [visibleAhus, setVisibleAhus] = useState(50);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const filterEditorRefs = useRef(new Map());
+  const selectAllIdsRef = useRef(new Set());
 
   const HOSPITAL_PREVIEW_LIMIT = 10;
 
@@ -210,14 +213,38 @@ function AdminAHUs() {
     else filterEditorRefs.current.delete(ahuId);
   };
 
+  useEffect(() => {
+    if (!selectAllIdsRef.current.size) return;
+    const ids = visibleAhuIdsKey ? visibleAhuIdsKey.split(",") : [];
+    for (const id of ids) {
+      if (!selectAllIdsRef.current.has(id) && !selectAllIdsRef.current.has(Number(id))) continue;
+      filterEditorRefs.current.get(Number(id))?.selectAllActive?.()
+        || filterEditorRefs.current.get(id)?.selectAllActive?.();
+    }
+  }, [visibleAhuIdsKey]);
+
   // multi-select: AHU checkbox also selects/clears every active filter in that AHU
   const toggleSelect = (id) => {
     const nextChecked = !(selected[id] || selected[String(id)]);
     setSelected((s) => ({ ...s, [id]: nextChecked }));
     setAhuPartial((p) => ({ ...p, [id]: false }));
+    if (!nextChecked) {
+      selectAllIdsRef.current.delete(id);
+      selectAllIdsRef.current.delete(String(id));
+    }
     const editor = filterEditorRefs.current.get(id);
     if (nextChecked) editor?.selectAllActive?.();
     else editor?.clearAll?.();
+  };
+
+  const clearFilterSelection = () => {
+    selectAllIdsRef.current = new Set();
+    setSelected({});
+    setAhuPartial({});
+    setSelectedFiltersForQB({});
+    for (const editor of filterEditorRefs.current.values()) {
+      editor?.clearAll?.();
+    }
   };
 
   const handleBulkAction = (action) => {
@@ -356,6 +383,63 @@ function AdminAHUs() {
     }
   };
 
+  const selectAllHospitalForQb = async () => {
+    if (!selectedHospitalKey) {
+      alert("Pick a hospital on the left first.");
+      return;
+    }
+    const rows = filtered;
+    if (!rows.length) {
+      alert("No AHUs on this hospital.");
+      return;
+    }
+    setSelectingAll(true);
+    try {
+      const ids = rows.map((a) => a.id);
+      selectAllIdsRef.current = new Set(ids.flatMap((id) => [id, String(id)]));
+      setVisibleAhus((v) => Math.max(v, rows.length));
+      setSelected(Object.fromEntries(ids.map((id) => [id, true])));
+      setAhuPartial((p) => {
+        const next = { ...p };
+        for (const id of ids) next[id] = false;
+        return next;
+      });
+
+      const missing = ids.filter((id) => preloadedFiltersByAhu[String(id)] === undefined);
+      let filterMap = { ...preloadedFiltersByAhu };
+      if (missing.length) {
+        const fetched = await fetchFiltersByAhuIds(missing);
+        filterMap = { ...filterMap, ...fetched };
+        setPreloadedFiltersByAhu((prev) => ({ ...prev, ...fetched }));
+      }
+
+      const nextQB = {};
+      for (const a of rows) {
+        const list = filterMap[String(a.id)] || filterMap[a.id] || [];
+        nextQB[a.id] = allSelectableFilterObjects(list);
+      }
+      setSelectedFiltersForQB(nextQB);
+
+      for (const id of ids) {
+        filterEditorRefs.current.get(id)?.selectAllActive?.();
+      }
+
+      const filtersByAhu = selectionToFiltersByAhu(nextQB, ahus);
+      const itemCount = countPackingSlipItems(filtersByAhu);
+      if (!itemCount) {
+        alert("No active filters to copy on this hospital.");
+        return;
+      }
+      await copyPackingSlipToClipboard(filtersByAhu, { mode: "special" });
+      setQbCopyResult(qbCopySummary(filtersByAhu, "special"));
+    } catch (err) {
+      console.error(err);
+      alert("Could not select all / copy. Allow clipboard access for this site, then try again.");
+    } finally {
+      setSelectingAll(false);
+    }
+  };
+
   const manualSelectionCount = Object.values(selectedFiltersForQB).reduce(
     (n, arr) => n + (arr?.length || 0),
     0
@@ -384,6 +468,19 @@ function AdminAHUs() {
             Add AHU
           </button>
           <button
+            className="btn btn-xs btn-outline btn-accent"
+            onClick={selectAllHospitalForQb}
+            disabled={!selectedHospitalKey || selectingAll || !filtered.length}
+            type="button"
+            title={
+              selectedHospitalKey
+                ? "Check every filter on this hospital and copy for QuickBooks paste"
+                : "Pick a hospital first"
+            }
+          >
+            {selectingAll ? "Selecting…" : "Select all"}
+          </button>
+          <button
             className={`btn btn-xs ${manualSelectionCount ? "btn-accent" : "btn-disabled"}`}
             onClick={copySelectionForQb}
             disabled={!manualSelectionCount}
@@ -410,6 +507,8 @@ function AdminAHUs() {
         selectedHospitalKey={selectedHospitalKey}
         selectedFiltersForQB={selectedFiltersForQB}
         ahus={ahus}
+        selectingAll={selectingAll}
+        onSelectAllHospital={selectAllHospitalForQb}
         onOpenManualReview={handleManualReviewOpen}
         onCopied={setQbCopyResult}
       />
@@ -526,7 +625,20 @@ function AdminAHUs() {
                   >
                     {selectedAhus.length ? `Delete selected (${selectedAhus.length})` : "Delete selected"}
                   </button>
-                  <button className="btn btn-xs btn-ghost" onClick={() => setSelected({})} type="button">
+                  <button
+                    className="btn btn-xs btn-outline btn-accent"
+                    onClick={selectAllHospitalForQb}
+                    disabled={!selectedHospitalKey || selectingAll || !filtered.length}
+                    type="button"
+                    title={
+                      selectedHospitalKey
+                        ? "Check every AHU and filter on this hospital, then copy for QuickBooks"
+                        : "Pick a hospital first"
+                    }
+                  >
+                    {selectingAll ? "Selecting…" : "Select all"}
+                  </button>
+                  <button className="btn btn-xs btn-ghost" onClick={clearFilterSelection} type="button">
                     Clear selection
                   </button>
                 </div>

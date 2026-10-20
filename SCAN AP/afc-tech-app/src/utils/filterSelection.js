@@ -25,6 +25,14 @@ export function filterObjectsForSelection(filters, selectedIds) {
     }));
 }
 
+export function allSelectableFilterObjects(filters) {
+  const selectable = selectableFilters(filters);
+  return filterObjectsForSelection(
+    selectable,
+    selectable.map((f) => f.id)
+  );
+}
+
 export function selectionMeta(filters, selectedIds) {
   const selectable = selectableFilters(filters);
   const selected = filterObjectsForSelection(selectable, selectedIds);

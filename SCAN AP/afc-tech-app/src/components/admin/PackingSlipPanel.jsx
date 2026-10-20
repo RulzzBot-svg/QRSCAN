@@ -23,6 +23,8 @@ export default function PackingSlipPanel({
   selectedHospitalKey,
   selectedFiltersForQB,
   ahus,
+  selectingAll,
+  onSelectAllHospital,
   onOpenManualReview,
   onCopied,
 }) {
@@ -134,6 +136,19 @@ export default function PackingSlipPanel({
           )}
           <button
             type="button"
+            className="btn btn-sm btn-outline btn-accent"
+            disabled={!selectedHospitalKey || selectingAll || !onSelectAllHospital}
+            onClick={onSelectAllHospital}
+            title={
+              selectedHospitalKey
+                ? "Check every filter on this hospital and copy for QuickBooks paste"
+                : "Pick a hospital first"
+            }
+          >
+            {selectingAll ? "Selecting…" : "Select all"}
+          </button>
+          <button
+            type="button"
             className="btn btn-sm btn-accent"
             disabled={!manualCount}
             onClick={copyManualSelection}
@@ -150,8 +165,8 @@ export default function PackingSlipPanel({
           </button>
         </div>
         <p className="text-xs opacity-60 mt-2">
-          Check an AHU to select every filter in it, then Copy for QuickBooks. In QB click QTY
-          and press Ctrl+Alt+V — not Ctrl+V.
+          Select all checks every filter on this hospital and copies. Or check AHUs one by one,
+          then Copy for QuickBooks. In QB click QTY and press Ctrl+Alt+V — not Ctrl+V.
         </p>
       </div>
 
