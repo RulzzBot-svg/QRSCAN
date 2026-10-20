@@ -14,7 +14,6 @@ import QRScanner from "./components/common/QRScanner";
 import AdminDashboard from "./components/admin/admin";
 import Hospitals from "./components/admin/hospitals";
 import AdminAHUs from "./components/admin/adminahus";
-import AdminUpcoming from "./components/admin/AdminUpcoming";
 import AdminJobs from "./components/admin/adminjobs";
 import AdminSignoffs from "./components/admin/AdminSignoffs";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -68,7 +67,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/jobs/:jobId/signature" element={<JobSignature />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="upcoming" element={<AdminUpcoming />} />
+          <Route path="upcoming" element={<Navigate to="/admin/hospitals" replace />} />
           <Route path="hospitals" element={<Hospitals />} />
           <Route path="ahus" element={<AdminAHUs />} />
           <Route path="jobs" element={<AdminJobs />} />

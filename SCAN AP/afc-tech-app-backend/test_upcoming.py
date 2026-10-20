@@ -119,6 +119,7 @@ def test_grouped_by_hospital_and_building():
     assert_eq(card["severity"], "overdue", "worst filter wins")
     assert_eq(card["filters_due"], 1, "only in-window filters count")
     assert_eq(card["qty_due"], 8, "qty from due filters only")
+    assert_eq(card["filters"][0]["frequency_days"], 90, "due filter keeps frequency")
 
     summary = payload["summary"]
     assert_eq(summary["hospitals"], 2, "two hospitals with due work")
@@ -128,9 +129,28 @@ def test_grouped_by_hospital_and_building():
     assert_eq(summary["filters_month"], 1, "one this-month filter")
 
 
+def test_frequency_on_overdue_two_year():
+    unit = ahu(
+        filters=[
+            filt(
+                id=51,
+                phase="FINAL",
+                last_service_date=TODAY - timedelta(days=800),
+                frequency_days=730,
+                quantity=12,
+            )
+        ]
+    )
+    payload = group_upcoming_ahus([unit])
+    card = payload["hospitals"][0]["buildings"][0]["ahus"][0]
+    assert_eq(card["filters"][0]["frequency_days"], 730, "2-year frequency is on the due row")
+    assert_eq(card["severity"], "overdue", "elapsed 2-year changeout is overdue")
+
+
 def main():
     test_severity_buckets()
     test_grouped_by_hospital_and_building()
+    test_frequency_on_overdue_two_year()
     print("ok")
 
 

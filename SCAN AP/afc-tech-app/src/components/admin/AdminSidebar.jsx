@@ -26,13 +26,6 @@ function AdminSidebar() {
         </li>
 
         <li>
-          <NavLink to="/admin/upcoming" className={linkClass}>
-            ⚠️
-            <span className="ml-2">Upcoming</span>
-          </NavLink>
-        </li>
-
-        <li>
           <NavLink to="/admin/hospitals" className={linkClass}>
             🏥
             <span className="ml-2">Hospitals</span>
