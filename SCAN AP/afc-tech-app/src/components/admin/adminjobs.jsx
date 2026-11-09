@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import AdminSidebar from "./AdminSidebar";
 import { API } from "../../api/api";
 import { formatDate } from "../../utils/dates";
 
@@ -14,14 +13,14 @@ function AdminJobs() {
   }, []);
 
   return (
-    <div data-theme="corporate" className="flex min-h-screen bg-base-200">
+    <div data-theme="corporate">
 
-      <main className="flex-1 p-6">
-        <h1 className="text-3xl font-bold text-primary mb-6">
+      <main>
+        <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-4 sm:mb-6">
           Job History
         </h1>
 
-        <div className="bg-base-100 border border-base-300 rounded-lg shadow">
+        <div className="bg-base-100 border border-base-300 rounded-lg shadow overflow-x-auto">
           <table className="table table-zebra table-pin-rows w-full">
             <thead>
               <tr>
@@ -57,7 +56,7 @@ function AdminJobs() {
         {/* JOB DETAIL MODAL */}
         {selectedJob && (
           <dialog className="modal modal-open">
-            <div className="modal-box max-w-3xl">
+            <div className="modal-box w-[calc(100%-1.5rem)] max-w-3xl max-h-[90vh]">
               <h3 className="font-bold text-xl text-primary mb-2">
                 Job #{selectedJob.id}
               </h3>

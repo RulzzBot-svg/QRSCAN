@@ -680,7 +680,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     <div className="bg-base-50">
 
       {/* Header with counts and action buttons */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
         <div className="text-xs opacity-70">
           <span className="font-semibold">{filteredActiveCount}</span> active
           <span className="ml-2 opacity-50">/ {filteredFilters.length} shown</span>
@@ -789,7 +789,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
                     <td className="px-1 py-0.5">
                       <input
-                        className="input input-xs input-bordered w-20"
+                        className="input input-xs input-bordered w-24 min-w-[5.5rem]"
                         value={f.phase}
                         onChange={(e) =>
                           updateFilter(f.id, "phase", e.target.value)
@@ -816,7 +816,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                             key={dim}
                             type="text"
                             placeholder={dim.toUpperCase()}
-                            className="input input-xs input-bordered w-10"
+                            className="input input-xs input-bordered w-12 text-center"
                             value={f.sizeParts?.[dim] || ""}
                             disabled={f._inactive}
                             onChange={(e) =>
@@ -830,7 +830,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                     <td className="px-1 py-0.5">
                       <input
                         type="number"
-                        className="input input-xs input-bordered w-10"
+                        inputMode="numeric"
+                        className="input input-xs input-bordered admin-qty-input"
                         value={f.quantity}
                         disabled={f._inactive}
                         onChange={(e) =>
@@ -859,7 +860,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
                     <td className="px-1 py-0.5">
                       <select
-                        className="select select-xs select-bordered w-24 text-xs"
+                        className="select select-xs select-bordered admin-freq-select"
                         value={frequencySelectValue(f.frequency_days)}
                         disabled={f._inactive}
                         onChange={(e) =>
@@ -897,7 +898,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                     <td className="px-1 py-0.5 text-xs">
                       <input
                         type="date"
-                        className="input input-xs input-bordered w-28 text-xs"
+                        className="input input-xs input-bordered w-[9.5rem] min-w-[9.5rem] text-xs"
                         value={toLocalIsoDate(f.last_service_date) || ""}
                         disabled={f._inactive}
                         onChange={(e) => updateFilter(f.id, "last_service_date", e.target.value)}

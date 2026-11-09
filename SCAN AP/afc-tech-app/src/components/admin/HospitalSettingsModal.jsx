@@ -142,14 +142,14 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
 
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box max-w-lg">
+      <div className="modal-box w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh]">
         <h3 className="font-bold text-lg text-slate-800">{hospital.name}</h3>
         <p className="text-sm text-base-content/60 mb-4">
           Contract settings and hospital portal logins
         </p>
 
         <form onSubmit={handleSave} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="form-control">
               <span className="label-text text-xs">Estimate #</span>
               <input
@@ -170,7 +170,7 @@ function HospitalSettingsModal({ hospital, open, onClose, onSaved }) {
             </label>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="form-control">
               <span className="label-text text-xs">Start date</span>
               <input

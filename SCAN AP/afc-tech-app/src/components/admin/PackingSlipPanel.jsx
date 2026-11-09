@@ -102,7 +102,7 @@ export default function PackingSlipPanel({
 
   return (
     <>
-      <div className="mx-4 mb-3 p-3 bg-base-100 border border-base-300 rounded-lg">
+      <div className="mb-3 p-3 bg-base-100 border border-base-300 rounded-lg">
         <div className="text-sm font-semibold mb-2">QuickBooks packing slip</div>
         <div className="flex flex-wrap items-end gap-3">
           <div>

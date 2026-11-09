@@ -16,10 +16,10 @@ export default function AdminSignoffs() {
   }, []);
 
   return (
-    <div className="min-h-screen">
-      <h1 className="text-3xl font-bold text-primary mb-4">Signed Off Forms</h1>
+    <div>
+      <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-4">Signed Off Forms</h1>
 
-      <div className="bg-base-100 border border-base-300 rounded-lg shadow">
+      <div className="bg-base-100 border border-base-300 rounded-lg shadow overflow-x-auto">
         <table className="table w-full">
           <thead>
             <tr>
@@ -55,7 +55,7 @@ export default function AdminSignoffs() {
 
       {selected && (
         <dialog className="modal modal-open">
-          <div className="modal-box max-w-3xl">
+          <div className="modal-box w-[calc(100%-1.5rem)] max-w-3xl max-h-[90vh]">
             <h3 className="font-bold text-xl text-primary">Sign-off #{selected.id}</h3>
             <div className="text-sm text-base-content/70 my-3">
               <div><strong>Hospital:</strong> {selected.hospital_id}</div>

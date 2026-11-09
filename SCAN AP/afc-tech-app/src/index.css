@@ -64,3 +64,31 @@ body {
 #client-qr-reader__dashboard {
   display: none !important;
 }
+
+/* Admin filter row: qty was crushed by spinner arrows; frequency was oversized. */
+.admin-qty-input {
+  width: 4rem;
+  min-width: 4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+.admin-qty-input::-webkit-outer-spin-button,
+.admin-qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.admin-qty-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.admin-freq-select {
+  width: 4.5rem;
+  min-width: 4.5rem;
+  max-width: 4.5rem;
+  padding-left: 0.35rem;
+  padding-right: 1.1rem;
+  font-size: 0.75rem;
+}
