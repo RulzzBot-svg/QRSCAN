@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import AdminSidebar from "./AdminSidebar";
+import AdminSidebar, { AdminBottomNav } from "./AdminSidebar";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { hasAuthToken } from "../../api/api";
 
@@ -32,24 +32,35 @@ export default function AdminLayout() {
   }, [navigate]);
 
   return (
-    <div data-theme="corporate" className="min-h-screen flex">
-      {/* Sidebar (always visible) */}
-      <AdminSidebar />
+    <div data-theme="corporate" className="drawer lg:drawer-open min-h-dvh">
+      <input id="admin-drawer" type="checkbox" className="drawer-toggle" />
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col bg-base-200">
-        {/* Top navbar */}
-        <div className="navbar bg-base-100 border-b border-base-300">
-          <div className="flex-1" />
+      <div className="drawer-content flex flex-col min-h-dvh min-w-0 bg-base-200">
+        <header className="navbar min-h-12 bg-base-100 border-b border-base-300 px-2 lg:px-4 sticky top-0 z-20">
+          <div className="flex-none lg:hidden">
+            <label htmlFor="admin-drawer" className="btn btn-ghost btn-square btn-sm" aria-label="Open menu">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </label>
+          </div>
+          <div className="flex-1 lg:hidden font-bold text-primary text-sm">AFC Admin</div>
+          <div className="flex-1 hidden lg:block" />
           <div className="flex-none">
             <NotificationsDropdown />
           </div>
-        </div>
+        </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 pb-24 lg:pb-6 overflow-x-hidden">
           <Outlet />
         </main>
+
+        <AdminBottomNav />
+      </div>
+
+      <div className="drawer-side z-40">
+        <label htmlFor="admin-drawer" aria-label="close sidebar" className="drawer-overlay" />
+        <AdminSidebar />
       </div>
     </div>
   );

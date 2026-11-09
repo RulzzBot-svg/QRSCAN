@@ -166,10 +166,10 @@ function AdminDashboard() {
   };
 
   return (
-    <div data-theme="corporate" className="min-h-screen bg-slate-50">
-      <main className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-slate-800">Overview</h1>
+    <div data-theme="corporate">
+      <main>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Overview</h1>
           <div className="flex gap-2 items-center">
             <button
               className="btn btn-sm btn-outline btn-warning"
@@ -191,7 +191,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           <KpiCard title="Hospitals" value={stats.hospitals} />
           <KpiCard title="Total AHUs" value={stats.ahus} />
           <KpiCard title="Overdue" value={stats.overdue} color="error" subtitle="Immediate attention" />

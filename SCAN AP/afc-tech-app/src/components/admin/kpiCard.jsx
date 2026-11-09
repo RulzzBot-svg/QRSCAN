@@ -11,7 +11,7 @@ function KpiCard({ title, value, subtitle, color = "primary" }) {
       <div className="card-body p-4">
         <div className="text-sm text-base-content/60">{title}</div>
 
-        <div className={`text-3xl font-bold ${colorMap[color] || "text-primary"}`}>
+        <div className={`text-2xl sm:text-3xl font-bold ${colorMap[color] || "text-primary"}`}>
           {value}
         </div>
 

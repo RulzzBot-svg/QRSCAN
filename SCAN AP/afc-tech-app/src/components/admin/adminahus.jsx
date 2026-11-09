@@ -177,6 +177,10 @@ function AdminAHUs() {
     () => filtered.slice(0, visibleAhus),
     [filtered, visibleAhus]
   );
+  const selectedHospitalName = useMemo(
+    () => grouped.find((g) => String(g.hospitalKey) === String(selectedHospitalKey))?.hospitalName || "",
+    [grouped, selectedHospitalKey]
+  );
   const visibleAhuIdsKey = visibleAhusList.map((a) => String(a.id)).join(",");
 
   useEffect(() => {
@@ -454,13 +458,13 @@ function AdminAHUs() {
   }
 
   return (
-    <div data-theme="corporate" className="min-h-screen bg-base-200">
-      <div className="flex items-center justify-between mb-3 px-4 pt-4">
+    <div data-theme="corporate" className="bg-base-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
         <div>
-          <h1 className="text-xl font-bold">Admin — AHUs & Filters</h1>
+          <h1 className="text-lg sm:text-xl font-bold">Admin — AHUs & Filters</h1>
           <div className="text-xs opacity-70">Compact view with always-visible filters</div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button className="btn btn-xs" onClick={() => setShowImport(true)} type="button">
             Import
           </button>
@@ -513,9 +517,23 @@ function AdminAHUs() {
         onCopied={setQbCopyResult}
       />
 
-      <div className="flex gap-4 px-4 pb-4">
-        {/* Left: Hospital tree (UNCHANGED) */}
-          <aside className="w-64 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto lg:max-h-[calc(100vh-150px)] shrink-0">
+      <div className="flex flex-col lg:flex-row gap-3">
+        {selectedHospitalKey ? (
+          <button
+            type="button"
+            className="lg:hidden btn btn-ghost btn-sm justify-start"
+            onClick={() => setSelectedHospitalKey(null)}
+          >
+            ← Hospitals
+            {selectedHospitalName ? <span className="font-semibold truncate"> · {selectedHospitalName}</span> : null}
+          </button>
+        ) : null}
+        {/* Left: Hospital tree — full width on phone until a hospital is picked */}
+          <aside
+            className={`w-full lg:w-64 bg-base-100 border border-base-300 rounded-lg p-3 overflow-auto max-h-64 lg:max-h-[calc(100vh-150px)] shrink-0 ${
+              selectedHospitalKey ? "hidden lg:block" : ""
+            }`}
+          >
             <div className="font-medium mb-2">Hospitals</div>
             <input
               className="input input-sm input-bordered w-full mb-2"
@@ -590,7 +608,7 @@ function AdminAHUs() {
         </aside>
 
         {/* Right: compact AHU list with always-visible filters */}
-        <section className="flex-1 w-full">
+        <section className={`flex-1 w-full min-w-0 ${selectedHospitalKey ? "" : "hidden lg:block"}`}>
           <div className="bg-base-100 border border-base-300 rounded-lg">
             {/* Top toolbar (kept) */}
             <div className="p-2 border-b space-y-2">
@@ -604,7 +622,7 @@ function AdminAHUs() {
                     placeholder="Search ALL AHUs..."
                     value={ahuQuery}
                     onChange={(e) => setAhuQuery(e.target.value)}
-                    className="input input-xs input-bordered w-72 max-w-full"
+                    className="input input-xs input-bordered w-full sm:w-56 lg:w-72"
                   />
                   <button className="btn btn-xs" onClick={() => handleBulkAction("Export CSV")} type="button">
                     Export
@@ -643,7 +661,7 @@ function AdminAHUs() {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-normal">
+              <div className="hidden md:flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-normal">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   <span className="badge badge-error badge-xs">Overdue</span>
                   = past due
@@ -752,7 +770,7 @@ function AdminAHUs() {
                 return (
                   <div key={`${a.id}-${filtersReloadToken}`} className="border border-base-300 rounded-lg overflow-hidden">
                     {/* Compact AHU header */}
-                    <div className="bg-base-200 px-3 py-1.5 flex items-center justify-between gap-2">
+                    <div className="bg-base-200 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <input
                           type="checkbox"
@@ -841,7 +859,7 @@ function AdminAHUs() {
       {/* Add AHU modal */}
       {showAddAhu && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-          <div className="bg-base-100 border p-4 rounded-lg w-96">
+          <div className="bg-base-100 border p-4 rounded-lg w-[min(24rem,calc(100vw-1.5rem))]">
             <div className="flex items-center justify-between mb-3">
               <div className="font-semibold">Add AHU</div>
               <div className="flex gap-2">
@@ -955,7 +973,7 @@ function AdminAHUs() {
       ) : null}
 
       {manualSelectionCount > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-base-100 border border-base-300 shadow-lg rounded-lg px-4 py-2 flex items-center gap-3">
+        <div className="fixed bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-40 bg-base-100 border border-base-300 shadow-lg rounded-lg px-4 py-2 flex flex-wrap items-center gap-3 max-w-[calc(100%-1rem)]">
           <div className="text-sm">
             <span className="font-semibold">{manualSelectionCount}</span> filter
             {manualSelectionCount === 1 ? "" : "s"} selected

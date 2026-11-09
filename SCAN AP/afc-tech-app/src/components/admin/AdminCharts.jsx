@@ -34,7 +34,7 @@ function AdminCharts({ hospitalRows = [], stats = {} }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="col-span-2 bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
+      <div className="lg:col-span-2 bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm">
         <h3 className="text-md font-semibold mb-2">Hospital Status (top hospitals)</h3>
         <div style={{ width: "100%", height: 260 }}>
           <ResponsiveContainer>

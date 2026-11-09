@@ -245,7 +245,7 @@ function AdminHospitals() {
   };
 
   return (
-    <div className="max-w-6xl">
+    <div className="max-w-6xl min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
           <h1 className="text-2xl font-bold">Hospitals</h1>
@@ -306,7 +306,7 @@ function AdminHospitals() {
           <span className="text-xs text-base-content/60 mb-1">Frequency</span>
           <select
             id="hospitals-frequency"
-            className="select select-sm select-bordered min-w-[12rem]"
+            className="select select-sm select-bordered w-full sm:w-auto sm:min-w-[12rem]"
             value={freqKey}
             onChange={(e) => {
               const next = e.target.value;
