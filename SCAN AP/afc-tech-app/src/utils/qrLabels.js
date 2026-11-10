@@ -384,8 +384,11 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     ? `${labels.length} label${labels.length === 1 ? "" : "s"} — 4×2 in Zebra ZD220 · black & white · scan opens FilterInfo`
     : `${labels.length} label${labels.length === 1 ? "" : "s"} — scan opens FilterInfo for that AHU`;
   const cards = labels.map((label) => labelCardHtml(label, options)).join("");
+  const htmlClass = zebra
+    ? `print-zebra${layout === QR_LAYOUTS.zebraBanner ? " print-zebra-banner" : ""}`
+    : "";
   return `<!DOCTYPE html>
-<html lang="en"${zebra ? ' class="print-zebra"' : ""}>
+<html lang="en"${htmlClass ? ` class="${htmlClass}"` : ""}>
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
@@ -582,35 +585,36 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     }
     .layout-zebra-banner .band {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
+      top: -0.04in;
+      left: -0.1in;
+      right: auto;
       z-index: 2;
       flex: none;
-      height: 0.22in;
-      width: 100%;
-      min-width: 100%;
+      height: 0.30in;
+      width: 4.2in;
+      min-width: 4.2in;
       max-width: none;
       align-self: stretch;
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 8px;
       margin: 0;
-      padding: 0 0.12in;
+      padding: 0.08in 0.22in 0.045in;
       background: #000;
       color: #fff;
-      box-shadow: 0 0 0 0.08in #000;
     }
     .layout-zebra-banner .band .company,
     .layout-zebra-banner .band .phone {
       color: #fff;
       margin: 0;
+      padding-top: 0.02in;
+      line-height: 1;
     }
     .layout-zebra-banner .body {
       flex: 1;
       min-height: 0;
-      margin-top: 0.22in;
+      margin-top: 0.26in;
       display: flex;
       flex-direction: row;
       align-items: stretch;
@@ -652,6 +656,10 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
         margin: 0 !important;
         padding: 0 !important;
         overflow: hidden !important;
+      }
+      html.print-zebra-banner,
+      html.print-zebra-banner body {
+        background: #000 !important;
       }
     }
   </style>
