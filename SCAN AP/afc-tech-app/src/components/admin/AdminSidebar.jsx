@@ -17,12 +17,25 @@ const linkClass = ({ isActive }) =>
   `flex items-center gap-3 px-3 py-2 rounded-lg transition
    ${isActive ? "bg-primary text-primary-content" : "hover:bg-base-300"}`;
 
-function AdminSidebar() {
+function AdminSidebar({ onCollapse }) {
   const navigate = useNavigate();
 
   return (
-    <aside className="w-56 min-h-full flex flex-col bg-base-100 border-r border-base-300">
-      <div className="p-3 font-bold text-primary">AFC Admin</div>
+    <aside className="w-56 h-full min-h-dvh flex flex-col bg-base-100 border-r border-base-300">
+      <div className="p-3 font-bold text-primary flex items-center justify-between gap-2">
+        <span>AFC Admin</span>
+        {onCollapse ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-square btn-xs"
+            onClick={onCollapse}
+            aria-label="Close sidebar"
+            title="Close sidebar"
+          >
+            «
+          </button>
+        ) : null}
+      </div>
 
       <ul className="menu grow px-2 space-y-1 text-sm">
         {ADMIN_NAV.map((item) => (

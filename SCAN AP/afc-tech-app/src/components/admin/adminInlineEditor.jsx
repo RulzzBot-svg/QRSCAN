@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useRef, useImperativeHandle, forwardRef, 
 import { API } from "../../api/api";
 import { parseIsoToDate, formatDate } from "../../utils/dates";
 import { selectableFilters, selectionMeta } from "../../utils/filterSelection";
+import { frequencyColor as getFrequencyColor } from "../../utils/frequencyColors";
 
 const FREQUENCY_OPTIONS = [
   { label: "30 Days", value: 30, short: "30d" },
@@ -123,24 +124,6 @@ const getRowStatus = (f) => {
     return { key: "dueSoon", label: `Due Soon (${diffDays}d)` };
   }
   return { key: "ok", label: `OK (${diffDays}d)` };
-};
-
-const getFrequencyColor = (freqDays) => {
-  if (!freqDays && freqDays !== 0) return null;
-  const m = Number(freqDays);
-  const map = {
-    30: "#FFFF99",
-    60: "#F2CEEF",
-    90: "#CCFFFF",
-    120: "#E5A065",
-    180: "#C5E0B3",
-    365: "#FBE4D5",
-    540: "#F3F0D9",
-    730: "#49BFBC",
-    1095: "#FFD965",
-  };
-
-  return map[m] || null;
 };
 
 /** Expected changeouts per year from frequency (90→4, 30→12, 60→6, …). */
