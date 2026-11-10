@@ -46,6 +46,34 @@ const buildSize = ({ h, w, d }) => {
   return `${h}x${w}x${d}`;
 };
 
+function patchFilterRow(f, field, value) {
+  if (field.startsWith("size.")) {
+    const key = field.split(".")[1];
+    const newSizeParts = { ...f.sizeParts, [key]: value };
+    return { ...f, sizeParts: newSizeParts, size: buildSize(newSizeParts), _dirty: true };
+  }
+  return { ...f, [field]: value, _dirty: true };
+}
+
+function filterSnapshot(filter, invoice) {
+  return JSON.stringify({
+    phase: filter.phase || "",
+    part_number: filter.part_number || "",
+    size: filter.size || "",
+    quantity: Number(filter.quantity) || 0,
+    unit_price: filter.unit_price === "" || filter.unit_price == null ? null : String(filter.unit_price),
+    frequency_days: Number(filter.frequency_days) || 0,
+    last_service_date: filter.last_service_date ? String(filter.last_service_date).slice(0, 10) : "",
+    invoice: invoice || "",
+  });
+}
+
+function commitOnEnter(e) {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  e.currentTarget.blur();
+}
+
 const startOfDay = (d) => {
   const x = new Date(d instanceof Date ? d.getTime() : parseIsoToDate(d)?.getTime());
   x.setHours(0, 0, 0, 0);
@@ -153,6 +181,10 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
   const filtersRef = useRef([]);
   const pendingSelectAll = useRef(null);
   const skipPreloadRef = useRef(false);
+  const invoicesRef = useRef({});
+  const lastSavedRef = useRef({});
+  const savingRef = useRef(new Set());
+  const pendingCommitRef = useRef(new Set());
   // QuickBooks Pull modal state (mocked integration)
   const [qbOpen, setQbOpen] = useState(false);
   const [qbRef, setQbRef] = useState("");
@@ -274,9 +306,13 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     setSelectedFilters(new Set());
     pendingSelectAll.current = null;
     skipPreloadRef.current = false;
+    lastSavedRef.current = {};
+    savingRef.current = new Set();
+    pendingCommitRef.current = new Set();
   }, [ahuId]);
 
   filtersRef.current = filters;
+  invoicesRef.current = filterInvoices;
 
   const reportSelection = useCallback((newSet, sourceFilters = filtersRef.current) => {
     if (!onSelectionChange) return;
@@ -362,6 +398,9 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       }
 
       setFilters(fetched);
+      for (const f of fetched) {
+        lastSavedRef.current[f.id] = filterSnapshot(f, invoicesRef.current[f.id]);
+      }
       try {
         if (ahuNotes !== null) {
           const notes = ahuNotes || "";
@@ -480,18 +519,44 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
   const updateFilter = (id, field, value) => {
     setFilters((prev) =>
-      prev.map((f) => {
-        if (f.id !== id) return f;
-
-        if (field.startsWith("size.")) {
-          const key = field.split(".")[1];
-          const newSizeParts = { ...f.sizeParts, [key]: value };
-          return { ...f, sizeParts: newSizeParts, size: buildSize(newSizeParts) };
-        }
-
-        return { ...f, [field]: value };
-      })
+      prev.map((f) => (f.id !== id ? f : patchFilterRow(f, field, value)))
     );
+  };
+
+  const commitRow = async (id, override) => {
+    if (override) {
+      filtersRef.current = filtersRef.current.map((row) => (row.id === id ? override : row));
+    }
+    const current = override || filtersRef.current.find((row) => row.id === id);
+    if (!current || current._inactive) return;
+    if (savingRef.current.has(id)) {
+      pendingCommitRef.current.add(id);
+      return;
+    }
+
+    const invoice = invoicesRef.current[id] || "";
+    const snap = filterSnapshot(current, invoice);
+    if (lastSavedRef.current[id] === snap) return;
+    if (current._isNew && !current._dirty) return;
+
+    savingRef.current.add(id);
+    try {
+      if (current._isNew) {
+        await saveNew(current);
+        pendingCommitRef.current.delete(id);
+      } else {
+        await saveFilter(current, { quiet: true });
+      }
+      lastSavedRef.current[id] = snap;
+    } catch (err) {
+      console.error("Filter autosave error:", err);
+    } finally {
+      savingRef.current.delete(id);
+      if (pendingCommitRef.current.has(id)) {
+        pendingCommitRef.current.delete(id);
+        commitRow(id);
+      }
+    }
   };
 
   const setInactiveUI = (id, inactive) => {
@@ -502,7 +567,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     );
   };
 
-  const saveFilter = async (filter) => {
+  const saveFilter = async (filter, { quiet = false } = {}) => {
     const payload = {
       phase: filter.phase,
       part_number: filter.part_number,
@@ -515,10 +580,10 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
     try {
       await API.put(`/admin/filters/${filter.id}`, payload);
 
-      const currentInvoice = filterInvoices[filter.id];
+      const currentInvoice = invoicesRef.current[filter.id];
 
       await API.patch(`/admin/ahus/${ahuId}`, { filter_invoices: { [filter.id]: currentInvoice } });
-      showToast("Filter updated.", "success");
+      if (!quiet) showToast("Filter updated.", "success");
     } catch (err) {
       console.error("Failed to save filter:", err);
       showToast("Failed to save filter.", "error");
@@ -545,7 +610,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
       const newId = res?.data?.id; // The real ID from the DB
 
       // Get the invoice typed into the temp row
-      const tmpInv = filterInvoices[filter.id];
+      const tmpInv = invoicesRef.current[filter.id];
 
       if (newId && tmpInv) {
         // Send the invoice to the DB using the NEW real ID
@@ -588,7 +653,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
         _isNew: true,
       },
     ]);
-    showToast("New filter row added. Fill it out and hit Save.", "success");
+    showToast("New filter row added. It saves when you leave a cell.", "success");
   };
 
   const deactivateFilter = async (filter) => {
@@ -744,7 +809,6 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                 <th className="px-1">Next</th>
                 <th className="px-1">Status</th>
                 <th className="px-1">Previous Invoice</th>
-                <th className="px-1">Save</th>
                 <th className="px-1">Remove</th>
               </tr>
             </thead>
@@ -794,6 +858,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         onChange={(e) =>
                           updateFilter(f.id, "phase", e.target.value)
                         }
+                        onBlur={() => commitRow(f.id)}
+                        onKeyDown={commitOnEnter}
                         disabled={f._inactive}
                       />
                     </td>
@@ -805,6 +871,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         onChange={(e) =>
                           updateFilter(f.id, "part_number", e.target.value)
                         }
+                        onBlur={() => commitRow(f.id)}
+                        onKeyDown={commitOnEnter}
                         disabled={f._inactive}
                       />
                     </td>
@@ -822,6 +890,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                             onChange={(e) =>
                               updateFilter(f.id, `size.${dim}`, e.target.value)
                             }
+                            onBlur={() => commitRow(f.id)}
+                            onKeyDown={commitOnEnter}
                           />
                         ))}
                       </div>
@@ -837,6 +907,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         onChange={(e) =>
                           updateFilter(f.id, "quantity", e.target.value)
                         }
+                        onBlur={() => commitRow(f.id)}
+                        onKeyDown={commitOnEnter}
                       />
                     </td>
 
@@ -854,6 +926,8 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                           onChange={(e) =>
                             updateFilter(f.id, "unit_price", e.target.value)
                           }
+                          onBlur={() => commitRow(f.id)}
+                          onKeyDown={commitOnEnter}
                         />
                       </td>
                     ) : null}
@@ -863,9 +937,12 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         className="select select-xs select-bordered admin-freq-select"
                         value={frequencySelectValue(f.frequency_days)}
                         disabled={f._inactive}
-                        onChange={(e) =>
-                          updateFilter(f.id, "frequency_days", Number(e.target.value))
-                        }
+                        onChange={(e) => {
+                          const next = patchFilterRow(f, "frequency_days", Number(e.target.value));
+                          setFilters((prev) => prev.map((row) => (row.id === f.id ? next : row)));
+                          commitRow(f.id, next);
+                        }}
+                        onBlur={() => commitRow(f.id)}
                       >
                         {FREQUENCY_OPTIONS.map((opt) => (
                           <option key={opt.value} value={String(opt.value)}>
@@ -901,7 +978,13 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                         className="input input-xs input-bordered w-[9.5rem] min-w-[9.5rem] text-xs"
                         value={toLocalIsoDate(f.last_service_date) || ""}
                         disabled={f._inactive}
-                        onChange={(e) => updateFilter(f.id, "last_service_date", e.target.value)}
+                        onChange={(e) => {
+                          const next = patchFilterRow(f, "last_service_date", e.target.value);
+                          setFilters((prev) => prev.map((row) => (row.id === f.id ? next : row)));
+                          commitRow(f.id, next);
+                        }}
+                        onBlur={() => commitRow(f.id)}
+                        onKeyDown={commitOnEnter}
                       />
                     </td>
 
@@ -951,32 +1034,14 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
                           const val = e.target.value;
                           setFilterInvoices((prev) => {
                             const updated = { ...prev, [f.id]: val };
-                            // Optional: Also manually trigger a save here for extra safety
+                            invoicesRef.current = updated;
                             localStorage.setItem(localInvoicesKey, JSON.stringify(updated));
                             return updated;
                           });
                         }}
+                        onBlur={() => commitRow(f.id)}
+                        onKeyDown={commitOnEnter}
                       />
-                    </td>
-
-                    <td className="px-1 py-0.5">
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-primary"
-                        disabled={f._inactive}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            if (f._isNew) await saveNew(f);
-                            else await saveFilter(f);
-                          } catch (err) {
-                            console.error("Filter save error:", err);
-                            showToast("Save failed.", "error");
-                          }
-                        }}
-                      >
-                        Save
-                      </button>
                     </td>
 
                     <td className="px-1 py-0.5">
@@ -1010,7 +1075,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
               {filteredFilters.length === 0 && filters.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="text-center py-3 opacity-70 text-xs">
+                  <td colSpan={showQbPrice ? 13 : 12} className="text-center py-3 opacity-70 text-xs">
                     No filters for this AHU.
                   </td>
                 </tr>
@@ -1018,7 +1083,7 @@ function AdminFilterEditorInline({ ahuId, isOpen, globalFilters, onSelectionChan
 
               {filteredFilters.length === 0 && filters.length > 0 && (
                 <tr>
-                  <td colSpan={13} className="text-center py-3 opacity-70 text-xs">
+                  <td colSpan={showQbPrice ? 13 : 12} className="text-center py-3 opacity-70 text-xs">
                     No filters match the current filters. Clear filters to see all{" "}
                     {filters.length} filter(s).
                   </td>
