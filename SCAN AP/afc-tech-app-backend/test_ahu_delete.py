@@ -3,6 +3,8 @@ import tempfile
 from datetime import date, datetime
 
 from flask import Flask
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from db import db
 from models import (
@@ -16,7 +18,25 @@ from models import (
     Notification,
     Technician,
 )
-from utility.ahu_delete import AHU_DELETE_LIMIT, delete_ahus_by_ids, normalize_ahu_ids
+from utility.ahu_delete import (
+    AHU_DELETE_LIMIT,
+    clear_hospital_survey_records,
+    delete_ahus_by_ids,
+    normalize_ahu_ids,
+)
+
+
+def _enable_sqlite_foreign_keys():
+    @event.listens_for(Engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
+
+
+_enable_sqlite_foreign_keys()
 
 
 def make_app(db_path):
@@ -116,6 +136,7 @@ def test_normalize_ahu_ids():
     assert_eq(normalize_ahu_ids(None), [], "empty")
     too_many = list(range(1, AHU_DELETE_LIMIT + 20))
     assert_eq(len(normalize_ahu_ids(too_many)), AHU_DELETE_LIMIT, "cap")
+    assert_eq(len(normalize_ahu_ids(too_many, limit=None)), AHU_DELETE_LIMIT + 19, "fresh-start has no cap")
 
 
 def test_delete_ahus_by_ids_removes_related_and_keeps_the_rest():
@@ -156,9 +177,91 @@ def test_delete_ahus_by_ids_removes_related_and_keeps_the_rest():
             pass
 
 
+def test_fresh_start_clears_more_ahus_than_the_admin_delete_cap():
+    """Eisenhower-sized hospitals exceed AHU_DELETE_LIMIT; buildings still have AHU FKs."""
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+    app = make_app(db_path)
+    try:
+        with app.app_context():
+            hospital = Hospital(name="Eisenhower")
+            db.session.add(hospital)
+            db.session.flush()
+            building = Building(hospital_id=hospital.id, name="Main")
+            db.session.add(building)
+            db.session.flush()
+            extra = AHU_DELETE_LIMIT + 10
+            for n in range(extra):
+                db.session.add(
+                    AHU(
+                        hospital_id=hospital.id,
+                        building_id=building.id,
+                        name=f"AHU-{n + 1}",
+                        location="Roof",
+                    )
+                )
+            db.session.commit()
+            hid = hospital.id
+            bid = building.id
+            assert_eq(AHU.query.filter_by(hospital_id=hid).count(), extra, "setup many AHUs")
+
+            result = clear_hospital_survey_records(hid)
+            db.session.commit()
+
+            assert_eq(result["ahus"], extra, "every AHU is removed, not only the first 150")
+            assert_eq(result["buildings"], 1, "building is removed")
+            assert_eq(AHU.query.filter_by(hospital_id=hid).count(), 0, "no leftover AHUs")
+            assert db.session.get(Building, bid) is None
+            assert db.session.get(Hospital, hid) is not None
+    finally:
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+def test_delete_ahus_by_ids_keeps_admin_cap():
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+    app = make_app(db_path)
+    try:
+        with app.app_context():
+            hospital = Hospital(name="Cap Hospital")
+            db.session.add(hospital)
+            db.session.flush()
+            building = Building(hospital_id=hospital.id, name="Main")
+            db.session.add(building)
+            db.session.flush()
+            extra = AHU_DELETE_LIMIT + 5
+            for n in range(extra):
+                db.session.add(
+                    AHU(
+                        hospital_id=hospital.id,
+                        building_id=building.id,
+                        name=f"AHU-{n + 1}",
+                        location="Roof",
+                    )
+                )
+            db.session.commit()
+            ids = [r[0] for r in db.session.query(AHU.id).all()]
+            result = delete_ahus_by_ids(ids)
+            db.session.commit()
+            assert_eq(result["ahus"], AHU_DELETE_LIMIT, "admin delete still caps")
+            leftover = AHU.query.count()
+            assert_eq(leftover, 5, "units beyond the cap stay")
+            assert db.session.get(Building, building.id) is not None
+    finally:
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
 def main():
     test_normalize_ahu_ids()
     test_delete_ahus_by_ids_removes_related_and_keeps_the_rest()
+    test_delete_ahus_by_ids_keeps_admin_cap()
+    test_fresh_start_clears_more_ahus_than_the_admin_delete_cap()
     print("ahu_delete tests passed")
 
 

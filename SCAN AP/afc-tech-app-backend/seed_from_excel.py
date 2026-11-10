@@ -7,11 +7,11 @@ from datetime import datetime, date, timedelta
 
 import pandas as pd
 import openpyxl
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 from db import db
-from models import Hospital, AHU, Filter, Building, Job, JobFilter, Notification
-from utility.ahu_delete import delete_ahus_by_ids
+from models import Hospital, AHU, Filter, Building, Job, JobFilter
+from utility.ahu_delete import clear_hospital_survey_records
 
 
 EXCEL_PATH = "./excel_data_raw/filter-datasheet.xlsm"
@@ -713,55 +713,6 @@ def upsert_hospital(name: str, hospital_id=None):
     db.session.add(h)
     db.session.flush()
     return h, True
-
-
-def clear_hospital_survey_records(hospital_id):
-    """
-    Delete AHUs/filters/buildings (and jobs on those AHUs) for one hospital.
-    Keeps the hospital row so Import can reload the workbook onto the same site.
-    """
-    try:
-        hid = int(hospital_id)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("hospital_id must be an integer") from exc
-
-    hospital = db.session.get(Hospital, hid)
-    if not hospital:
-        raise ValueError(f"Hospital id {hid} was not found")
-
-    building_ids = [r[0] for r in db.session.query(Building.id).filter_by(hospital_id=hid).all()]
-    ahu_q = db.session.query(AHU.id).filter(AHU.hospital_id == hid)
-    if building_ids:
-        ahu_q = db.session.query(AHU.id).filter(
-            or_(AHU.hospital_id == hid, AHU.building_id.in_(building_ids))
-        )
-    ahu_ids = [r[0] for r in ahu_q.all()]
-
-    counts = {
-        "ahus": 0,
-        "filters": 0,
-        "jobs": 0,
-        "buildings": len(building_ids),
-    }
-
-    db.session.query(Notification).filter(Notification.hospital_id == hid).delete(
-        synchronize_session=False
-    )
-
-    if ahu_ids:
-        deleted = delete_ahus_by_ids(ahu_ids)
-        counts["ahus"] = deleted["ahus"]
-        counts["filters"] = deleted["filters"]
-        counts["jobs"] = deleted["jobs"]
-
-    if building_ids:
-        db.session.query(Building).filter(Building.id.in_(building_ids)).delete(
-            synchronize_session=False
-        )
-
-    db.session.flush()
-    db.session.expire_all()
-    return counts
 
 
 def upsert_building(hospital_id: int, name: str, floor_area: str = None):
