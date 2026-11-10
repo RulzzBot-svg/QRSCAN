@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAdminHospitals, getAdminUpcoming } from "../../api/admin";
+import { API } from "../../api/api";
+import { fetchFiltersByAhuIds, getAdminHospitals, getAdminUpcoming } from "../../api/admin";
 import { formatDate } from "../../utils/dates";
 import { frequencyLabel } from "../../client/format";
+import HospitalFrequencyCalendar from "./HospitalFrequencyCalendar";
 import HospitalSettingsModal from "./HospitalSettingsModal";
 
 const FREQUENCIES = [
@@ -154,6 +156,8 @@ function AdminHospitals() {
   const [freqKey, setFreqKey] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [calendarSource, setCalendarSource] = useState(null);
+  const [calendarLoading, setCalendarLoading] = useState(true);
 
   const usingDates = freqKey === "dates";
   const frequencyDays = usingDates || freqKey === "all" ? null : Number(freqKey);
@@ -190,6 +194,32 @@ function AdminHospitals() {
     // Frequency options are client-side; only the default window vs From–To hits the API.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcomingQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCalendar = async () => {
+      setCalendarLoading(true);
+      try {
+        const ahusRes = await API.get("/admin/ahus");
+        const ahus = Array.isArray(ahusRes.data) ? ahusRes.data : [];
+        const filtersByAhu = await fetchFiltersByAhuIds(
+          ahus.map((a) => a.id),
+          { includeInactive: false }
+        );
+        if (cancelled) return;
+        setCalendarSource({ hospitals, ahus, filtersByAhu });
+      } catch (err) {
+        console.error("Failed to load frequency calendar", err);
+        if (!cancelled) setCalendarSource({ hospitals, ahus: [], filtersByAhu: {} });
+      } finally {
+        if (!cancelled) setCalendarLoading(false);
+      }
+    };
+    loadCalendar();
+    return () => {
+      cancelled = true;
+    };
+  }, [hospitals]);
 
   const dueById = useMemo(() => {
     const map = new Map();
@@ -245,7 +275,7 @@ function AdminHospitals() {
   };
 
   return (
-    <div className="max-w-6xl min-w-0">
+    <div className="max-w-[96rem] min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
           <h1 className="text-2xl font-bold">Hospitals</h1>
@@ -257,6 +287,8 @@ function AdminHospitals() {
           {loading ? <span className="loading loading-spinner loading-xs" /> : "↻ Refresh"}
         </button>
       </div>
+
+      <HospitalFrequencyCalendar source={calendarSource} loading={calendarLoading} />
 
       {usingDates ? (
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 mb-5">
