@@ -67,3 +67,5 @@ export const MONTH_LABELS = [
   "NOVEMBER",
   "DECEMBER",
 ];
+
+export const MONTH_SHORT = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];

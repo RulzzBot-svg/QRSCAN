@@ -1,4 +1,4 @@
-import { monthsForFilter, buildFrequencyCalendar } from "../src/utils/hospitalFrequencyCalendar.js";
+import { monthsForFilter, buildFrequencyCalendar, slicesForMonth } from "../src/utils/hospitalFrequencyCalendar.js";
 import { frequencyColor, frequencyShortLabel } from "../src/utils/frequencyColors.js";
 
 function assert(cond, message) {
@@ -38,11 +38,12 @@ assert(grid.rows.length === 2, "both hospitals listed");
 const choc = grid.rows.find((r) => r.name === "CHOC");
 assert(choc.freqs.get(30).has(1) && choc.freqs.get(30).has(12), "CHOC 30-day paints Jan and Dec");
 assert(choc.freqs.get(90).has(4), "CHOC 90-day paints April");
-const jan = grid.months[0];
-assert(jan.freqs.includes(30) && jan.freqs.includes(90), "January shows frequencies that are due");
-assert(!jan.freqs.includes(365), "January hides 365 when nobody is due");
-const oct = grid.months[9];
-assert(oct.freqs.includes(365), "October shows 365 for Huntington");
+const janSlices = slicesForMonth(choc, 1);
+assert(janSlices[0] === 30 && janSlices[1] === 90, `January CHOC splits 30+90, got ${janSlices}`);
+assert(slicesForMonth(choc, 2).length === 1 && slicesForMonth(choc, 2)[0] === 30, "February CHOC is 30-day only");
+const hunt = grid.rows.find((r) => r.name === "Huntington");
+assert(slicesForMonth(hunt, 10)[0] === 365, "October Huntington is 365-day");
+assert(slicesForMonth(hunt, 1).length === 0, "January Huntington is empty");
 
 assert(frequencyColor(30) === "#FFFF99", "30-day yellow");
 assert(frequencyShortLabel(730) === "2 YEARS", "2-year short label");

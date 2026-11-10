@@ -122,3 +122,16 @@ export function buildFrequencyCalendar({ hospitals = [], ahus = [], filtersByAhu
 export function cellKey(hospitalId, year, month, freq) {
   return `${hospitalId}:${year}:${month}:${freq}`;
 }
+
+export function slicesForMonth(row, month) {
+  if (!row) return [];
+  if (row.cells) {
+    const raw = row.cells[String(month)] ?? row.cells[month] ?? [];
+    return [...raw].map(Number).filter((n) => n > 0).sort((a, b) => a - b);
+  }
+  const freqs = [];
+  for (const [freq, months] of row.freqs || []) {
+    if (months.has(month)) freqs.push(Number(freq));
+  }
+  return freqs.sort((a, b) => a - b);
+}

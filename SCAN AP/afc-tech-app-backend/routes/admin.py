@@ -9,6 +9,7 @@ from datetime import datetime, date
 from middleware.auth import require_admin
 from middleware.pin_utils import hash_pin
 from utility.http import internal_error, validate_signature_payload
+from utility.hospital_frequency_calendar import frequency_calendar_payload
 import subprocess
 import tempfile
 import time
@@ -138,6 +139,23 @@ def get_hospitals():
         return jsonify([_hospital_settings_dict(h) for h in hospitals]), 200
     except Exception as e:
         print(f"Error fetching hospitals: {e}")
+        return internal_error(e)
+
+
+@admin_bp.route("/frequency-calendar", methods=["GET"])
+@require_admin
+def get_frequency_calendar():
+    """One compact year of hospital changeout months (no full filter payloads)."""
+    try:
+        raw = request.args.get("year")
+        year = int(raw) if raw else date.today().year
+        if year < 2000 or year > 2100:
+            return jsonify({"error": "year out of range"}), 400
+        return jsonify(frequency_calendar_payload(year)), 200
+    except ValueError:
+        return jsonify({"error": "year must be an integer"}), 400
+    except Exception as e:
+        print(f"Error building frequency calendar: {e}")
         return internal_error(e)
 
 
