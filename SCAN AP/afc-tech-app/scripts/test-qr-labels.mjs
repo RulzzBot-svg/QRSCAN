@@ -199,12 +199,12 @@ const banner = buildQrPrintDocument(
 );
 assert(banner.includes("layout-zebra-banner"), "banner design should set its layout class");
 assert(banner.includes("class=\"band\""), "banner design should use a top bar");
-assert(banner.includes("height: 0.22in"), "banner bar stays a thin strip");
-assert(banner.includes("class=\"print-zebra\""), "print document pins the 4x2 page");
-assert(banner.includes("left: 0"), "banner bar is pinned to the left edge");
-assert(banner.includes("right: 0"), "banner bar is pinned to the right edge");
-assert(banner.includes("width: 100%"), "banner bar spans the full label width");
-assert(banner.includes("box-shadow: 0 0 0 0.08in #000"), "banner bleeds so print corners stay black");
+assert(banner.includes("height: 0.30in"), "banner bar is tall enough to sit type below the top edge");
+assert(banner.includes("class=\"print-zebra print-zebra-banner\""), "print document pins the 4x2 banner page");
+assert(banner.includes("left: -0.1in"), "banner bar overruns the left edge");
+assert(banner.includes("width: 4.2in"), "banner bar overruns the right edge so the corner stays black");
+assert(banner.includes("align-items: flex-end"), "company name and phone sit lower in the bar");
+assert(banner.includes("html.print-zebra-banner"), "print page fill is black behind the banner");
 assert(banner.includes("1.42in"), "banner QR is large enough for the bigger AFC mark");
 assert(banner.includes("ADVANCED FILTRATION CONCEPTS"), "banner still names the company");
 assert(banner.includes("323.832.8316"), "banner still shows the phone");

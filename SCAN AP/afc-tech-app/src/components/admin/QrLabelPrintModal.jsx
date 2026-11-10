@@ -327,20 +327,24 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
   );
 
   return (
-    <div className="border border-base-300 rounded bg-white text-black overflow-hidden">
+    <div
+      className={`border border-base-300 text-black overflow-hidden ${
+        banner ? "bg-black rounded-none" : "bg-white rounded"
+      }`}
+    >
       <div
-        className="flex flex-col bg-white overflow-hidden w-full"
+        className={`flex flex-col overflow-hidden w-full ${banner ? "bg-black" : "bg-white"}`}
         style={{ aspectRatio: "2 / 1" }}
       >
         {banner ? (
-          <div className="bg-black text-white flex items-center justify-between gap-2 px-2 py-[3px] shrink-0 w-full self-stretch">
-            <span className="text-[8px] font-extrabold uppercase tracking-wide truncate">
+          <div className="bg-black text-white flex items-end justify-between gap-2 px-2 pt-2 pb-1 shrink-0 w-full self-stretch">
+            <span className="text-[8px] font-extrabold uppercase tracking-wide truncate leading-none pt-0.5">
               {AFC_COMPANY_NAME}
             </span>
-            <span className="text-[9px] font-extrabold shrink-0">{AFC_PHONE}</span>
+            <span className="text-[9px] font-extrabold shrink-0 leading-none pt-0.5">{AFC_PHONE}</span>
           </div>
         ) : null}
-        <div className={`flex items-stretch flex-1 min-h-0 ${flip ? "flex-row-reverse" : ""}`}>
+        <div className={`flex items-stretch flex-1 min-h-0 bg-white ${flip ? "flex-row-reverse" : ""}`}>
           {qr}
           {copy}
         </div>
