@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import { monthsForFilter, buildFrequencyCalendar, slicesForMonth, cellKey, monthKey } from "../src/utils/hospitalFrequencyCalendar.js";
+import { monthsForFilter, buildFrequencyCalendar, slicesForMonth, frequenciesForMonth, cellKey, monthKey } from "../src/utils/hospitalFrequencyCalendar.js";
 import { frequencyColor, frequencyShortLabel } from "../src/utils/frequencyColors.js";
 
 function assert(cond, message) {
@@ -48,6 +48,11 @@ assert(oct.freqs.includes(365), "October shows 365 for Huntington");
 const janSlices = slicesForMonth(choc, 1);
 assert(janSlices[0] === 30 && janSlices[1] === 90, `January CHOC splits 30+90, got ${janSlices}`);
 assert(slicesForMonth({ cells: { "2026-01": [90, 30] } }, "2026-01").join(",") === "30,90", "API cells split by month key");
+assert(
+  frequenciesForMonth([{ cells: { "2026-01": [90] } }, { cells: { "2026-01": [30, 90] } }], "2026-01").join(",") ===
+    "30,90",
+  "month frequency columns include every cadence due that month"
+);
 assert(monthKey(2027, 3) === "2027-03", "month key is YYYY-MM");
 assert(cellKey(1, "2026-01", 90) === "1:2026-01:90", "check key includes the 24-month slot");
 
@@ -55,7 +60,7 @@ assert(frequencyColor(30) === "#FFFF99", "30-day yellow");
 assert(frequencyShortLabel(730) === "2 YEARS", "2-year short label");
 
 const css = readFileSync(new URL("../src/index.css", import.meta.url), "utf8");
-assert(css.includes("flex-direction: column"), "month square splits with a horizontal cut");
-assert(css.includes("inset 0 1px 0"), "stacked cadences share a horizontal seam");
+assert(css.includes(".freq-cal .freq-h"), "Excel cadence labels sit under each month");
+assert(css.includes(".freq-cal .freq-cell"), "each cadence keeps its own cell");
 
 console.log("hospitalFrequencyCalendar tests passed");
