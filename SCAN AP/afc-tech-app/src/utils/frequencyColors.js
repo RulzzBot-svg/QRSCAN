@@ -53,6 +53,8 @@ export function frequencyShortLabel(days) {
   return map[n] || `${n} DAY`;
 }
 
+export const MONTH_SHORT = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
 export const MONTH_LABELS = [
   "JANUARY",
   "FEBRUARY",
