@@ -119,6 +119,27 @@ export function buildFrequencyCalendar({ hospitals = [], ahus = [], filtersByAhu
   return { year: y, frequencies, months, rows };
 }
 
-export function cellKey(hospitalId, year, month, freq) {
-  return `${hospitalId}:${year}:${month}:${freq}`;
+export function monthKey(year, month) {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
+}
+
+export function cellKey(hospitalId, monthKeyValue, freq) {
+  return `${hospitalId}:${monthKeyValue}:${freq}`;
+}
+
+export function slicesForMonth(row, key) {
+  if (!row) return [];
+  if (row.cells) {
+    const raw = row.cells[key] ?? row.cells[String(key)] ?? [];
+    return [...raw]
+      .map(Number)
+      .filter((n) => n > 0)
+      .sort((a, b) => a - b);
+  }
+  const freqs = [];
+  const month = Number(String(key).slice(-2));
+  for (const [freq, months] of row.freqs || []) {
+    if (months.has(month)) freqs.push(Number(freq));
+  }
+  return freqs.sort((a, b) => a - b);
 }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API } from "../../api/api";
-import { fetchFiltersByAhuIds, getAdminHospitals, getAdminUpcoming } from "../../api/admin";
+import { getAdminHospitals, getAdminUpcoming } from "../../api/admin";
 import { formatDate } from "../../utils/dates";
 import { frequencyLabel } from "../../client/format";
 import HospitalFrequencyCalendar from "./HospitalFrequencyCalendar";
@@ -156,8 +155,6 @@ function AdminHospitals() {
   const [freqKey, setFreqKey] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [calendarSource, setCalendarSource] = useState(null);
-  const [calendarLoading, setCalendarLoading] = useState(true);
 
   const usingDates = freqKey === "dates";
   const frequencyDays = usingDates || freqKey === "all" ? null : Number(freqKey);
@@ -194,32 +191,6 @@ function AdminHospitals() {
     // Frequency options are client-side; only the default window vs From–To hits the API.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcomingQuery]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadCalendar = async () => {
-      setCalendarLoading(true);
-      try {
-        const ahusRes = await API.get("/admin/ahus");
-        const ahus = Array.isArray(ahusRes.data) ? ahusRes.data : [];
-        const filtersByAhu = await fetchFiltersByAhuIds(
-          ahus.map((a) => a.id),
-          { includeInactive: false }
-        );
-        if (cancelled) return;
-        setCalendarSource({ hospitals, ahus, filtersByAhu });
-      } catch (err) {
-        console.error("Failed to load frequency calendar", err);
-        if (!cancelled) setCalendarSource({ hospitals, ahus: [], filtersByAhu: {} });
-      } finally {
-        if (!cancelled) setCalendarLoading(false);
-      }
-    };
-    loadCalendar();
-    return () => {
-      cancelled = true;
-    };
-  }, [hospitals]);
 
   const dueById = useMemo(() => {
     const map = new Map();
@@ -288,8 +259,6 @@ function AdminHospitals() {
         </button>
       </div>
 
-      <HospitalFrequencyCalendar source={calendarSource} loading={calendarLoading} />
-
       {usingDates ? (
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 mb-5">
           <div className="text-xs uppercase tracking-wide text-primary font-semibold">Due in this range</div>
@@ -314,6 +283,8 @@ function AdminHospitals() {
           </div>
         </div>
       )}
+
+      <HospitalFrequencyCalendar />
 
       <div className="flex flex-wrap items-end gap-3 mb-5">
         {usingDates ? null : (

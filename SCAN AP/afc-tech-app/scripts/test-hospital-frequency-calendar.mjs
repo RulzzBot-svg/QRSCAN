@@ -1,4 +1,4 @@
-import { monthsForFilter, buildFrequencyCalendar } from "../src/utils/hospitalFrequencyCalendar.js";
+import { monthsForFilter, buildFrequencyCalendar, slicesForMonth, cellKey, monthKey } from "../src/utils/hospitalFrequencyCalendar.js";
 import { frequencyColor, frequencyShortLabel } from "../src/utils/frequencyColors.js";
 
 function assert(cond, message) {
@@ -43,6 +43,12 @@ assert(jan.freqs.includes(30) && jan.freqs.includes(90), "January shows frequenc
 assert(!jan.freqs.includes(365), "January hides 365 when nobody is due");
 const oct = grid.months[9];
 assert(oct.freqs.includes(365), "October shows 365 for Huntington");
+
+const janSlices = slicesForMonth(choc, 1);
+assert(janSlices[0] === 30 && janSlices[1] === 90, `January CHOC splits 30+90, got ${janSlices}`);
+assert(slicesForMonth({ cells: { "2026-01": [90, 30] } }, "2026-01").join(",") === "30,90", "API cells split by month key");
+assert(monthKey(2027, 3) === "2027-03", "month key is YYYY-MM");
+assert(cellKey(1, "2026-01", 90) === "1:2026-01:90", "check key includes the 24-month slot");
 
 assert(frequencyColor(30) === "#FFFF99", "30-day yellow");
 assert(frequencyShortLabel(730) === "2 YEARS", "2-year short label");
