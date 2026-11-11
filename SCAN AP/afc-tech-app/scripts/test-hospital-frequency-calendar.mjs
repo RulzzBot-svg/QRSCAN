@@ -62,5 +62,6 @@ assert(frequencyShortLabel(730) === "2 YEARS", "2-year short label");
 const css = readFileSync(new URL("../src/index.css", import.meta.url), "utf8");
 assert(css.includes("flex-direction: column"), "month square splits with a horizontal cut");
 assert(css.includes("inset 0 1px 0"), "stacked cadences share a horizontal seam");
+assert(!/\.freq-cal \{[^}]*min-width:\s*100%/.test(css), "calendar table does not stretch and leave a gap after hospital names");
 
 console.log("hospitalFrequencyCalendar tests passed");
