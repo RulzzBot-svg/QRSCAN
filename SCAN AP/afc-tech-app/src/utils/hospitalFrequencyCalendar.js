@@ -143,3 +143,11 @@ export function slicesForMonth(row, key) {
   }
   return freqs.sort((a, b) => a - b);
 }
+
+export function frequenciesForMonth(hospitals, key) {
+  const found = new Set();
+  for (const row of hospitals || []) {
+    for (const freq of slicesForMonth(row, key)) found.add(freq);
+  }
+  return [...found].sort((a, b) => a - b);
+}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getFrequencyCalendar } from "../../api/admin";
 import { calendarFrequencyColor, frequencyShortLabel } from "../../utils/frequencyColors";
-import { cellKey, slicesForMonth } from "../../utils/hospitalFrequencyCalendar";
+import { cellKey, frequenciesForMonth, slicesForMonth } from "../../utils/hospitalFrequencyCalendar";
 
 const CHECKS_KEY = "adminFreqCalendarChecks";
 
@@ -17,11 +17,11 @@ function loadChecks() {
 
 function CheckMark() {
   return (
-    <svg viewBox="0 0 20 20" className="w-3 h-3" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="w-4 h-4" aria-hidden="true">
       <path
         fill="none"
         stroke="#14532d"
-        strokeWidth="3"
+        strokeWidth="2.8"
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M4 10.8 8.1 15.2 16.2 5"
@@ -95,6 +95,14 @@ export default function HospitalFrequencyCalendar() {
   const safeYearIndex = Math.min(yearIndex, Math.max(yearGroups.length - 1, 0));
   const currentYear = yearGroups[safeYearIndex] || null;
   const visibleMonths = currentYear?.months || [];
+  const monthCols = useMemo(
+    () =>
+      visibleMonths.map((m) => ({
+        ...m,
+        freqs: frequenciesForMonth(display?.hospitals, m.key),
+      })),
+    [visibleMonths, display]
+  );
 
   const toggle = (hospitalId, key, freq) => {
     const id = cellKey(hospitalId, key, freq);
@@ -127,8 +135,7 @@ export default function HospitalFrequencyCalendar() {
         <div className="border-t border-base-300">
           <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-3 pb-2">
             <p className="text-xs text-base-content/60">
-              Each month is one square. If a hospital has more than one cadence that month, the square splits across.
-              Click a color to check it off.
+              Months light up by cadence. Click a colored cell to check it off.
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -184,44 +191,63 @@ export default function HospitalFrequencyCalendar() {
               <table className="freq-cal">
                 <thead>
                   <tr>
-                    <th className="name-col">HOSPITAL</th>
-                    {visibleMonths.map((m) => (
-                      <th key={m.key} className="month-h">
+                    <th rowSpan={2} className="name-col">
+                      HOSPITALS / MONTHS
+                    </th>
+                    {monthCols.map((m) => (
+                      <th key={m.key} className="month-h" colSpan={Math.max(m.freqs.length, 1)}>
                         {m.label}
                       </th>
                     ))}
+                  </tr>
+                  <tr>
+                    {monthCols.map((m) =>
+                      m.freqs.length ? (
+                        m.freqs.map((freq) => (
+                          <th
+                            key={`${m.key}-${freq}`}
+                            className="freq-h"
+                            style={{ backgroundColor: calendarFrequencyColor(freq) }}
+                          >
+                            {frequencyShortLabel(freq)}
+                          </th>
+                        ))
+                      ) : (
+                        <th key={`${m.key}-empty`} className="freq-h freq-h-empty" />
+                      )
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {(display.hospitals || []).map((row) => (
                     <tr key={row.id ?? row.name}>
                       <th className="name-col">{row.name}</th>
-                      {visibleMonths.map((m) => {
-                        const slices = slicesForMonth(row, m.key);
-                        return (
-                          <td key={`${row.id}-${m.key}`} className="cell">
-                            <div className={`freq-month ${slices.length ? "" : "is-empty"}`}>
-                              {slices.map((freq) => {
-                                const checked = Boolean(checks[cellKey(row.id, m.key, freq)]);
-                                return (
-                                  <button
-                                    key={freq}
-                                    type="button"
-                                    className={`freq-slice ${checked ? "is-checked" : ""}`}
-                                    style={{ backgroundColor: calendarFrequencyColor(freq) }}
-                                    aria-pressed={checked}
-                                    aria-label={`${row.name} ${m.label} ${m.year} ${frequencyShortLabel(freq)}${checked ? " checked" : ""}`}
-                                    title={`${row.name} · ${m.label} ${m.year} · ${frequencyShortLabel(freq)}`}
-                                    onClick={() => toggle(row.id, m.key, freq)}
-                                  >
-                                    {checked ? <CheckMark /> : null}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        );
-                      })}
+                      {monthCols.map((m) =>
+                        (m.freqs.length ? m.freqs : [null]).map((freq) => {
+                          if (freq == null) {
+                            return <td key={`${row.id}-${m.key}-empty`} className="cell" />;
+                          }
+                          const on = slicesForMonth(row, m.key).includes(freq);
+                          const checked = Boolean(checks[cellKey(row.id, m.key, freq)]);
+                          return (
+                            <td key={`${row.id}-${m.key}-${freq}`} className="cell">
+                              {on ? (
+                                <button
+                                  type="button"
+                                  className={`freq-cell ${checked ? "is-checked" : ""}`}
+                                  style={{ backgroundColor: calendarFrequencyColor(freq) }}
+                                  aria-pressed={checked}
+                                  aria-label={`${row.name} ${m.label} ${m.year} ${frequencyShortLabel(freq)}${checked ? " checked" : ""}`}
+                                  title={`${row.name} · ${m.label} ${m.year} · ${frequencyShortLabel(freq)}`}
+                                  onClick={() => toggle(row.id, m.key, freq)}
+                                >
+                                  {checked ? <CheckMark /> : null}
+                                </button>
+                              ) : null}
+                            </td>
+                          );
+                        })
+                      )}
                     </tr>
                   ))}
                 </tbody>
