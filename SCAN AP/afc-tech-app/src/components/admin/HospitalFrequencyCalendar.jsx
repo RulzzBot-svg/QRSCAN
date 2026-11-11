@@ -33,6 +33,7 @@ function CheckMark() {
 export default function HospitalFrequencyCalendar() {
   const [open, setOpen] = useState(false);
   const [display, setDisplay] = useState(null);
+  const [yearIndex, setYearIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [checks, setChecks] = useState(loadChecks);
@@ -91,6 +92,10 @@ export default function HospitalFrequencyCalendar() {
     return groups;
   }, [display]);
 
+  const safeYearIndex = Math.min(yearIndex, Math.max(yearGroups.length - 1, 0));
+  const currentYear = yearGroups[safeYearIndex] || null;
+  const visibleMonths = currentYear?.months || [];
+
   const toggle = (hospitalId, key, freq) => {
     const id = cellKey(hospitalId, key, freq);
     setChecks((prev) => {
@@ -100,11 +105,6 @@ export default function HospitalFrequencyCalendar() {
       return next;
     });
   };
-
-  const rangeLabel =
-    display?.start && display?.end
-      ? `${display.start.slice(0, 4)} – ${display.end.slice(0, 4)}`
-      : "24 months";
 
   return (
     <section className="rounded-xl border border-base-300 bg-base-100 mb-5 overflow-hidden">
@@ -118,7 +118,7 @@ export default function HospitalFrequencyCalendar() {
         <span className="flex-1 min-w-0">
           <span className="font-semibold block">Frequency calendar</span>
           <span className="text-xs text-base-content/50">
-            24 months of changeout cadence. Opens on click so this page stays fast.
+            This year and next. Opens on click so this page stays fast.
           </span>
         </span>
       </button>
@@ -127,10 +127,32 @@ export default function HospitalFrequencyCalendar() {
         <div className="border-t border-base-300">
           <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-3 pb-2">
             <p className="text-xs text-base-content/60">
-              Each month is one square. If a hospital has more than one cadence that month, the square splits. Click a
-              color to check it off.
+              Each month is one square. If a hospital has more than one cadence that month, the square splits across.
+              Click a color to check it off.
             </p>
-            <div className="text-sm font-semibold tabular-nums">{rangeLabel}</div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                disabled={safeYearIndex <= 0}
+                onClick={() => setYearIndex((i) => Math.max(0, i - 1))}
+                aria-label="Previous year"
+              >
+                ‹
+              </button>
+              <div className="text-sm font-semibold tabular-nums min-w-[3.5rem] text-center">
+                {currentYear?.year ?? ""}
+              </div>
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                disabled={safeYearIndex >= yearGroups.length - 1}
+                onClick={() => setYearIndex((i) => Math.min(yearGroups.length - 1, i + 1))}
+                aria-label="Next year"
+              >
+                ›
+              </button>
+            </div>
           </div>
 
           {legend.length ? (
@@ -162,17 +184,8 @@ export default function HospitalFrequencyCalendar() {
               <table className="freq-cal">
                 <thead>
                   <tr>
-                    <th className="name-col" rowSpan={2}>
-                      HOSPITAL
-                    </th>
-                    {yearGroups.map((group) => (
-                      <th key={group.year} className="year-h" colSpan={group.months.length}>
-                        {group.year}
-                      </th>
-                    ))}
-                  </tr>
-                  <tr>
-                    {(display.months || []).map((m) => (
+                    <th className="name-col">HOSPITAL</th>
+                    {visibleMonths.map((m) => (
                       <th key={m.key} className="month-h">
                         {m.label}
                       </th>
@@ -183,7 +196,7 @@ export default function HospitalFrequencyCalendar() {
                   {(display.hospitals || []).map((row) => (
                     <tr key={row.id ?? row.name}>
                       <th className="name-col">{row.name}</th>
-                      {(display.months || []).map((m) => {
+                      {visibleMonths.map((m) => {
                         const slices = slicesForMonth(row, m.key);
                         return (
                           <td key={`${row.id}-${m.key}`} className="cell">
