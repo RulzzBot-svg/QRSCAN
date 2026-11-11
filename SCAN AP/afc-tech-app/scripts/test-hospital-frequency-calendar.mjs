@@ -1,3 +1,4 @@
+import { readFileSync } from "fs";
 import { monthsForFilter, buildFrequencyCalendar, slicesForMonth, cellKey, monthKey } from "../src/utils/hospitalFrequencyCalendar.js";
 import { frequencyColor, frequencyShortLabel } from "../src/utils/frequencyColors.js";
 
@@ -52,5 +53,9 @@ assert(cellKey(1, "2026-01", 90) === "1:2026-01:90", "check key includes the 24-
 
 assert(frequencyColor(30) === "#FFFF99", "30-day yellow");
 assert(frequencyShortLabel(730) === "2 YEARS", "2-year short label");
+
+const css = readFileSync(new URL("../src/index.css", import.meta.url), "utf8");
+assert(css.includes("flex-direction: column"), "month square splits with a horizontal cut");
+assert(css.includes("inset 0 1px 0"), "stacked cadences share a horizontal seam");
 
 console.log("hospitalFrequencyCalendar tests passed");
