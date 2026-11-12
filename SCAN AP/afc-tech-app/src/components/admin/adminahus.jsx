@@ -42,6 +42,7 @@ const naturalAhuSort = (a, b) => {
 function AdminAHUs() {
   const [searchParams] = useSearchParams();
   const hospitalFromUrl = searchParams.get("hospital");
+  const ahuFromUrl = searchParams.get("ahu");
   const [ahus, setAhus] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -113,6 +114,23 @@ function AdminAHUs() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (hospitalFromUrl) {
+      setSelectedHospitalKey(String(hospitalFromUrl));
+      setShowAllHospitals(true);
+    }
+  }, [hospitalFromUrl]);
+
+  useEffect(() => {
+    if (!ahuFromUrl || !ahus.length) return;
+    const target = ahus.find((a) => String(a.id) === String(ahuFromUrl));
+    if (!target) return;
+    if (target.hospital_id != null) {
+      setSelectedHospitalKey(String(target.hospital_id));
+      setShowAllHospitals(true);
+    }
+  }, [ahuFromUrl, ahus]);
+
   // helper to refresh data after mutations
   const refreshData = async () => {
     setPreloadedFiltersByAhu({});
@@ -155,7 +173,7 @@ function AdminAHUs() {
   // NOTE: This is your existing "Search ALL AHUs..." behavior (searches through all AHUs)
   const filtered = useMemo(() => {
     const q = (ahuQuery || "").toLowerCase();
-    return ahus.filter((a) => {
+    const list = ahus.filter((a) => {
       if (selectedHospitalKey && String(a.hospital_id) !== String(selectedHospitalKey)) return false;
       if (!q) return true;
       return (
@@ -166,7 +184,11 @@ function AdminAHUs() {
         String(a.excel_block || a.group || a.display_name || "").toLowerCase().includes(q)
       );
     });
-  }, [ahus, ahuQuery, selectedHospitalKey]);
+    if (!ahuFromUrl) return list;
+    const hit = list.find((a) => String(a.id) === String(ahuFromUrl));
+    if (!hit) return list;
+    return [hit, ...list.filter((a) => a !== hit)];
+  }, [ahus, ahuQuery, selectedHospitalKey, ahuFromUrl]);
 
   const selectedAhus = useMemo(
     () => filtered.filter((a) => selected[a.id] || selected[String(a.id)]),
@@ -177,6 +199,14 @@ function AdminAHUs() {
     () => filtered.slice(0, visibleAhus),
     [filtered, visibleAhus]
   );
+
+  useEffect(() => {
+    if (!ahuFromUrl || loading) return;
+    const el = document.getElementById(`admin-ahu-${ahuFromUrl}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [ahuFromUrl, loading, visibleAhusList]);
+
   const selectedHospitalName = useMemo(
     () => grouped.find((g) => String(g.hospitalKey) === String(selectedHospitalKey))?.hospitalName || "",
     [grouped, selectedHospitalKey]
@@ -461,7 +491,7 @@ function AdminAHUs() {
     <div data-theme="corporate" className="bg-base-200">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold">Admin — AHUs & Filters</h1>
+          <h1 className="text-lg sm:text-xl font-bold">Surveys</h1>
           <div className="text-xs opacity-70">Compact view with always-visible filters</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -661,28 +691,6 @@ function AdminAHUs() {
                   </button>
                 </div>
               </div>
-              <div className="hidden md:flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-normal">
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  <span className="badge badge-error badge-xs">Overdue</span>
-                  = past due
-                </span>
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  <span className="badge badge-warning badge-xs">Due Soon</span>
-                  = within 14 days
-                </span>
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  <span className="badge badge-info badge-xs">540 Days</span>
-                  = 18 Months
-                </span>
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  <span className="badge badge-info badge-xs">2yr</span>
-                  = 730 days
-                </span>
-                <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                  <span className="badge badge-info badge-xs">3yr</span>
-                  = 1095 days
-                </span>
-              </div>
             </div>
 
             {/* ✅ NEW: GLOBAL FILTER BAR (independent of the tables) */}
@@ -767,8 +775,15 @@ function AdminAHUs() {
                 </div>
               ) : null}
               {visibleAhusList.map((a) => {
+                const focused = ahuFromUrl && String(a.id) === String(ahuFromUrl);
                 return (
-                  <div key={`${a.id}-${filtersReloadToken}`} className="border border-base-300 rounded-lg overflow-hidden">
+                  <div
+                    key={`${a.id}-${filtersReloadToken}`}
+                    id={`admin-ahu-${a.id}`}
+                    className={`border rounded-lg overflow-hidden ${
+                      focused ? "border-primary ring-2 ring-primary/40" : "border-base-300"
+                    }`}
+                  >
                     {/* Compact AHU header */}
                     <div className="bg-base-200 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-3 flex-1 min-w-0">

@@ -96,27 +96,37 @@ body {
   overflow-x: auto;
   padding-bottom: 0.5rem;
   width: 100%;
+  min-width: 0;
 }
 .freq-cal {
-  border-collapse: separate;
-  border-spacing: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   width: 100%;
-  table-layout: auto;
+  min-width: 0;
   font-size: 10px;
+}
+.freq-cal-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 3px;
+  align-items: stretch;
 }
 .freq-cal .name-col {
   position: sticky;
   left: 0;
   z-index: 3;
   background: #fff;
-  width: 1%;
-  min-width: 8.5rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: left;
   padding: 0.4rem 0.6rem;
   font-weight: 700;
   white-space: nowrap;
 }
-.freq-cal thead .name-col,
+.freq-cal-row.is-head .name-col,
 .freq-cal .month-h {
   background: #1e4e8c;
   color: #fff;
@@ -126,13 +136,13 @@ body {
   font-weight: 700;
   padding: 0.35rem 0.3rem;
 }
-.freq-cal thead .name-col {
+.freq-cal-row.is-head .name-col {
   text-align: left;
   z-index: 4;
 }
 .freq-cal .month-h,
 .freq-cal .cell {
-  min-width: 2.4rem;
+  min-width: 0;
 }
 .freq-cal .cell {
   height: 2.7rem;

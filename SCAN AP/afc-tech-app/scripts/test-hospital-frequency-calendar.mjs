@@ -62,7 +62,13 @@ assert(frequencyShortLabel(730) === "2 YEARS", "2-year short label");
 const css = readFileSync(new URL("../src/index.css", import.meta.url), "utf8");
 assert(css.includes("flex-direction: column"), "month square splits with a horizontal cut");
 assert(css.includes("inset 0 1px 0"), "stacked cadences share a horizontal seam");
-assert(/\n\.freq-cal \{\n[\s\S]*?width: 100%;/.test(css), "calendar table fills the card width");
-assert(css.includes("width: 1%"), "hospital names stay shrink-wrapped so leftover width goes to months");
+assert(!/\.freq-cal \{[^}]*min-width:\s*100%/.test(css), "calendar does not dump leftover width into hospital names");
+assert(!/\.freq-cal \{[^}]*width:\s*max-content/.test(css), "calendar is not shrink-wrapped to month squares");
+assert(/\.freq-cal-row \{[^}]*width:\s*100%/.test(css), "calendar rows span the accordion");
+
+const calJsx = readFileSync(new URL("../src/components/admin/HospitalFrequencyCalendar.jsx", import.meta.url), "utf8");
+assert(calJsx.includes("freq-cal-row"), "calendar rows are a full-width grid");
+assert(calJsx.includes("max-content repeat("), "name column sizes to the hospital names");
+assert(calJsx.includes("minmax(0, 1fr)"), "month columns share leftover width");
 
 console.log("hospitalFrequencyCalendar tests passed");

@@ -1,11 +1,26 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { API } from "../../api/api";
 import { formatDate } from "../../utils/dates";
 
+function ahuSurveyPath(job) {
+  if (job?.ahu_id == null) return null;
+  const qs = new URLSearchParams();
+  qs.set("ahu", String(job.ahu_id));
+  if (job.hospital_id != null) qs.set("hospital", String(job.hospital_id));
+  return `/admin/ahus?${qs.toString()}`;
+}
 
 function AdminJobs() {
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
+
+  const openAhuInSurveys = (job) => {
+    const path = ahuSurveyPath(job);
+    if (!path) return;
+    navigate(path);
+  };
 
   useEffect(() => {
     API.get("/admin/jobs")
@@ -58,12 +73,35 @@ function AdminJobs() {
           <dialog className="modal modal-open">
             <div className="modal-box w-[calc(100%-1.5rem)] max-w-3xl max-h-[90vh]">
               <h3 className="font-bold text-xl text-primary mb-2">
-                Job #{selectedJob.id}
+                {ahuSurveyPath(selectedJob) ? (
+                  <button
+                    type="button"
+                    className="btn btn-link p-0 h-auto min-h-0 font-bold text-xl text-primary"
+                    onClick={() => openAhuInSurveys(selectedJob)}
+                    title="Open this AHU in Surveys"
+                  >
+                    Job #{selectedJob.id}
+                  </button>
+                ) : (
+                  <>Job #{selectedJob.id}</>
+                )}
               </h3>
 
               <div className="text-sm text-base-content/70 mb-4 space-y-1">
                 <div>
-                  <strong>AHU:</strong> {selectedJob.ahu_name}
+                  <strong>AHU:</strong>{" "}
+                  {ahuSurveyPath(selectedJob) ? (
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 h-auto min-h-0 font-semibold align-baseline"
+                      onClick={() => openAhuInSurveys(selectedJob)}
+                      title="Open this AHU in Surveys"
+                    >
+                      {selectedJob.ahu_name || `AHU ${selectedJob.ahu_id}`}
+                    </button>
+                  ) : (
+                    selectedJob.ahu_name
+                  )}
                   {" "}
                   {(selectedJob.building_name || selectedJob.hospital_name) ? (
                     <em className="text-sm">{`${selectedJob.building_name || ""}${selectedJob.building_name && selectedJob.hospital_name ? "-" : ""}${selectedJob.hospital_name || ""}`}</em>

@@ -102,8 +102,13 @@ export default function PackingSlipPanel({
 
   return (
     <>
-      <div className="mb-3 p-3 bg-base-100 border border-base-300 rounded-lg">
-        <div className="text-sm font-semibold mb-2">QuickBooks packing slip</div>
+      <details className="mb-3 bg-base-100 border border-base-300 rounded-lg group">
+        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2 text-sm font-semibold flex items-center gap-2">
+          <span className="text-xs text-base-content/40 transition-transform group-open:rotate-90">▶</span>
+          QuickBooks packing slip
+          {manualCount ? <span className="badge badge-xs badge-accent">{manualCount}</span> : null}
+        </summary>
+        <div className="px-3 pb-3">
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="text-xs opacity-70 block">Job completed from</label>
@@ -168,7 +173,8 @@ export default function PackingSlipPanel({
           Select all checks every filter on this hospital and copies. Or check AHUs one by one,
           then Copy for QuickBooks. In QB click QTY and press Ctrl+Alt+V — not Ctrl+V.
         </p>
-      </div>
+        </div>
+      </details>
 
       <PackingSlipReviewModal
         open={showJobReview}
