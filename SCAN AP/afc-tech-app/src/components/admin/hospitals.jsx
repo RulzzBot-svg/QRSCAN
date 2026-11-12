@@ -442,7 +442,7 @@ function AdminHospitals() {
                         className="btn btn-xs btn-outline"
                         onClick={() => openAhus(hospital.id)}
                       >
-                        Open in AHUs
+                        Open in Surveys
                       </button>
                     </div>
                     {dueCount === 0 ? (

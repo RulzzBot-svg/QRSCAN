@@ -95,6 +95,9 @@ export default function HospitalFrequencyCalendar() {
   const safeYearIndex = Math.min(yearIndex, Math.max(yearGroups.length - 1, 0));
   const currentYear = yearGroups[safeYearIndex] || null;
   const visibleMonths = currentYear?.months || [];
+  const calGridStyle = {
+    gridTemplateColumns: `max-content repeat(${Math.max(visibleMonths.length, 1)}, minmax(0, 1fr))`,
+  };
 
   const toggle = (hospitalId, key, freq) => {
     const id = cellKey(hospitalId, key, freq);
@@ -107,7 +110,7 @@ export default function HospitalFrequencyCalendar() {
   };
 
   return (
-    <section className="rounded-xl border border-base-300 bg-base-100 mb-5 overflow-hidden">
+    <section className="w-full min-w-0 rounded-xl border border-base-300 bg-base-100 mb-5 overflow-hidden">
       <button
         type="button"
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-base-200/60"
@@ -181,51 +184,49 @@ export default function HospitalFrequencyCalendar() {
             </div>
           ) : display ? (
             <div className="freq-cal-wrap px-2 pb-3">
-              <table className="freq-cal">
-                <thead>
-                  <tr>
-                    <th className="name-col">HOSPITAL</th>
-                    {visibleMonths.map((m) => (
-                      <th key={m.key} className="month-h">
-                        {m.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(display.hospitals || []).map((row) => (
-                    <tr key={row.id ?? row.name}>
-                      <th className="name-col">{row.name}</th>
-                      {visibleMonths.map((m) => {
-                        const slices = slicesForMonth(row, m.key);
-                        return (
-                          <td key={`${row.id}-${m.key}`} className="cell">
-                            <div className={`freq-month ${slices.length ? "" : "is-empty"}`}>
-                              {slices.map((freq) => {
-                                const checked = Boolean(checks[cellKey(row.id, m.key, freq)]);
-                                return (
-                                  <button
-                                    key={freq}
-                                    type="button"
-                                    className={`freq-slice ${checked ? "is-checked" : ""}`}
-                                    style={{ backgroundColor: calendarFrequencyColor(freq) }}
-                                    aria-pressed={checked}
-                                    aria-label={`${row.name} ${m.label} ${m.year} ${frequencyShortLabel(freq)}${checked ? " checked" : ""}`}
-                                    title={`${row.name} · ${m.label} ${m.year} · ${frequencyShortLabel(freq)}`}
-                                    onClick={() => toggle(row.id, m.key, freq)}
-                                  >
-                                    {checked ? <CheckMark /> : null}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
+              <div className="freq-cal">
+                <div className="freq-cal-row is-head" style={calGridStyle}>
+                  <div className="name-col">HOSPITAL</div>
+                  {visibleMonths.map((m) => (
+                    <div key={m.key} className="month-h">
+                      {m.label}
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+                {(display.hospitals || []).map((row) => (
+                  <div key={row.id ?? row.name} className="freq-cal-row" style={calGridStyle}>
+                    <div className="name-col" title={row.name}>
+                      {row.name}
+                    </div>
+                    {visibleMonths.map((m) => {
+                      const slices = slicesForMonth(row, m.key);
+                      return (
+                        <div key={`${row.id}-${m.key}`} className="cell">
+                          <div className={`freq-month ${slices.length ? "" : "is-empty"}`}>
+                            {slices.map((freq) => {
+                              const checked = Boolean(checks[cellKey(row.id, m.key, freq)]);
+                              return (
+                                <button
+                                  key={freq}
+                                  type="button"
+                                  className={`freq-slice ${checked ? "is-checked" : ""}`}
+                                  style={{ backgroundColor: calendarFrequencyColor(freq) }}
+                                  aria-pressed={checked}
+                                  aria-label={`${row.name} ${m.label} ${m.year} ${frequencyShortLabel(freq)}${checked ? " checked" : ""}`}
+                                  title={`${row.name} · ${m.label} ${m.year} · ${frequencyShortLabel(freq)}`}
+                                  onClick={() => toggle(row.id, m.key, freq)}
+                                >
+                                  {checked ? <CheckMark /> : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
         </div>

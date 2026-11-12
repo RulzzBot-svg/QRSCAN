@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 export const ADMIN_NAV = [
   { to: "/admin", label: "Dashboard", short: "Home", end: true, icon: "📊" },
   { to: "/admin/hospitals", label: "Hospitals", short: "Hospitals", icon: "🏥" },
-  { to: "/admin/ahus", label: "AHUs", short: "AHUs", icon: "🌀" },
+  { to: "/admin/ahus", label: "Surveys", short: "Surveys", icon: "🌀" },
   { to: "/admin/jobs", label: "Jobs", short: "Jobs", icon: "📋" },
   { to: "/admin/signoffs", label: "Signed Off", short: "Signed", icon: "📝" },
 ];
