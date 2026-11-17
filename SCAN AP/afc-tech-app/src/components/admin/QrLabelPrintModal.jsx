@@ -14,6 +14,7 @@ import {
   storeQrLogo,
   toBlackAndWhiteDataUrl,
   zebraHeadline,
+  buildingLine,
   hospitalLine,
   AFC_COMPANY_NAME,
   AFC_PHONE,
@@ -243,14 +244,12 @@ export default function QrLabelPrintModal({
                     alt={`QR for ${label.name}`}
                     className="mx-auto w-40 h-40"
                   />
-                  {(label.hospital || label.building) && (
-                    <div className="text-xs opacity-70 mt-2">
-                      {[label.hospital, label.building].filter(Boolean).join(" · ")}
-                    </div>
-                  )}
-                  <div className="font-semibold text-sm mt-1">{label.name}</div>
-                  {label.location ? (
-                    <div className="text-xs mt-0.5">{label.location}</div>
+                  <div className="font-semibold text-sm mt-2">{zebraHeadline(label)}</div>
+                  {buildingLine(label) ? (
+                    <div className="text-xs font-semibold mt-0.5">{buildingLine(label)}</div>
+                  ) : null}
+                  {hospitalLine(label) ? (
+                    <div className="text-base font-extrabold tracking-wide mt-1">{hospitalLine(label)}</div>
                   ) : null}
                   <button
                     className="btn btn-xs mt-2"
@@ -273,6 +272,7 @@ export default function QrLabelPrintModal({
 
 function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
   const headline = zebraHeadline(label);
+  const building = buildingLine(label, headline);
   const hospital = hospitalLine(label);
   const flip = layout === QR_LAYOUTS.zebraFlip;
   const banner = layout === QR_LAYOUTS.zebraBanner;
@@ -293,11 +293,14 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
         />
       ) : null}
       <div className={`flex-1 flex flex-col justify-center pt-2 ${logoSrc ? "pr-6" : ""}`}>
-        <div className="font-extrabold text-lg leading-tight tracking-tight break-words">
+        <div className="font-extrabold text-[15px] leading-tight tracking-tight break-words">
           {headline}
         </div>
+        {building ? (
+          <div className="text-xs font-bold mt-1 break-words">{building}</div>
+        ) : null}
         {hospital ? (
-          <div className="text-[10px] font-bold tracking-wide mt-1.5">
+          <div className="text-lg font-extrabold tracking-wide mt-1.5 leading-tight break-words">
             {hospital}
           </div>
         ) : null}
