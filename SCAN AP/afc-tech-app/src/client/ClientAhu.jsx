@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getClientAhu } from "./api";
 import { prettyDate } from "./format";
+import { isVBankFilter, VBankIcon } from "./filterIcons";
 
 export default function ClientAhu() {
   const { ahuId } = useParams();
@@ -193,6 +194,7 @@ function FilterCard({ filter: f }) {
       ? f.days_overdue ?? "—"
       : f.days_until_due ?? "—";
   const pre = isPrePhase(f.phase);
+  const vbank = isVBankFilter(f.phase);
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-base-100 border border-base-300 shadow-sm">
@@ -200,10 +202,20 @@ function FilterCard({ filter: f }) {
       <div className="p-4 pl-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-bold">{f.phase || "Filter"}</p>
-            <p className="text-sm text-base-content/55 mt-0.5 flex items-center gap-1.5">
-              <GridIcon className="w-3.5 h-3.5 text-base-content/35 shrink-0" />
-              <span>
+            <p className="font-bold flex items-center gap-1.5">
+              {vbank ? <VBankIcon variant="filled" className="w-10 h-10 text-primary shrink-0" /> : null}
+              {f.phase || "Filter"}
+            </p>
+            <p className="text-sm text-base-content/55 mt-0.5 flex items-center gap-1.5 min-w-0">
+              {vbank ? (
+                <>
+                  <span className="shrink-0">v-bank</span>
+                  <VBankIcon variant="outline" className="w-8 h-8 text-primary shrink-0" />
+                </>
+              ) : (
+                <GridIcon className="w-3.5 h-3.5 text-base-content/35 shrink-0" />
+              )}
+              <span className="truncate">
                 {f.size || "—"} · qty {f.quantity ?? "—"}
               </span>
             </p>
