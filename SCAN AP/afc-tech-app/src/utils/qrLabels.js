@@ -276,14 +276,36 @@ export async function applyLogoToLabels(labels, logoDataUrl) {
   return next;
 }
 
-export function zebraHeadline(label) {
-  const name = String(label?.name || "").trim();
+export function ahuNameOnly(label) {
+  let name = String(label?.name || "").trim();
   const building = String(label?.building || "").trim();
-  if (!building) return name;
-  const haystack = name.toLowerCase();
-  const needle = building.toLowerCase();
-  if (haystack.includes(needle)) return name;
-  return name ? `${name} — ${building}` : building;
+  if (building) {
+    const suffix = ` — ${building}`;
+    if (name.toLowerCase().endsWith(suffix.toLowerCase())) {
+      name = name.slice(0, -suffix.length).trim();
+    }
+  }
+  return name;
+}
+
+export function ahuLocationLine(label) {
+  const name = ahuNameOnly(label);
+  const location = String(label?.location || "").trim();
+  if (!location) return name;
+  if (name.toLowerCase().includes(location.toLowerCase())) return name;
+  return name ? `${name} — ${location}` : location;
+}
+
+export function buildingLine(label, headline = "") {
+  const building = String(label?.building || "").trim();
+  if (!building) return "";
+  const hay = String(headline || ahuLocationLine(label)).toLowerCase();
+  if (hay.includes(building.toLowerCase())) return "";
+  return building;
+}
+
+export function zebraHeadline(label) {
+  return ahuLocationLine(label);
 }
 
 export const AFC_COMPANY_NAME = "ADVANCED FILTRATION CONCEPTS";
@@ -311,12 +333,14 @@ export function hospitalLine(label) {
 }
 
 function zebraIdentityHtml(label, { sideLogo = "", footer = true } = {}) {
-  const headline = zebraHeadline(label);
+  const headline = ahuLocationLine(label);
+  const building = buildingLine(label, headline);
   const hospital = hospitalLine(label);
   return `
         ${sideLogo ? `<img class="logo" src="${sideLogo}" alt="AFC" />` : ""}
         <div class="identity">
           <div class="name">${escapeHtml(headline)}</div>
+          ${building ? `<div class="building">${escapeHtml(building)}</div>` : ""}
           ${hospital ? `<div class="hospital">${escapeHtml(hospital)}</div>` : ""}
         </div>
         ${
@@ -333,9 +357,10 @@ function zebraIdentityHtml(label, { sideLogo = "", footer = true } = {}) {
 function labelCardHtml(label, options = {}) {
   const layout = resolveQrLayout(options.layout);
   const sideLogo = usesSideLogo(layout) ? options.sideLogoDataUrl || "" : "";
-  const meta = [label.hospital, label.building].filter(Boolean).join(" · ");
+  const headline = ahuLocationLine(label);
+  const building = buildingLine(label, headline);
+  const hospital = hospitalLine(label);
   if (isZebraLayout(layout)) {
-    const headline = zebraHeadline(label);
     const qr = `<div class="qr-wrap">
         <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(headline)}" />
       </div>`;
@@ -366,10 +391,10 @@ function labelCardHtml(label, options = {}) {
   }
   return `
     <article class="label">
-      <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(label.name)}" />
-      ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
-      <div class="name">${escapeHtml(label.name)}</div>
-      ${label.location ? `<div class="location">${escapeHtml(label.location)}</div>` : ""}
+      <img class="qr" src="${label.qrDataUrl}" alt="QR for ${escapeHtml(headline)}" />
+      <div class="name">${escapeHtml(headline)}</div>
+      ${building ? `<div class="building">${escapeHtml(building)}</div>` : ""}
+      ${hospital ? `<div class="hospital">${escapeHtml(hospital)}</div>` : ""}
     </article>
   `;
 }
@@ -447,6 +472,8 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     }
     .meta { font-size: 11px; color: #444; margin-top: 6px; }
     .name { font-size: 14px; font-weight: 700; margin-top: 4px; }
+    .building { font-size: 12px; margin-top: 2px; }
+    .hospital { font-size: 16px; font-weight: 800; margin-top: 4px; }
     .location { font-size: 12px; margin-top: 2px; }
     .grid.layout-single {
       grid-template-columns: 1fr;
@@ -534,9 +561,16 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       margin: 0;
       overflow-wrap: anywhere;
     }
-    .zebra-page .hospital {
+    .zebra-page .building {
       font-size: 8pt;
       font-weight: 700;
+      letter-spacing: 0.04em;
+      margin: 0.04in 0 0;
+      overflow-wrap: anywhere;
+    }
+    .zebra-page .hospital {
+      font-size: 12pt;
+      font-weight: 800;
       letter-spacing: 0.06em;
       margin: 0.06in 0 0;
       overflow-wrap: anywhere;

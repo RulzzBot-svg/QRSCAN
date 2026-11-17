@@ -4,6 +4,8 @@ import {
   DEFAULT_QR_BASE_URL,
   escapeHtml,
   zebraHeadline,
+  ahuLocationLine,
+  buildingLine,
   hospitalLine,
   isZebraLayout,
   resolveQrLayout,
@@ -37,12 +39,12 @@ const html = buildQrPrintDocument(
 );
 
 assert(html.includes("QR Codes — Foothill"), "title should render");
-assert(html.includes("AHU-01 &lt;test&gt;"), "AHU name should be escaped");
-assert(html.includes("Roof &amp; penthouse"), "location should be escaped");
+assert(html.includes("AHU-01 &lt;test&gt; — Roof &amp; penthouse"), "AHU-LOCATION should be escaped");
 assert(html.includes("data:image/png;base64,AAA"), "QR image should be embedded");
 assert(html.includes("grid-template-columns: repeat(3, 1fr)"), "print sheet should stay 3-up");
 assert(!html.includes("max-width: 800px"), "print sheet should not collapse on a hidden iframe");
-assert(html.includes("Foothill · Main"), "hospital and building should show");
+assert(html.includes(">Main<"), "sheet should print the building");
+assert(html.includes(">FOOTHILL<"), "sheet should print the hospital in bigger type");
 assert(html.includes("layout-sheet"), "default layout should be 3-up sheet");
 assert(!html.includes("ID 7"), "printed labels should not show the internal ID");
 
@@ -97,25 +99,37 @@ assert(zebra.includes("323.832.8316"), "zebra footer should show the company pho
 assert(zebra.includes("data:image/png;base64,LOGO"), "zebra layout should print the corner logo");
 assert(zebra.includes("img class=\"qr\""), "zebra QR should keep a dedicated class");
 assert(zebra.includes("Zebra ZD220"), "zebra hint should mention the printer");
-assert(zebra.includes("AHU-1 — 21 Building"), "zebra headline should keep building already in the AHU name");
-assert(zebra.includes("font-size: 14pt"), "zebra name should use the smaller wrapping type");
+assert(zebra.includes("AHU-1 — 6th Floor"), "zebra headline is AHU then location");
+assert(zebra.includes(">21 Building<"), "zebra prints the building on its own line");
+assert(zebra.includes("font-size: 14pt"), "zebra name keeps the current type");
+assert(zebra.includes("font-size: 12pt"), "zebra hospital name is larger than the old 8pt line");
 assert(!zebra.includes("font-size: 24pt"), "zebra name should no longer be 24pt");
 assert(zebra.includes("zebra-page"), "zebra print CSS should share the 4x2 page class");
 assert(!zebra.includes("ID 128"), "zebra labels should not show the internal ID");
 assert(!zebra.includes("class=\"id\""), "zebra labels should not include an ID row");
-assert(!zebra.includes("6th Floor"), "zebra service layout should not print location");
+assert(zebra.includes("6th Floor"), "zebra labels print the AHU location");
 
 assert(
-  zebraHeadline({ name: "AHU-012", building: "Main" }) === "AHU-012 — Main",
-  "headline is AHU name then this unit's building"
+  ahuLocationLine({ name: "AHU-012", location: "Roof", building: "Main" }) === "AHU-012 — Roof",
+  "headline is AHU name then location"
 );
 assert(
-  zebraHeadline({ name: "AHU-1 — 21 Building", building: "21 Building" }) === "AHU-1 — 21 Building",
-  "stored AHU names that already include the building are left alone"
+  zebraHeadline({ name: "AHU-012", location: "Roof" }) === "AHU-012 — Roof",
+  "zebraHeadline is the AHU-LOCATION line"
 );
 assert(
-  zebraHeadline({ name: "1/SF-1B", building: "Anderson Pavilion" }) === "1/SF-1B — Anderson Pavilion",
-  "CHLA units show AHU then Anderson Pavilion"
+  ahuLocationLine({ name: "AHU-1 — 21 Building", location: "6th Floor", building: "21 Building" }) ===
+    "AHU-1 — 6th Floor",
+  "building is stripped from the stored name so location can sit on the AHU line"
+);
+assert(
+  buildingLine({ name: "AHU-012", location: "Roof", building: "Main" }) === "Main",
+  "building sits on its own line"
+);
+assert(
+  ahuLocationLine({ name: "1/SF-1B", location: "Penthouse", building: "Anderson Pavilion" }) ===
+    "1/SF-1B — Penthouse",
+  "CHLA units show AHU then location"
 );
 assert(hospitalLine({ hospital: "Huntington" }) === "HUNTINGTON", "hospital line is uppercase without brackets");
 assert(hospitalLine({ hospital: "" }) === "", "blank hospital stays off the label");
@@ -145,7 +159,8 @@ const short = buildQrPrintDocument(
   "QR Codes — Foothill",
   { layout: "zebra" }
 );
-assert(short.includes("AHU-012 — Main"), "print HTML headline is AHU then building");
+assert(short.includes(">AHU-012<"), "print HTML headline is the AHU when location is blank");
+assert(short.includes(">Main<"), "print HTML still shows the building");
 assert(short.includes(">FOOTHILL<"), "print HTML hospital line is the hospital name only");
 assert(short.includes("323.832.8316"), "short-name labels should still show the company phone");
 assert(!short.includes("[FOOTHILL]"), "short-name labels should not show a bracketed hospital");
@@ -180,7 +195,8 @@ const mark = buildQrPrintDocument(
 );
 assert(mark.includes("layout-zebra-mark"), "logo-in-QR design should set its layout class");
 assert(mark.includes("size: 4in 2in"), "logo-in-QR design stays 4x2");
-assert(mark.includes("font-size: 14pt"), "logo-in-QR name stays the smaller type");
+assert(mark.includes("font-size: 14pt"), "logo-in-QR name stays the current type");
+assert(mark.includes("1.28in"), "logo-in-QR design still uses the same QR size");
 assert(!mark.includes("img class=\"logo\""), "logo-in-QR design should not also print a corner logo");
 
 const banner = buildQrPrintDocument(
@@ -188,6 +204,7 @@ const banner = buildQrPrintDocument(
     {
       id: 128,
       name: "AHU-1 — 21 Building",
+      location: "6th Floor",
       hospital: "Huntington",
       building: "21 Building",
       url: "https://qrscan-lyart.vercel.app/FilterInfo/128",
@@ -208,7 +225,10 @@ assert(banner.includes("html.print-zebra-banner"), "print page fill is black beh
 assert(banner.includes("1.42in"), "banner QR is large enough for the bigger AFC mark");
 assert(banner.includes("ADVANCED FILTRATION CONCEPTS"), "banner still names the company");
 assert(banner.includes("323.832.8316"), "banner still shows the phone");
-assert(banner.includes("font-size: 14pt"), "banner name stays the smaller type");
+assert(banner.includes("AHU-1 — 6th Floor"), "banner only changes the printed names");
+assert(banner.includes(">21 Building<"), "banner still prints the building");
+assert(banner.includes(">HUNTINGTON<"), "banner still prints the hospital");
+assert(banner.includes("font-size: 14pt"), "banner name stays the current type");
 
 const flip = buildQrPrintDocument(
   [
@@ -227,6 +247,6 @@ const flip = buildQrPrintDocument(
 assert(flip.includes("layout-zebra-flip"), "QR-right design should set its layout class");
 assert(flip.includes("flex-direction: row-reverse"), "QR-right design should flip the row");
 assert(flip.includes("data:image/png;base64,LOGO"), "QR-right design still prints the side mark");
-assert(flip.includes("font-size: 14pt"), "QR-right name stays the smaller type");
+assert(flip.includes("font-size: 14pt"), "QR-right name stays the current type");
 
 console.log("qrLabels tests passed");
