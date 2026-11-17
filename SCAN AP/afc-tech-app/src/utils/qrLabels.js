@@ -472,8 +472,8 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
     }
     .meta { font-size: 11px; color: #444; margin-top: 6px; }
     .name { font-size: 14px; font-weight: 700; margin-top: 4px; }
-    .building { font-size: 12px; font-weight: 700; margin-top: 2px; }
-    .hospital { font-size: 18px; font-weight: 800; letter-spacing: 0.04em; margin-top: 4px; }
+    .building { font-size: 12px; margin-top: 2px; }
+    .hospital { font-size: 16px; font-weight: 800; margin-top: 4px; }
     .location { font-size: 12px; margin-top: 2px; }
     .grid.layout-single {
       grid-template-columns: 1fr;
@@ -554,7 +554,7 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       min-height: 0;
     }
     .zebra-page .name {
-      font-size: 12pt;
+      font-size: 14pt;
       font-weight: 800;
       line-height: 1.1;
       letter-spacing: -0.02em;
@@ -562,18 +562,17 @@ export function buildQrPrintDocument(labels, title = "AHU QR Labels", options = 
       overflow-wrap: anywhere;
     }
     .zebra-page .building {
-      font-size: 9pt;
+      font-size: 8pt;
       font-weight: 700;
-      line-height: 1.15;
+      letter-spacing: 0.04em;
       margin: 0.04in 0 0;
       overflow-wrap: anywhere;
     }
     .zebra-page .hospital {
-      font-size: 14pt;
+      font-size: 12pt;
       font-weight: 800;
-      letter-spacing: 0.04em;
-      line-height: 1.1;
-      margin: 0.05in 0 0;
+      letter-spacing: 0.06em;
+      margin: 0.06in 0 0;
       overflow-wrap: anywhere;
     }
     .zebra-page .footer {

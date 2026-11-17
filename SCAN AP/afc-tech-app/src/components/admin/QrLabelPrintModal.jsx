@@ -244,12 +244,12 @@ export default function QrLabelPrintModal({
                     alt={`QR for ${label.name}`}
                     className="mx-auto w-40 h-40"
                   />
-                  <div className="font-semibold text-sm mt-2">{zebraHeadline(label)}</div>
+                  <div className="font-semibold text-sm mt-1">{zebraHeadline(label)}</div>
                   {buildingLine(label) ? (
-                    <div className="text-xs font-semibold mt-0.5">{buildingLine(label)}</div>
+                    <div className="text-xs mt-0.5">{buildingLine(label)}</div>
                   ) : null}
                   {hospitalLine(label) ? (
-                    <div className="text-base font-extrabold tracking-wide mt-1">{hospitalLine(label)}</div>
+                    <div className="text-sm font-extrabold mt-1">{hospitalLine(label)}</div>
                   ) : null}
                   <button
                     className="btn btn-xs mt-2"
@@ -293,14 +293,14 @@ function ZebraPreviewCard({ label, layout, logoSrc, onPrint }) {
         />
       ) : null}
       <div className={`flex-1 flex flex-col justify-center pt-2 ${logoSrc ? "pr-6" : ""}`}>
-        <div className="font-extrabold text-[15px] leading-tight tracking-tight break-words">
+        <div className="font-extrabold text-lg leading-tight tracking-tight break-words">
           {headline}
         </div>
         {building ? (
-          <div className="text-xs font-bold mt-1 break-words">{building}</div>
+          <div className="text-[10px] font-bold tracking-wide mt-1 break-words">{building}</div>
         ) : null}
         {hospital ? (
-          <div className="text-lg font-extrabold tracking-wide mt-1.5 leading-tight break-words">
+          <div className="text-sm font-extrabold tracking-wide mt-1.5">
             {hospital}
           </div>
         ) : null}
