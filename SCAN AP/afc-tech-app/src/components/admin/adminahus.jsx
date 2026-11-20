@@ -39,10 +39,15 @@ const naturalAhuSort = (a, b) => {
   return A.localeCompare(B, undefined, { numeric: true, sensitivity: "base" });
 };
 
+const AHU_FOCUS_MS = 3000;
+
 function AdminAHUs() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const hospitalFromUrl = searchParams.get("hospital");
   const ahuFromUrl = searchParams.get("ahu");
+  const [focusedAhuId, setFocusedAhuId] = useState(() =>
+    ahuFromUrl ? String(ahuFromUrl) : null
+  );
   const [ahus, setAhus] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -122,14 +127,22 @@ function AdminAHUs() {
   }, [hospitalFromUrl]);
 
   useEffect(() => {
-    if (!ahuFromUrl || !ahus.length) return;
-    const target = ahus.find((a) => String(a.id) === String(ahuFromUrl));
+    if (!focusedAhuId || !ahus.length) return;
+    const target = ahus.find((a) => String(a.id) === String(focusedAhuId));
     if (!target) return;
     if (target.hospital_id != null) {
       setSelectedHospitalKey(String(target.hospital_id));
       setShowAllHospitals(true);
     }
-  }, [ahuFromUrl, ahus]);
+  }, [focusedAhuId, ahus]);
+
+  // Drop `ahu` from the URL so refresh / saves don't keep jumping back to it.
+  useEffect(() => {
+    if (!searchParams.has("ahu")) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("ahu");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // helper to refresh data after mutations
   const refreshData = async () => {
@@ -184,11 +197,11 @@ function AdminAHUs() {
         String(a.excel_block || a.group || a.display_name || "").toLowerCase().includes(q)
       );
     });
-    if (!ahuFromUrl) return list;
-    const hit = list.find((a) => String(a.id) === String(ahuFromUrl));
+    if (!focusedAhuId) return list;
+    const hit = list.find((a) => String(a.id) === String(focusedAhuId));
     if (!hit) return list;
     return [hit, ...list.filter((a) => a !== hit)];
-  }, [ahus, ahuQuery, selectedHospitalKey, ahuFromUrl]);
+  }, [ahus, ahuQuery, selectedHospitalKey, focusedAhuId]);
 
   const selectedAhus = useMemo(
     () => filtered.filter((a) => selected[a.id] || selected[String(a.id)]),
@@ -201,11 +214,16 @@ function AdminAHUs() {
   );
 
   useEffect(() => {
-    if (!ahuFromUrl || loading) return;
-    const el = document.getElementById(`admin-ahu-${ahuFromUrl}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [ahuFromUrl, loading, visibleAhusList]);
+    if (!focusedAhuId || loading) return;
+    const el = document.getElementById(`admin-ahu-${focusedAhuId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusedAhuId, loading, visibleAhusList]);
+
+  useEffect(() => {
+    if (!focusedAhuId || loading) return;
+    const t = window.setTimeout(() => setFocusedAhuId(null), AHU_FOCUS_MS);
+    return () => window.clearTimeout(t);
+  }, [focusedAhuId, loading]);
 
   const selectedHospitalName = useMemo(
     () => grouped.find((g) => String(g.hospitalKey) === String(selectedHospitalKey))?.hospitalName || "",
@@ -775,7 +793,7 @@ function AdminAHUs() {
                 </div>
               ) : null}
               {visibleAhusList.map((a) => {
-                const focused = ahuFromUrl && String(a.id) === String(ahuFromUrl);
+                const focused = focusedAhuId && String(a.id) === String(focusedAhuId);
                 return (
                   <div
                     key={`${a.id}-${filtersReloadToken}`}
