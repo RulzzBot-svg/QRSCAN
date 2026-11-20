@@ -13,6 +13,11 @@ const ahus = readFileSync(new URL("../src/components/admin/adminahus.jsx", impor
 assert(ahus.includes(">Surveys<"), "Surveys page title");
 assert(ahus.includes('searchParams.get("ahu")'), "Surveys tab reads ahu from the URL");
 assert(ahus.includes("admin-ahu-"), "focused AHU from a job gets an anchor");
+assert(ahus.includes("AHU_FOCUS_MS"), "job deep-link highlight is timed");
+assert(/AHU_FOCUS_MS\s*=\s*3000/.test(ahus), "highlight lasts about 3 seconds");
+assert(ahus.includes('next.delete("ahu")'), "ahu is dropped from the URL after focusing");
+assert(ahus.includes("setFocusedAhuId(null)"), "highlight clears instead of staying selected");
+assert(ahus.includes("{ replace: true }"), "URL cleanup does not add a history entry");
 assert(!ahus.includes("= past due"), "color legend copy is gone");
 assert(!ahus.includes("= within 14 days"), "due-soon legend is gone");
 assert(!ahus.includes("= 18 Months"), "540-day legend is gone");
